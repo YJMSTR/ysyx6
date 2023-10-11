@@ -30,10 +30,13 @@ build:
 	@mkdir -p bin
 
 
-$(TESTS): $(TARGET) $(SO_TARGET)
+$(TESTS): $(TARGET) $(SO_TARGET) $(TEST_SRC)
 	@echo building TESTS, TEST_SRC=:$(TEST_SRC)
-	
-	$(CC) $(CFLAGS) $(TEST_SRC) $(TARGET) -o $@	
+	@echo TESTS=$(TESTS)
+	@for x in $(TESTS); do\
+		echo x=$$x;\
+		$(CC) $(CFLAGS) $$x.c $(TARGET) -o $$x;\
+	done
 
 .PHONY: tests 
 tests: $(TESTS)
