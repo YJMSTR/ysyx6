@@ -33,5 +33,5 @@ clean:
 sim:
 	$(call git_commit, "sim RTL") # DO NOT REMOVE THIS LINE!!!
 	@echo "Write this Makefile by yourself."
-
+	verilator --cc --exe --trace --build sim_main.cpp build/TOP.v
 -include ../Makefile
