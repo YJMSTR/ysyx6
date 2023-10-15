@@ -30,8 +30,8 @@ clean:
 
 .PHONY: test verilog help compile bsp reformat checkformat clean
 
-sim:
+sim: verilog
 	$(call git_commit, "sim RTL") # DO NOT REMOVE THIS LINE!!!
-	@echo "Write this Makefile by yourself."
 	verilator --cc --exe --trace --build sim_main.cpp build/TOP.v
+
 -include ../Makefile
