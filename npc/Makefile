@@ -1,13 +1,39 @@
 BUILD_DIR = ./build
+OBJ_DIR = $(BUILD_DIR)/obj_dir
+BIN = $(BUILD_DIR)/$(TOPNAME)
+NXDC_FILES = constr/top.nxdc
+TOPNAME = Top
 
 export PATH := $(PATH):$(abspath ./utils)
+
+VERILATOR = verilator
+VERILATOR_CFLAGS += -MMD --build -cc  \
+				-O3 --x-assign fast --x-initial fast --noassert
+
+$(shell mkdir -p $(BUILD_DIR))
+
+# constraint file
+SRC_AUTO_BIND = $(abspath $(BUILD_DIR)/auto_bind.cpp)
+$(SRC_AUTO_BIND): $(NXDC_FILES)
+	python3 $(NVBOARD_HOME)/scripts/auto_pin_bind.py $^ $@
+
+# project source
+VSRCS = $(shell find $(BUILD_DIR) -name "*.v")
+CSRCS = $(shell find $(abspath ./) -name "*.c" -or -name "*.cc" -or -name "*.cpp")
+CSRCS += $(SRC_AUTO_BIND)
+
+# rules for NVBoard
+include $(NVBOARD_HOME)/scripts/nvboard.mk
+
+# rules for verilator
+INCFLAGS = $(addprefix -I, $(INC_PATH))
+CXXFLAGS += $(INCFLAGS) -DTOP_NAME="\"V$(TOPNAME)\""
 
 test:
 	mill -i __.test
 
 verilog:
 	$(call git_commit, "generate verilog")
-	mkdir -p $(BUILD_DIR)
 	mill -i __.test.runMain Elaborate -td $(BUILD_DIR)
 
 help:
@@ -30,8 +56,14 @@ clean:
 
 .PHONY: test verilog help compile bsp reformat checkformat clean
 
-sim: verilog
+sim: $(VSRCS) $(CSRCS) $(NVBOARD_ARCHIVE) verilog
 	$(call git_commit, "sim RTL") # DO NOT REMOVE THIS LINE!!!
-	verilator --cc --exe --trace --build sim_main.cpp build/TOP.v
+	$(VERILATOR) $(VERILATOR_CFLAGS) \
+	--top-module $(TOPNAME) $(VSRCS) $(CSRCS) $(NVBOARD_ARCHIVE) \
+	$(addprefix -CFLAGS , $(CXXFLAGS)) $(addprefix -LDFLAGS , $(LDFLAGS)) \
+	--Mdir $(OBJ_DIR) --exe -o $(abspath $(BIN))
+
+run: sim
+	@$(BIN)
 
 -include ../Makefile

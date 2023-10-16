@@ -1,7 +1,7 @@
 import chisel3._
 
 
-class TOP extends Module {
+class Top extends Module {
   val io = IO(new Bundle {
   val a  = Input(Bool())
   val b  = Input(Bool())
