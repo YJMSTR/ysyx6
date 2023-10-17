@@ -1,13 +1,14 @@
 #include "VTop.h"
 // #include "verilated_vcd_c.h"
 #include <nvboard.h>
-
+#include <unistd.h>
 static TOP_NAME top;
 
 void nvboard_bind_all_pins(VTop *top);
 
 static void single_cycle() {
 	top.clock = 0; top.eval();
+  //sleep(1);
   top.clock = 1; top.eval();
 }
 
@@ -27,7 +28,7 @@ int main(int argc, char** argv) {
 	nvboard_bind_all_pins(&top);
 	nvboard_init();
 
-	reset(10);
+	reset(5);
 
   while (1) {
     nvboard_update();
