@@ -56,14 +56,14 @@ clean:
 
 .PHONY: test verilog help compile bsp reformat checkformat clean
 
-sim: $(VSRCS) $(CSRCS) $(NVBOARD_ARCHIVE) verilog
+sim: $(VSRCS) $(CSRCS) $(NVBOARD_ARCHIVE) 
 	$(call git_commit, "sim RTL") # DO NOT REMOVE THIS LINE!!!
 	$(VERILATOR) $(VERILATOR_CFLAGS) \
 	--top-module $(TOPNAME) $(VSRCS) $(CSRCS) $(NVBOARD_ARCHIVE) \
 	$(addprefix -CFLAGS , $(CXXFLAGS)) $(addprefix -LDFLAGS , $(LDFLAGS)) \
 	--Mdir $(OBJ_DIR) --exe -o $(abspath $(BIN))
 
-run: sim
+run: 
 	@$(BIN)
 
 -include ../Makefile
