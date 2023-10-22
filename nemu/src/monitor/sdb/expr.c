@@ -22,9 +22,16 @@
 
 enum {
   TK_NOTYPE = 256, TK_EQ,
-
   /* TODO: Add more token types */
-
+  // 我们先来处理一种简单的情况 -- 算术表达式, 
+  // 即待求值表达式中只允许出现以下的token类型:十进制数，加减乘除，括号，空格串
+  TK_NUM = '0',
+  TK_PLUS = '+',
+  TK_SUB = '-',
+  TK_MUL = '*',
+  TK_DIV = '/', 
+  TK_LPAR = '(',
+  TK_RPAR = ')',
 };
 
 static struct rule {
@@ -39,6 +46,12 @@ static struct rule {
   {" +", TK_NOTYPE},    // spaces
   {"\\+", '+'},         // plus
   {"==", TK_EQ},        // equal
+  {"\\-", TK_SUB},      // minus
+  {"\\*", TK_MUL},      // multi
+  {"/", TK_DIV},        // div
+  {"\\(", TK_LPAR},    
+  {"\\)", TK_RPAR},   
+  {"[0-9]+", TK_NUM},     // 十进制数
 };
 
 #define NR_REGEX ARRLEN(rules)
@@ -95,9 +108,19 @@ static bool make_token(char *e) {
          */
 
         switch (rules[i].token_type) {
-          default: TODO();
+          case TK_NOTYPE:
+            continue;
+          default: 
+            tokens[nr_token].type = rules[i].token_type;
         }
-
+        if (substr_len >= 32) {
+          // 缓冲区会溢出
+          Log("regex token str too long, err");
+          return false;
+        }
+        memset (tokens[i].str, '\0', sizeof(tokens[nr_token].str));
+        strcpy (tokens[nr_token].str, substr_start);
+        nr_token++;
         break;
       }
     }

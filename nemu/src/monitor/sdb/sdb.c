@@ -97,6 +97,13 @@ static int cmd_x(char *args) {
   return 0;
 }
 
+static int cmd_p(char *args) {
+  bool ret = 1;
+  uint32_t res = expr(args, &ret);
+  printf("%u\n", res);
+  return !ret;
+}
+
 static int cmd_help(char *args);
 
 static struct {
@@ -110,6 +117,7 @@ static struct {
   { "si", "Single step", cmd_si}, 
   { "info", "Print program status", cmd_info},
   { "x", "Print memory status", cmd_x},
+  { "p", "expr", cmd_p},
   /* TODO: Add more commands */
 
 };
