@@ -8,6 +8,7 @@
 !/npc/*
 !Makefile
 !README.md
+!record.md
 !.gitignore
 !init.sh
 !/learn_c_the_hard_way/*

@@ -1,0 +1,386 @@
+# 第六期一生一芯实验记录
+
+之前做过第四期一生一芯，完成到 PA2.3 和数电实验，单周期刚开始写。
+
+第六期预学习的流程发生了一些变化，重走一遍流程
+
+## PA0
+
+安装了一个全新的 Ubuntu 22.04.3, 不过太新了，装 PA0 里那些软件包的时候满足不了依赖关系，通过 aptitude 降级了一些软件才解决。
+
+Ubuntu 22.04.3 刚装好时不能关机和重启，会卡在 logo，STFW 得知是 NVIDIA 显卡驱动问题，装完驱动解决。
+
+之前做 ysyx 的时候只把 pa2 分支传到了自己的 GitHub 上，这次把所有分支都传上去了，方便恢复。
+
+在 NEMU 里键入 q 退出时报错：`make: *** [/home/yjmstr/ysyx-workbench/nemu/scripts/native.mk:38: run] Error 1, 原因不明`。
+
+## 复习 C 语言
+
+预学习答辩需要完成 C 语言入门必做题。大部分内容之前都学过了，这里仅记录新学到的东西
+
+### ex4
+
+Valgrind 第一次用
+
+### ex16
+
+strdup 返回指向参数字符串副本的指针，它的行为类似 malloc ，但会复制字符串到新创建的内存
+
+附加题：将程序改成不用指针和 malloc 的版本。
+
+```c
+#include <stdio.h>
+#include <assert.h>
+#include <stdlib.h>
+#include <string.h>
+
+struct Person {
+	char *name;
+	int age;
+	int height;
+	int weight;
+};
+
+struct Person Person_create(char *name, int age, int height, int weight)
+{
+	struct Person who;
+
+	who.name = strdup(name);
+	who.age = age;
+	who.height = height;
+	who.weight = weight;
+
+	return who;
+}
+
+
+
+void Person_print(struct Person who)
+{
+	printf("Name: %s\n", who.name);
+	printf("\tAge: %d\n", who.age);
+	printf("\tHeight: %d\n", who.height);
+	printf("\tWeight: %d\n", who.weight);
+}
+
+int main(int argc, char *argv[])
+{
+	struct Person joe = Person_create(
+			"Joe Alex", 32, 64, 140);
+
+	struct Person frank = Person_create(
+			"Frank Blank", 20, 72, 180);
+
+	printf("Joe is at memory location %p:\n", &joe);
+	Person_print(joe);
+
+	printf("Frank is at memory location %p:\n", &frank);
+	Person_print(frank);
+
+
+	joe.age += 20;
+	joe.height -= 2;
+	joe.weight += 40;
+       	Person_print(joe);
+	frank.age += 20;
+	frank.weight += 20;
+	Person_print(frank);
+	// destroy them both so we clean up
+        free(joe.name);
+	free(frank.name);
+	return 0;
+}
+```
+
+不想显示释放内存的话，可以使用 libGC 库中的 GC_malloc，然后把所有的 free 删掉
+
+### ex17
+
+strncpy 的缺陷：n 大于源串长度时，遇到 '\0' 结束，但小于源串长度时到第n个字符结束，不会在末尾补'\0'
+
+附加题2：把结构体里的定长数组改成指针，读入参数后用 malloc 进行分配。
+Database_load 与 Database_store 函数也要进行对应的修改，原先 load 函数从文件中读入 Database 结构体到 conn->db 当中，现在要在读入时分配内存。
+
+附加题3：strcmp
+
+附加题4：可以用 sizeof 来计算结构体的大小，结构体包含多种类型成员时，会进行对齐，最终的大小和对齐规则有关。成员变量需要满足 `offset mod size == 0`;
+
+附加题6：编写 shell 脚本如下：
+
+```shell
+#!/bin/bash
+set -e
+make ex17
+./ex17 db.dat 512 100 c
+./ex17 db.dat 512 100 s 1 zed zed@zed.com
+./ex17 db.dat 512 100 s 2 frank frank@frank.com
+./ex17 db.dat 512 100 s 3 joe joe@joe.com
+
+./ex17 db.dat 512 100 l
+./ex17 db.dat 512 100 d 3 
+
+./ex17 db.dat 512 100 l
+./ex17 db.dat 512 100 g 2
+
+```
+
+### ex20
+
+C 语言使用错误码或 errno 来处理错误。本教程提供了调试宏
+
+### ex28
+
+后面的实验要用到代码框架，ex28-ex31 会逐步构建出这个框架
+
+此外 ex28 用到了 ex20 的 dbg.h
+
+第三行 PREFIX?= xxx 在没有 PREFIX 设置的平台上运行 Makefile 时有效
+
+Makefile 规则中通配符会自动展开，但在定义变量和函数引用时通配符会失效，这种时候需要使用 wildcard 来让通配符有效。
+
+patsubst 是模式串替换函数，例如可以用于替换 .c 后缀为 .o 后缀
+
+### ex29
+
+修改 Makefile 和 ex29_tests.c ，把 argv 去掉，并修改路径即可。
+
+### ex32
+
+实验时出现了找不到函数定义的问题，看预学习微信群得知是动态链接的问题, 但我用他提供的 Makefile 加载静态库也有问题。
+
+ex29 提到了 ubuntu 下动态链接需要注意 -ldl 参数的顺序，不然会导致找不到函数。
+
+静态库使用 ar 进行打包，r 选项用于将后面的文件列表添加到文件包。r 选项改成 rs 表示生成静态库，为静态库创建索引。也可以直接 ar r 然后 ranlib 来为静态库创建索引。但教程中不仅 ar rcs 还 ranlib 了，意义不明
+
+编译时用 -Lxx 选项告诉编译器去 xx 目录下找库，-lxx 告诉编译器要链接什么库，-Ixx 告诉编译器去 xx 目录下找头文件。
+
+区别于静态库，共享库在运行时才会真正被链接。
+
+一般的目标文件称为 Relocatable，在链接时可以把目标文件中各段的地址做重定位，重定位时需要修改指令。
+
+list_tests.c 找不到 list.c 中定义的函数。list.c -> list.o -> liblcthw.a，随后 liblcthw.a 提供给 list_tests.c 来生成 list_tests
+
+手动加载静态库可以成功通过测试，所使用的命令如下：
+
+```sh
+mkdir -p build
+ar rs build/liblcthw.a src/lcthw/list.o
+ranlib build/liblcthw.a
+cc $CFLAGS tests/list_tests.c build/liblcthw.a -o tests/list_tests
+sh tests/runtests.sh
+```
+
+手动加载动态库也可以成功编译通过测试，所使用的命令如下：
+
+```sh
+mkdir -p build
+ar rs build/liblcthw.a src/lcthw/list.o
+ranlib build/liblcthw.a 
+cc -shared -o build/liblcthw.so src/lcthw/list.o
+cc $CFLAGS tests/list_tests.c build/liblcthw.so -o tests/list_tests
+sh tests/runtests.sh
+```
+
+说明是 Makefile 写得有问题
+
+注意到 Makefile 中每一个目标的规则中都没有编译命令，那终端中出现的 cc 命令是哪来的呢？原来这是 Makefile 的隐藏规则，如果一个目标在 Makefile 中的所有规则都没有命令列表，make 会尝试在内建的隐含规则数据库中查找适用的规则。make 的隐含规则数据库可以用 make -p 打印。
+
+我们可以改成使用上面能够成功编译的规则，向 Makefile 中添加一个目标 `$TESTS` 及其对应的规则如下，并对 tests 进行修改，去掉其对 CFLAGS 的修改：
+
+```Makefile
+
+$(TESTS): $(TARGET) $(SO_TARGET)
+	@echo building TESTS, TEST_SRC=:$(TEST_SRC)
+
+	$(CC) $(CFLAGS) $(TEST_SRC) $(TARGET) -o $@
+
+.PHONY: tests 
+tests: $(TESTS)
+	@echo TARGET=$(TARGET)
+	sh ./tests/runtests.sh
+
+```
+
+如果要用动态库，就把 `$TARGET` 改为 `$SO_TARGET` 即可。
+
+附加题：咕咕咕
+
+### ex33
+
+从测例可以看出要实现的函数为 `int List_bubble_sort()` 和 `List* List_merge_sort()`
+
+写完以后 make 的时候出错了，报错 main 和 all_tests 多次定义。查看 Makefile 的输出发现在编译 list_algos_tests 时把 list.c 也给输入进来了。修改 Makefile, 用 for 循环遍历 tests 目录下的 c 文件，依次编译出对应的文件。
+
+附加题让 man 3 time 查询基本的时间函数，但 man 3 time 提示不存在该条目，应该 man 2 time。
+
+原始数据就 5 个字符串，太小了，测时间的时候两个排序各跑了 5000000 次，冒泡 1s，归并跑了 7s. 可能是因为归并排序每次划分 left 和 right 时需要从链表头部遍历一次链表导致的，如果用数组的话直接按下标划分即可。
+
+### ex42
+
+Makefile 里 TESTS 目标漏了 `TEST_SRC` 依赖，补上以后 ok
+
+本题化身宏孩儿就行
+
+附加题提到了 DArray，没听说过这是什么，往前翻 ex34 找到了相关的内容，原来是指动态数组。
+
+### ex44
+
+要用到 ex36 的 bstrlib 库，按照 ex36 的文档获取源文件后还没有编写 bstring 的单元测试
+
+附加题给的 wiki 链接点开没有 POSIX 的优化实现，切换到中文页面的话只有代码没有解释。英文页面的解释大意如下：
+
+> 可以把缓冲区映射到虚拟内存中的两块连续区域上（底层缓冲区的长度必须等于系统页面大小的倍数），对环形缓冲区的读写可以通过内存访问变得更加高效。
+
+大致思想是断环成链
+
+mkstemp() 用于生成独特的临时文件名，传入的参数是文件名的模板，末6个字符必须是 XXXXXX，然后他们会被替换为一个独特的字符串。
+
+unlink() 移除指定的文件
+
+ftruncate() 会将指定文件扩大/裁减到指定大小。扩大时用 '\0' 填充
+
+mmap() 在虚拟内存中创建映射, 新映射的起始地址为 addr，映射的长度由 length 参数指定。当 addr 为 NULL，内核会选取页面对齐地址来创建映射，否则 addr 会作为内核选择映射起始地址的依据（但可能不是最终的起始地址）。
+
+## 搭建 Verilator 仿真环境
+
+verilog 的第四期搭过了，这次搭 chisel 的。对照 npc 目录下的 readme 进行配置。
+
+前面双控开关啥的直接参考上次的实验报告即可。
+
+make 时报错找不到 type Tests，看微信群和 mill 的 changelog 得知是 Tests 这个 trait 要被弃用了，应该改用 ScalaTests 作为替代。
+
+### 一键仿真
+
+按照模板用 chisel 实现了双控开关，并用 verilator 进行仿真。makefile 中代码如下：
+
+```makefile
+sim: verilog
+	$(call git_commit, "sim RTL") # DO NOT REMOVE THIS LINE!!!
+	verilator --cc --exe --trace --build sim_main.cpp build/TOP.v
+```
+
+去掉了 -Wall 选项，因为生成的 verilog 代码的 clock 和 reset 置空了，会报错，之后看情况加回来。
+
+playground/src 目录下包含 Elaborate.scala 和 TOP.scala 两个文件，平常改 TOP 和外面的 sim_main 就行，Elaborate 不用动。test 目录目前清空了，之后深入学习 chisel 之后再补上。
+
+### 接入 nvboard
+
+对着 example 的 makefile 改了改，现在 make run 即可自动 make verilog 随后 make sim，然后执行编译出的可执行文件。
+
+todo：在 makefile 里控制是否生成波形图
+
+```makefile
+BUILD_DIR = ./build
+OBJ_DIR = $(BUILD_DIR)/obj_dir
+BIN = $(BUILD_DIR)/$(TOPNAME)
+NXDC_FILES = constr/top.nxdc
+TOPNAME = Top
+
+export PATH := $(PATH):$(abspath ./utils)
+
+VERILATOR = verilator
+VERILATOR_CFLAGS += -MMD --build -cc  \
+				-O3 --x-assign fast --x-initial fast --noassert
+
+$(shell mkdir -p $(BUILD_DIR))
+
+# constraint file
+SRC_AUTO_BIND = $(abspath $(BUILD_DIR)/auto_bind.cpp)
+$(SRC_AUTO_BIND): $(NXDC_FILES)
+	python3 $(NVBOARD_HOME)/scripts/auto_pin_bind.py $^ $@
+
+# project source
+VSRCS = $(shell find $(BUILD_DIR) -name "*.v")
+CSRCS = $(shell find $(abspath ./) -name "*.c" -or -name "*.cc" -or -name "*.cpp")
+CSRCS += $(SRC_AUTO_BIND)
+
+# rules for NVBoard
+include $(NVBOARD_HOME)/scripts/nvboard.mk
+
+# rules for verilator
+INCFLAGS = $(addprefix -I, $(INC_PATH))
+CXXFLAGS += $(INCFLAGS) -DTOP_NAME="\"V$(TOPNAME)\""
+
+test:
+	mill -i __.test
+
+verilog:
+	$(call git_commit, "generate verilog")
+	mill -i __.test.runMain Elaborate -td $(BUILD_DIR)
+
+help:
+	mill -i __.test.runMain Elaborate --help
+
+compile:
+	mill -i __.compile
+
+bsp:
+	mill -i mill.bsp.BSP/install
+
+reformat:
+	mill -i __.reformat
+
+checkformat:
+	mill -i __.checkFormat
+
+clean:
+	-rm -rf $(BUILD_DIR)
+
+.PHONY: test verilog help compile bsp reformat checkformat clean
+
+sim: $(VSRCS) $(CSRCS) $(NVBOARD_ARCHIVE) verilog
+	$(call git_commit, "sim RTL") # DO NOT REMOVE THIS LINE!!!
+	$(VERILATOR) $(VERILATOR_CFLAGS) \
+	--top-module $(TOPNAME) $(VSRCS) $(CSRCS) $(NVBOARD_ARCHIVE) \
+	$(addprefix -CFLAGS , $(CXXFLAGS)) $(addprefix -LDFLAGS , $(LDFLAGS)) \
+	--Mdir $(OBJ_DIR) --exe -o $(abspath $(BIN))
+
+run: sim
+	@$(BIN)
+
+-include ../Makefile
+```
+
+但目前有个问题，如果先 make verilog 再 make run 会报错。
+
+### 流水灯
+
+继承自 Module 类的模块会获得隐式的全局时钟和同步复位信号，如果继承自 RawModule，就不会有这两个信号。也可以用 withClock 等对象创建单独的时钟域和复位域。
+
+使用 RegInit，即可在每次 reset 时初始化寄存器，无需显式判断 reset 的值。
+
+```scala
+import chisel3._
+import chisel3.util._
+
+class Top extends Module {
+  val io = IO(new Bundle {
+    // val clk = Input(Clock())
+    // val rst = Input(Bool())
+    val led  = Output(UInt(16.W))
+  })
+  val count = RegInit(0.U(32.W))
+  val led = RegInit(1.U(16.W))
+
+  when(count === 0.U) {
+    led := Cat(led(14, 0), led(15))
+  }
+  count := Mux(count >= 5000000.U, 0.U, count+1.U)
+
+  io.led := led
+}
+```
+
+流水灯接入nvboard 改引脚绑定就行，然后make run
+
+## 数电实验
+
+### 7. ps2键盘
+
+键盘和第四期中数电实验有所不同，新加入了 FIFO 队列，需要处理一下 ready和nextdata_n 信号。
+
+只有当 ready 信号为 1 时（队列非空），接收模块才能从键盘控制器读取数据。每当读取完毕一次数据，就要将 nextdata_n 置 0 一个周期，
+
+已有的键盘模块verilog代码可以通过chisel的blackbox连进chisel。编译的时候chisel生成的 verilog代码中会多出来一行黑盒连接的verilog的文件名，很奇怪。
+
+还是用第四期做键盘的方法，在键盘控制器模块添加一个 kbd_clk 时钟，当键盘每次收到一个帧就将其置为高电平，否则为低电平。在 chisel 顶层模块使用 withClock(kbd_clk) 将 keycount 和 lastdata 包进去，lastdata 记录最近收到的 3 帧的内容，keycount 记录按键数。ascii 的转换偷懒只写了数字键的，其它建直接输出键码。nextdata 每个周期和自己取反。
