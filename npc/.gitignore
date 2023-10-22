@@ -12,6 +12,7 @@
 !.scalafmt.conf
 !build.sc
 !README.md
+!record.md
 build/
 
 # mill
