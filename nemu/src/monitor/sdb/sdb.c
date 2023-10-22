@@ -17,8 +17,10 @@
 #include <cpu/cpu.h>
 #include <readline/readline.h>
 #include <readline/history.h>
+#include <memory/vaddr.h>
 #include "sdb.h"
 
+extern NEMUState nemu_state;
 static int is_batch_mode = false;
 
 void init_regex();
@@ -49,7 +51,50 @@ static int cmd_c(char *args) {
 
 
 static int cmd_q(char *args) {
+  nemu_state.state = NEMU_QUIT;
   return -1;
+}
+
+static int cmd_si(char *args) {
+  if (args == NULL) {
+    cpu_exec(1);
+    return 0;
+  }
+  int s = atoi(args);
+  cpu_exec(s);
+  return 0;
+}
+
+static int cmd_info(char *args) {
+  if (args != NULL) {
+    if (strcmp(args, "r") == 0) {
+      isa_reg_display();
+    } 
+    if (strcmp(args, "w") == 0) {
+      //wp_print();
+    }
+  }
+  return 0;
+}
+
+static int cmd_x(char *args) {
+  // little-endian
+  // usage：x $count $expr
+  // expr 必须是 0x 开头的16进制数
+  uint32_t addr = 0;
+  char *arg = strtok(args, " ");
+  assert(arg);
+  int count = atoi(arg);
+  char *arg2 = arg + strlen(arg) + 1;
+  sscanf(arg2, "%x", &addr);
+  for (uint32_t i = 0; i < count; i++) {
+    printf("0x%08x: 0x%08x , ", addr + i * 4, vaddr_read(addr+i*4, 4));
+    for (uint32_t j = 0; j < 4; j++) {
+      printf("%02x ", vaddr_read(addr + i*4+j, 1));
+    }
+    printf("\n");
+  }
+  return 0;
 }
 
 static int cmd_help(char *args);
@@ -62,7 +107,9 @@ static struct {
   { "help", "Display information about all supported commands", cmd_help },
   { "c", "Continue the execution of the program", cmd_c },
   { "q", "Exit NEMU", cmd_q },
-
+  { "si", "Single step", cmd_si}, 
+  { "info", "Print program status", cmd_info},
+  { "x", "Print memory status", cmd_x},
   /* TODO: Add more commands */
 
 };
@@ -127,7 +174,7 @@ void sdb_mainloop() {
       if (strcmp(cmd, cmd_table[i].name) == 0) {
         if (cmd_table[i].handler(args) < 0) { return; }
         break;
-      }
+      } 
     }
 
     if (i == NR_CMD) { printf("Unknown command '%s'\n", cmd); }
