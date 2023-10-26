@@ -19,7 +19,7 @@ void init_monitor(int, char *[]);
 void am_init_monitor();
 void engine_start();
 int is_exit_status_bad();
-
+extern word_t expr(char *e, bool *success);
 int main(int argc, char *argv[]) {
   /* Initialize the monitor. */
 #ifdef CONFIG_TARGET_AM
@@ -30,6 +30,14 @@ int main(int argc, char *argv[]) {
 
   /* Start engine. */
   engine_start();
-
+  // char args[65536];
+  // uint32_t res = 0;
+  // bool ok = 0;
+  // Assert(freopen("$NEMU_HOME/input", "r", stdin) == 0, "failed to freopen");
+  // while (scanf("%s %u", args, &res) == 1) {
+  //   Assert(expr(args, &ok) == res, "fail expr test");
+  // }
+  // Log("pass all tests");
+  // return 0;
   return is_exit_status_bad();
 }

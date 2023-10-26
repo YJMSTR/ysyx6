@@ -29,7 +29,7 @@ enum {
   TK_PLUS = '+',
   TK_SUB = '-',
   TK_MUL = '*',
-  TK_DIV = '/', 
+  TK_DIV = '/',
   TK_LPAR = '(',
   TK_RPAR = ')',
 };
@@ -79,8 +79,10 @@ typedef struct token {
   int type;
   char str[32];
 } Token;
-
-static Token tokens[32] __attribute__((used)) = {};
+// 为了支持负数扩容到64，因为填充的0要占token
+// 默认负数前面有括号，除非负号是 token 0
+// 测试表达式求值，将其改成65536
+static Token tokens[65536] __attribute__((used)) = {};
 static int nr_token __attribute__((used))  = 0;
 
 static bool make_token(char *e) {
@@ -118,8 +120,9 @@ static bool make_token(char *e) {
           Log("regex token str too long, err");
           return false;
         }
-        memset (tokens[i].str, '\0', sizeof(tokens[nr_token].str));
-        strcpy (tokens[nr_token].str, substr_start);
+        memset (tokens[nr_token].str, '\0', sizeof(tokens[nr_token].str));
+        strncpy (tokens[nr_token].str, substr_start, substr_len);
+        tokens[nr_token].str[substr_len] = '\0';
         nr_token++;
         break;
       }
@@ -130,10 +133,105 @@ static bool make_token(char *e) {
       return false;
     }
   }
-
+  Token real_tokens[65536];
+  int real_nr_token = 0;
+  for (int i = 0; i < nr_token; i++) {
+    if (tokens[i].type == '-') {
+      if (i == 0 || tokens[i-1].type == '(') {
+        memset(real_tokens[real_nr_token].str, '\0', sizeof(real_tokens[real_nr_token].str));
+        real_tokens[real_nr_token].str[0] = '0';
+        real_tokens[real_nr_token++].type = TK_NUM;
+      } 
+    }
+    // real_tokens[real_nr_token].type = tokens[i].type;
+    // strcpy(real_tokens[real_nr_token].str, tokens[i].str);
+    real_tokens[real_nr_token] = tokens[i];
+    //Log("tokens[%d].str = %s, real_tokens[%d].str = %s", i, tokens[i].str, real_nr_token, real_tokens[real_nr_token].str);
+    real_nr_token++;
+  }
+  for (int i = 0; i < real_nr_token; i++) {
+    tokens[i] = real_tokens[i];
+    Log("real_tokens[%d].type=%d str=%s\n", i, tokens[i].type, tokens[i].str);
+  }
+  nr_token = real_nr_token;
   return true;
 }
 
+bool check_parentheses_match(int p, int q) {
+	if (p > q) return true;
+	int s = 0;
+	for (int i = p; i <= q; i++) {
+		if (tokens[i].type == '(') s++;
+		else if (tokens[i].type == ')') s--;
+		if (s < 0) return false;
+	}
+  //Log("check parentheses match (%d %d) = %d", p, q, s == 0);
+	return (s == 0);
+}
+
+
+bool check_parentheses(int p, int q) {
+  bool res = tokens[p].type == '(' 
+	&& tokens[q].type == ')' 
+	&& check_parentheses_match(p+1, q-1);	//中间得是合法括号序列
+  //Log("check parentheses (%d %d) = %d", p, q, res);
+	return res;
+}
+
+word_t eval(int p, int q) {
+  Log("eval %d %d", p, q);
+  if (p > q) {
+    Log("Bad expression, p > q");
+    return -1;
+  } else if (p == q) {
+    Assert(tokens[p].type == TK_NUM , "illegal expr");  
+    return (word_t)atoi(tokens[p].str);
+  } else if (check_parentheses(p, q) == true) {
+    return eval(p + 1, q - 1);
+  } else {
+    int op = -1;
+    int sump = 0;
+    for (int i = p; i <= q; i++) {
+      switch(tokens[i].type) {
+        case '+':
+        case '-':
+          if (sump == 0)
+            op = i;
+          break;
+        case '*':
+        case '/':
+          if (sump == 0)
+            op = i;
+          break;
+        case '(':
+          sump++;
+          break;
+        case ')':
+          sump--;
+          break;
+        case TK_NUM:
+        case TK_NOTYPE:
+          continue;
+        default:
+          Assert(0, "op token type unsupport, token[%d].type=%d str=%s,p=%d,q=%d", i, tokens[i].type,tokens[i].str, p, q);
+      }
+    }
+    if (op == -1) {
+      Log("op == -1, p == %d, q == %d", p, q);
+      return -1;
+    }
+    word_t val1 = eval(p, op-1);
+    word_t val2 = eval(op+1, q);
+
+    switch (tokens[op].type) {
+      case '+': return val1 + val2;
+      case '-': return val1 - val2;
+      case '*': return val1 * val2;
+      case '/': return val1 / val2;
+      default: Assert(0, "token unsupport");
+    }
+  }
+}
 
 word_t expr(char *e, bool *success) {
   if (!make_token(e)) {
@@ -142,7 +240,7 @@ word_t expr(char *e, bool *success) {
   }
 
   /* TODO: Insert codes to evaluate the expression. */
-  TODO();
-
-  return 0;
+  word_t val = eval(0, nr_token-1);
+  *success = true;
+  return val;
 }

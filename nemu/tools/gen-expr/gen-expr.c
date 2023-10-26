@@ -59,14 +59,14 @@ static void gen_num() {
 	}
 	if (i==0) {
 		buf[buf_pointer++] = '0';
-		gen('u');
+		//gen('u');
 		buf[buf_pointer] = '\0';
 		return;
 	}
 	while (i) {
 		buf[buf_pointer++] = tmp_stk[i--]+'0';
 	}
-  gen('u'); 
+  //gen('u'); 
 	if(tmp == 0) gen(')');
 }
 
