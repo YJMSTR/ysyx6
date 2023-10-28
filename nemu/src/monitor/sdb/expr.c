@@ -57,9 +57,9 @@ static struct rule {
   {"/", TK_DIV},        // div
   {"\\(", TK_LPAR},    
   {"\\)", TK_RPAR},   
-  {"[0-9]+", TK_NUM},     // 十进制数
   {"0[xX][0-9a-fA-F]+", TK_HEX},   // 十六进制数
   {"[\\$][0-9a-zA-Z]+", TK_REG},   // 寄存器
+  {"[0-9]+", TK_NUM},     // 十进制数
   {"!=", TK_NEQ},
   {"&&", TK_AND},
 };
@@ -192,12 +192,24 @@ word_t eval(int p, int q) {
     Log("Bad expression, p > q");
     return -1;
   } else if (p == q) {
-    Assert(tokens[p].type == TK_NUM || tokens[p].type == TK_REG, "illegal expr");
+    Assert(tokens[p].type == TK_NUM || tokens[p].type == TK_REG || tokens[p].type == TK_HEX, "illegal expr");
     if (tokens[p].type == TK_REG) {  
       bool success = false;
       word_t regval = isa_reg_str2val(tokens[p].str, &success);
       Assert(success == true, "isa_reg_str2val fail, success=%d", success);
       return regval;
+    } else if (tokens[p].type == TK_HEX) {
+      word_t val = 0;
+      for (int i = 2; i < strlen(tokens[p].str); i++) {
+        word_t cval = 114514;
+        char c = tokens[p].str[i];
+        if (c >= '0' && c <= '9') cval = c - '0';
+        if (c >= 'a' && c <= 'f') cval = c + 10 - 'a';
+        if (c >= 'A' && c <= 'F') cval = c + 10 - 'A';
+        Assert(c != 114514, "hex fail");
+        val = val * 16u + cval;
+      }
+      return val;
     }
     return (word_t)atoi(tokens[p].str);
   } else if (check_parentheses(p, q) == true) {
@@ -236,6 +248,7 @@ word_t eval(int p, int q) {
           if (op == -1)
             op = i;
         case TK_NUM:
+        case TK_HEX:
         case TK_REG:
         case TK_NOTYPE:
           continue;

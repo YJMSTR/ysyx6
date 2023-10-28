@@ -71,7 +71,7 @@ static int cmd_info(char *args) {
       isa_reg_display();
     } 
     if (strcmp(args, "w") == 0) {
-      //wp_print();
+      wp_print();
     }
   }
   return 0;
@@ -98,10 +98,24 @@ static int cmd_x(char *args) {
 }
 
 static int cmd_p(char *args) {
-  bool ret = 1;
+  bool ret = 0;
   uint32_t res = expr(args, &ret);
   printf("%u(DEC) == 0x%08x(HEX)\n", res, res);
   return !ret;
+}
+
+static int cmd_w(char *args) {
+  bool ret = 0;
+  WP* cur = new_wp();
+  memcpy(cur->str, args, strlen(args));
+  cur->val = expr(args, &ret);
+  return ret;
+}
+
+static int cmd_d(char *args) {
+  int num = atoi(args);
+  free_wp(num);
+  return 1;
 }
 
 static int cmd_help(char *args);
@@ -118,6 +132,8 @@ static struct {
   { "info", "Print program status", cmd_info},
   { "x", "Print memory status", cmd_x},
   { "p", "expr", cmd_p},
+  { "w", "new watch point", cmd_w},
+  { "d", "delete watch point", cmd_d},
   /* TODO: Add more commands */
 
 };
