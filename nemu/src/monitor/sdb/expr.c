@@ -14,6 +14,7 @@
 ***************************************************************************************/
 
 #include <isa.h>
+#include <memory/vaddr.h>
 
 /* We use the POSIX regex functions to process regular expressions.
  * Type 'man regex' for more information about POSIX regex functions.
@@ -21,7 +22,7 @@
 #include <regex.h>
 
 enum {
-  TK_NOTYPE = 256, TK_EQ,
+  TK_NOTYPE = 256, TK_EQ = '=',
   /* TODO: Add more token types */
   // 我们先来处理一种简单的情况 -- 算术表达式, 
   // 即待求值表达式中只允许出现以下的token类型:十进制数，加减乘除，括号，空格串
@@ -32,6 +33,11 @@ enum {
   TK_DIV = '/',
   TK_LPAR = '(',
   TK_RPAR = ')',
+  TK_HEX = 'x',
+  TK_REG = '$',
+  TK_NEQ = '!',
+  TK_AND = '&',
+  TK_DEREF,
 };
 
 static struct rule {
@@ -52,6 +58,10 @@ static struct rule {
   {"\\(", TK_LPAR},    
   {"\\)", TK_RPAR},   
   {"[0-9]+", TK_NUM},     // 十进制数
+  {"0[xX][0-9a-fA-F]+", TK_HEX},   // 十六进制数
+  {"[\\$][0-9a-zA-Z]+", TK_REG},   // 寄存器
+  {"!=", TK_NEQ},
+  {"&&", TK_AND},
 };
 
 #define NR_REGEX ARRLEN(rules)
@@ -133,6 +143,7 @@ static bool make_token(char *e) {
       return false;
     }
   }
+  // 处理负号
   Token real_tokens[65536];
   int real_nr_token = 0;
   for (int i = 0; i < nr_token; i++) {
@@ -143,10 +154,7 @@ static bool make_token(char *e) {
         real_tokens[real_nr_token++].type = TK_NUM;
       } 
     }
-    // real_tokens[real_nr_token].type = tokens[i].type;
-    // strcpy(real_tokens[real_nr_token].str, tokens[i].str);
     real_tokens[real_nr_token] = tokens[i];
-    //Log("tokens[%d].str = %s, real_tokens[%d].str = %s", i, tokens[i].str, real_nr_token, real_tokens[real_nr_token].str);
     real_nr_token++;
   }
   for (int i = 0; i < real_nr_token; i++) {
@@ -184,7 +192,13 @@ word_t eval(int p, int q) {
     Log("Bad expression, p > q");
     return -1;
   } else if (p == q) {
-    Assert(tokens[p].type == TK_NUM , "illegal expr");  
+    Assert(tokens[p].type == TK_NUM || tokens[p].type == TK_REG, "illegal expr");
+    if (tokens[p].type == TK_REG) {  
+      bool success = false;
+      word_t regval = isa_reg_str2val(tokens[p].str, &success);
+      Assert(success == true, "isa_reg_str2val fail, success=%d", success);
+      return regval;
+    }
     return (word_t)atoi(tokens[p].str);
   } else if (check_parentheses(p, q) == true) {
     return eval(p + 1, q - 1);
@@ -195,6 +209,15 @@ word_t eval(int p, int q) {
       switch(tokens[i].type) {
         case '+':
         case '-':
+          if (sump == 0)
+            op = i;
+          break;
+        case TK_AND:
+          if (sump == 0) 
+            op = i;
+          break;
+        case TK_NEQ:
+        case TK_EQ:
           if (sump == 0)
             op = i;
           break;
@@ -209,7 +232,11 @@ word_t eval(int p, int q) {
         case ')':
           sump--;
           break;
+        case TK_DEREF:
+          if (op == -1)
+            op = i;
         case TK_NUM:
+        case TK_REG:
         case TK_NOTYPE:
           continue;
         default:
@@ -219,6 +246,14 @@ word_t eval(int p, int q) {
     if (op == -1) {
       Log("op == -1, p == %d, q == %d", p, q);
       return -1;
+    } 
+    if (tokens[op].type == TK_DEREF) {
+      Log("DEREF op = %d token (%d %d)", op, p, q);
+      word_t val = eval(op+1, q);
+      Log("DEREF addr = 0x%08x == %u", val, val);
+      word_t res = vaddr_read(val, 4);
+      Log("DEREF res = 0x%08x == %u", res, res);
+      return res;
     }
     word_t val1 = eval(p, op-1);
     word_t val2 = eval(op+1, q);
@@ -228,6 +263,9 @@ word_t eval(int p, int q) {
       case '-': return val1 - val2;
       case '*': return val1 * val2;
       case '/': return val1 / val2;
+      case TK_AND: return val1 && val2;
+      case TK_EQ: return val1 == val2;
+      case TK_NEQ: return val1 != val2;
       default: Assert(0, "token unsupport");
     }
   }
@@ -240,6 +278,12 @@ word_t expr(char *e, bool *success) {
   }
 
   /* TODO: Insert codes to evaluate the expression. */
+  for (int i = 0; i < nr_token; i++) {
+    if (tokens[i].type == '*' && (i == 0 || tokens[i-1].type == '+' || tokens[i-1].type == '-' || tokens[i-1].type == '*' || tokens[i-1].type == '/' || tokens[i-1].type == '(')) {
+      tokens[i].type = TK_DEREF;
+    }
+  }
+
   word_t val = eval(0, nr_token-1);
   *success = true;
   return val;

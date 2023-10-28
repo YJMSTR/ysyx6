@@ -100,7 +100,7 @@ static int cmd_x(char *args) {
 static int cmd_p(char *args) {
   bool ret = 1;
   uint32_t res = expr(args, &ret);
-  printf("%u\n", res);
+  printf("%u(DEC) == 0x%08x(HEX)\n", res, res);
   return !ret;
 }
 
