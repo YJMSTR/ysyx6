@@ -490,3 +490,24 @@ LUI: 将立即数放到 rd 的高二十位
 mstatus：priv spec 3.1.6 节
 
 ##### shell 命令
+
+```makefile
+count:
+	@find . -name "*.h" -or -name "*.c" |xargs wc -l
+```
+
+pa0 23775 
+
+pa1 24197
+
+##### RTFM
+
+-Wall
+
+`This enables all the warnings about constructions that some users consider questionable, and that are easy to avoid (or modify to prevent the warning), even in conjunction with macros`
+
+-Werror
+
+`Make all warnings into errors.`
+
+开启这两个选项能够使我们的代码规避大部分可能引起bug的行为。

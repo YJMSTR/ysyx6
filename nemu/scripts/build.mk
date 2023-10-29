@@ -49,6 +49,9 @@ $(OBJ_DIR)/%.o: %.cc
 
 app: $(BINARY)
 
+count: 
+	@find . -name "*.h" -or -name "*.c" |xargs wc -l
+
 $(BINARY):: $(OBJS) $(ARCHIVES)
 	@echo + LD $@
 	@$(LD) -o $@ $(OBJS) $(LDFLAGS) $(ARCHIVES) $(LIBS)
