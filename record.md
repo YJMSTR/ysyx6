@@ -511,3 +511,27 @@ pa1 24197
 `Make all warnings into errors.`
 
 开启这两个选项能够使我们的代码规避大部分可能引起bug的行为。
+
+## PA2
+
+### 不停计算的机器
+
+#### 理解 YEMU 如何执行程序
+
+1. YEMU 上执行的加法程序的状态机
+
+   (0, x, x)->(1, x, M[y])->(2, M[y], M[y])->(3, M[y], M[x])->(4, M[y]+M[x], M[x])
+
+2. 通过 RTFSC 理解 YEMU 如何执行一条指令
+
+   通过 exec_once 函数，先从 M[pc] 处取出指令，然后进行译码，根据译码结果执行对应的操作，然后更新 pc。
+
+执行指令->在状态机上转移一步
+
+#### RTFSC理解指令执行的过程
+
+执行 isa_exec_once 函数，首先通过 inst_fetch 函数取指，随后调用 decode_exec 函数译码并执行。decode_exec 中调用 decode_operand 函数进行指令的译码和执行。执行过程中通过 INSTPAT 对指令字符串进行模式匹配，转为函数所需的参数。
+
+### 运行更多的程序
+
+执行到 ebreak 的时侯报错，

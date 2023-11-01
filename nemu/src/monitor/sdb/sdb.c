@@ -109,6 +109,9 @@ static int cmd_w(char *args) {
   WP* cur = new_wp();
   memcpy(cur->str, args, strlen(args));
   cur->val = expr(args, &ret);
+  if (!ret) {
+    free_wp(cur->NO);
+  }
   return ret;
 }
 
