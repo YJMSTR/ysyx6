@@ -534,4 +534,42 @@ pa1 24197
 
 ### 运行更多的程序
 
-执行到 ebreak 的时侯报错，
+mul-longlong 测例过不去，等接入 difftest 再调一下
+
+## 程序、运行时环境和AM
+
+### RTFSC（3）
+
+#### 阅读makefile
+
+am的makefile只有如下短短几行
+
+```makefile
+NAME     := am
+SRCS      = $(addprefix src/, $(AM_SRCS))
+INC_PATH += $(AM_HOME)/am/src
+
+include $(AM_HOME)/Makefile
+
+```
+
+第一行`NAME	:= am` 用`:=`运算符避免了多次展开，但也因此必须提前声明。
+
+第二行声明一个 SRCS 变量， 值为`src/$(AM_SRCS)` 
+
+第三行通过`+=`运算符给 INC_PATH变量追加一个值，为am/src的绝对路径。
+
+最后一行导入上一级目录的Makefile，这个Makefile比较有含金量，可以通过make html获得一个html版本以便阅读，各个步骤在html里都有说明
+
+#### 批处理运行nemu
+
+查看sdb的源码可以发现，批处理需要在 nemu 启动时传入 b 参数。修改 platform/nemu.mk 即可。
+
+#### 实现字符串处理函数
+
+注意memset虽然传入了int，但是填充时是按无符号char进行填充的，每个字符都填充。
+
+## 最简单的处理器
+
+支持 addi 和 ebreak，参考一生一芯视频课提到的 YPC （第六节）的写法
+
