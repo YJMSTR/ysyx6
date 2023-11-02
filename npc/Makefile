@@ -1,7 +1,7 @@
 BUILD_DIR = ./build
 OBJ_DIR = $(BUILD_DIR)/obj_dir
 BIN = $(BUILD_DIR)/$(TOPNAME)
-NXDC_FILES = constr/top.nxdc
+# NXDC_FILES = constr/top.nxdc
 TOPNAME = Top
 
 export PATH := $(PATH):$(abspath ./utils)
@@ -12,18 +12,18 @@ VERILATOR_CFLAGS += -MMD --build -cc  \
 
 $(shell mkdir -p $(BUILD_DIR))
 
-# constraint file
-SRC_AUTO_BIND = $(abspath $(BUILD_DIR)/auto_bind.cpp)
-$(SRC_AUTO_BIND): $(NXDC_FILES)
-	python3 $(NVBOARD_HOME)/scripts/auto_pin_bind.py $^ $@
+# # constraint file
+# SRC_AUTO_BIND = $(abspath $(BUILD_DIR)/auto_bind.cpp)
+# $(SRC_AUTO_BIND): $(NXDC_FILES)
+# 	python3 $(NVBOARD_HOME)/scripts/auto_pin_bind.py $^ $@
 
 # project source
 VSRCS = $(shell find $(BUILD_DIR) -name "*.v")
 CSRCS = $(shell find $(abspath ./) -name "*.c" -or -name "*.cc" -or -name "*.cpp")
 CSRCS += $(SRC_AUTO_BIND)
 
-# rules for NVBoard
-include $(NVBOARD_HOME)/scripts/nvboard.mk
+# # rules for NVBoard
+# include $(NVBOARD_HOME)/scripts/nvboard.mk
 
 # rules for verilator
 INCFLAGS = $(addprefix -I, $(INC_PATH))
