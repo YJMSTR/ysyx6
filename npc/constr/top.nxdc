@@ -1,0 +1,14 @@
+top=Top
+
+io_data_0 SW0 
+io_data_1 SW1 
+io_data_2 SW2
+io_data_3 SW3 
+io_data_4 SW4 
+io_data_5 SW5 
+io_data_6 SW6 
+io_data_7 SW7
+
+io_seg0 (SEG0A, SEG0B, SEG0C, SEG0D, SEG0E, SEG0F, SEG0G)
+io_out (LD2, LD1, LD0)
+io_Y LD3
