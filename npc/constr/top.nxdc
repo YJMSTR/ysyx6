@@ -1,0 +1,9 @@
+top=Top
+
+io_A (SW3, SW2, SW1, SW0)
+io_B (SW7, SW6, SW5, SW4)
+io_sel (SW10, SW9, SW8)
+io_of LD4
+io_ez LD5 
+io_c LD6
+io_out (LD3, LD2, LD1, LD0)
