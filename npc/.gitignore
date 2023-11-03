@@ -1,8 +1,8 @@
-!.gitignore
-!constr/
 *.*
 *
 !*/
+!.gitignore
+!constr/
 !Makefile
 !*.mk
 !*.scala
