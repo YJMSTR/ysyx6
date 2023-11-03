@@ -1,7 +1,8 @@
+!.gitignore
+!constr/
 *.*
 *
 !*/
-!constr/
 !Makefile
 !*.mk
 !*.scala
@@ -9,7 +10,6 @@
 !*.v
 !*.cpp
 !*.cc
-!.gitignore
 !.scalafmt.conf
 !build.sc
 !README.md
