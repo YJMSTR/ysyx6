@@ -1,6 +1,10 @@
 *.*
 *
 !*/
+!.gitignore
+!constr/
+!constr/**
+!*.nxdc
 !Makefile
 !*.mk
 !*.scala
@@ -8,11 +12,9 @@
 !*.v
 !*.cpp
 !*.cc
-!.gitignore
 !.scalafmt.conf
 !build.sc
 !README.md
-!record.md
 build/
 
 # mill
