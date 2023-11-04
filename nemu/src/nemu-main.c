@@ -33,7 +33,7 @@ int main(int argc, char *argv[]) {
   // char args[65536];
   // uint32_t res = 0;
   // bool ok = 0;
-  // Assert(freopen("$NEMU_HOME/input", "r", stdin) == 0, "failed to freopen");
+  // Assert(freopen("$NEMU_HOME/tools/gen-expr/input", "r", stdin) == 0, "failed to freopen");
   // while (scanf("%s %u", args, &res) == 1) {
   //   Assert(expr(args, &ok) == res, "fail expr test");
   // }
