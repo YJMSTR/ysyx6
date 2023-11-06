@@ -569,6 +569,10 @@ include $(AM_HOME)/Makefile
 
 注意memset虽然传入了int，但是填充时是按无符号char进行填充的，每个字符都填充。
 
+#### 实现 sprintf
+
+
+
 ## 最简单的处理器
 
 支持 addi 和 ebreak，参考一生一芯视频课提到的 YPC （第六节）的写法
