@@ -17,6 +17,8 @@
 #include <cpu/decode.h>
 #include <cpu/difftest.h>
 #include <locale.h>
+#include <ftrace.h>
+
 // #include <monitor/sdb/sdb.h>
 
 /* The assembly code of instructions executed is only output to the screen
@@ -73,7 +75,9 @@ static void exec_once(Decode *s, vaddr_t pc) {
   space_len = space_len * 3 + 1;
   memset(p, ' ', space_len);
   p += space_len;
-
+  if (ftrace_is_enable()) {
+    ftrace(pc, s->dnpc, iringbuf.inst[iringbuf.cur], cpu.gpr[1]);
+  }
 #ifndef CONFIG_ISA_loongarch32r
   void disassemble(char *str, int size, uint64_t pc, uint8_t *code, int nbyte);
   disassemble(p, s->logbuf + sizeof(s->logbuf) - p,

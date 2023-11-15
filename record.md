@@ -561,7 +561,7 @@ include $(AM_HOME)/Makefile
 
 最后一行导入上一级目录的Makefile，这个Makefile比较有含金量，可以通过make html获得一个html版本以便阅读，各个步骤在html里都有说明
 
-#### 批处理运行nemu
+#### 批处理运行 nemu
 
 查看sdb的源码可以发现，批处理需要在 nemu 启动时传入 b 参数。修改 platform/nemu.mk 即可。
 
@@ -571,7 +571,424 @@ include $(AM_HOME)/Makefile
 
 #### 实现 sprintf
 
+可变参数列表需要使用 stdarg.h 中的 va_xxx 系列宏
 
+sprintf 末尾需要加上 `'\0'`
+
+### 基础设施（2）
+
+#### trace
+
+Kconfig 里已经定义了 ITRACE. 其它 trace 的开关与否可以用类似的方法定义。
+
+环形缓冲区在 cpu_exec 末尾检测 cpu 状态为 abort 或 stop 后进行输出。
+
+mtrace 略
+
+#### 消失的符号
+
+https://blog.csdn.net/helowken2/article/details/113782851
+
+>  elf 的符号包括一个 Symbol Table，其中包含一组 Symbol。这些 Symbol 在程序中要么表示定义，要么表示引用，它们的作用是在编译和链接的过程中进行定位和重定位。
+
+https://blog.csdn.net/helowken2/article/details/113792555
+
+> 从链接器的角度看，Symbol 可以分为3类（这里的类别不同于 Symbol Type）
+>
+> Global Symbol Def：定义在当前对象文件中，可以被其他对象文件引用。例如定义在当前对象文件中的非 static 的函数或者全局变量。
+>
+> Global Symbol Ref：定义在其他对象文件中，被当前对象文件所引用。又被称作 externals，例如定义在其他对象文件中的非 static 的函数或者全局变量。
+>
+> Local Symbol：定义和引用都在当前对象文件中。例如 static 函数和 static 全局变量。这些 Symbol 对当前对象文件的任何地方都可见，但是不能被其他对象文件引用。
+>
+> Local Symbol 并不是指局部变量
+>
+> 1. .symtab 不会包含任何局部变量。
+> 2. 局部变量是运行期间在 Stack 上进行分配 
+> 3. static 变量不会在 Stack 上进行分配，而是在编译期间，由编译器在 ".data" 或 ".bss"  Section 上分配空间，然后在 ".symtab" 段中创建 Symbol，这些 Symbol 名字都是唯一的。
+
+NR_DATA 宏会在预处理阶段被展开
+
+#### 寻找 Hello World
+
+```
+  [29] .strtab           STRTAB           0000000000000000  000033a0
+       00000000000001e2  0000000000000000           0     0     1
+
+```
+
+33a0 旁边是
+
+```
+000033a0  00 53 63 72 74 31 2e 6f  00 5f 5f 61 62 69 5f 74  |.Scrt1.o.__abi_t|
+000033b0  61 67 00 63 72 74 73 74  75 66 66 2e 63 00 64 65  |ag.crtstuff.c.de|
+000033c0  72 65 67 69 73 74 65 72  5f 74 6d 5f 63 6c 6f 6e  |register_tm_clon|
+000033d0  65 73 00 5f 5f 64 6f 5f  67 6c 6f 62 61 6c 5f 64  |es.__do_global_d|
+000033e0  74 6f 72 73 5f 61 75 78  00 63 6f 6d 70 6c 65 74  |tors_aux.complet|
+000033f0  65 64 2e 30 00 5f 5f 64  6f 5f 67 6c 6f 62 61 6c  |ed.0.__do_global|
+00003400  5f 64 74 6f 72 73 5f 61  75 78 5f 66 69 6e 69 5f  |_dtors_aux_fini_|
+00003410  61 72 72 61 79 5f 65 6e  74 72 79 00 66 72 61 6d  |array_entry.fram|
+00003420  65 5f 64 75 6d 6d 79 00  5f 5f 66 72 61 6d 65 5f  |e_dummy.__frame_|
+00003430  64 75 6d 6d 79 5f 69 6e  69 74 5f 61 72 72 61 79  |dummy_init_array|
+00003440  5f 65 6e 74 72 79 00 68  65 6c 6c 6f 77 6f 72 6c  |_entry.helloworl|
+00003450  64 2e 63 00 5f 5f 46 52  41 4d 45 5f 45 4e 44 5f  |d.c.__FRAME_END_|
+00003460  5f 00 5f 44 59 4e 41 4d  49 43 00 5f 5f 47 4e 55  |_._DYNAMIC.__GNU|
+00003470  5f 45 48 5f 46 52 41 4d  45 5f 48 44 52 00 5f 47  |_EH_FRAME_HDR._G|
+00003480  4c 4f 42 41 4c 5f 4f 46  46 53 45 54 5f 54 41 42  |LOBAL_OFFSET_TAB|
+00003490  4c 45 5f 00 5f 5f 6c 69  62 63 5f 73 74 61 72 74  |LE_.__libc_start|
+000034a0  5f 6d 61 69 6e 40 47 4c  49 42 43 5f 32 2e 33 34  |_main@GLIBC_2.34|
+000034b0  00 5f 49 54 4d 5f 64 65  72 65 67 69 73 74 65 72  |._ITM_deregister|
+000034c0  54 4d 43 6c 6f 6e 65 54  61 62 6c 65 00 5f 65 64  |TMCloneTable._ed|
+000034d0  61 74 61 00 5f 66 69 6e  69 00 70 72 69 6e 74 66  |ata._fini.printf|
+000034e0  40 47 4c 49 42 43 5f 32  2e 32 2e 35 00 5f 5f 64  |@GLIBC_2.2.5.__d|
+000034f0  61 74 61 5f 73 74 61 72  74 00 5f 5f 67 6d 6f 6e  |ata_start.__gmon|
+00003500  5f 73 74 61 72 74 5f 5f  00 5f 5f 64 73 6f 5f 68  |_start__.__dso_h|
+00003510  61 6e 64 6c 65 00 5f 49  4f 5f 73 74 64 69 6e 5f  |andle._IO_stdin_|
+00003520  75 73 65 64 00 5f 65 6e  64 00 5f 5f 62 73 73 5f  |used._end.__bss_|
+00003530  73 74 61 72 74 00 6d 61  69 6e 00 5f 5f 54 4d 43  |start.main.__TMC|
+00003540  5f 45 4e 44 5f 5f 00 5f  49 54 4d 5f 72 65 67 69  |_END__._ITM_regi|
+00003550  73 74 65 72 54 4d 43 6c  6f 6e 65 54 61 62 6c 65  |sterTMCloneTable|
+00003560  00 5f 5f 63 78 61 5f 66  69 6e 61 6c 69 7a 65 40  |.__cxa_finalize@|
+00003570  47 4c 49 42 43 5f 32 2e  32 2e 35 00 5f 69 6e 69  |GLIBC_2.2.5._ini|
+00003580  74 00 00 2e 73 79 6d 74  61 62 00 2e 73 74 72 74  |t...symtab..strt|
+00003590  61 62 00 2e 73 68 73 74  72 74 61 62 00 2e 69 6e  |ab..shstrtab..in|
+000035a0  74 65 72 70 00 2e 6e 6f  74 65 2e 67 6e 75 2e 70  |terp..note.gnu.p|
+000035b0  72 6f 70 65 72 74 79 00  2e 6e 6f 74 65 2e 67 6e  |roperty..note.gn|
+000035c0  75 2e 62 75 69 6c 64 2d  69 64 00 2e 6e 6f 74 65  |u.build-id..note|
+000035d0  2e 41 42 49 2d 74 61 67  00 2e 67 6e 75 2e 68 61  |.ABI-tag..gnu.ha|
+000035e0  73 68 00 2e 64 79 6e 73  79 6d 00 2e 64 79 6e 73  |sh..dynsym..dyns|
+000035f0  74 72 00 2e 67 6e 75 2e  76 65 72 73 69 6f 6e 00  |tr..gnu.version.|
+00003600  2e 67 6e 75 2e 76 65 72  73 69 6f 6e 5f 72 00 2e  |.gnu.version_r..|
+00003610  72 65 6c 61 2e 64 79 6e  00 2e 72 65 6c 61 2e 70  |rela.dyn..rela.p|
+00003620  6c 74 00 2e 69 6e 69 74  00 2e 70 6c 74 2e 67 6f  |lt..init..plt.go|
+00003630  74 00 2e 70 6c 74 2e 73  65 63 00 2e 74 65 78 74  |t..plt.sec..text|
+00003640  00 2e 66 69 6e 69 00 2e  72 6f 64 61 74 61 00 2e  |..fini..rodata..|
+00003650  65 68 5f 66 72 61 6d 65  5f 68 64 72 00 2e 65 68  |eh_frame_hdr..eh|
+00003660  5f 66 72 61 6d 65 00 2e  69 6e 69 74 5f 61 72 72  |_frame..init_arr|
+00003670  61 79 00 2e 66 69 6e 69  5f 61 72 72 61 79 00 2e  |ay..fini_array..|
+00003680  64 79 6e 61 6d 69 63 00  2e 64 61 74 61 00 2e 62  |dynamic..data..b|
+00003690  73 73 00 2e 63 6f 6d 6d  65 6e 74 00 00 00 00 00  |ss..comment.....|
+000036a0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
+```
+
+hd 的输出中 helloworld 位置如下
+
+```
+00002000  01 00 02 00 68 65 6c 6c  6f 20 77 6f 72 6c 64 00  |....hello world.|
+```
+
+2000 对应的是 rodata，而不是字符串表 
+
+#### 实现 ftrace
+
+在 parse_args 里加入了 r 参数，对应读取 elf. 用此方式读取 elf 时自动启用 ftrace。需要注意的是 ftrace 读取 elf 与当前架构的位宽有关，后续将 32 位 NEMU 改为 64 位时需要修改 ftrace。
+
+下面直接把做第四期 ftrace 时候的笔记复制过来：
+
+> 如果每执行一条指令就去 func 里查找对应的函数显然不太合理，只需要关心函数调用和返回的指令即可
+>
+> 可以关注所有的跳转指令的目的寄存器，判断是否是函数（有哪些指令可以调用函数？）
+>
+> 先考虑实现对 jal 的支持。
+>
+> 可以向 ftrace 函数传入 dnpc，判断跳转到的地方是不是函数。而返回指令可以分析指令中跳转地址-4 的地方是不是函数。（nemu 中实现的 jal 是将 pc+4 存入 rd）。
+>
+> 实现时发现 存在 iringbuf 中的 instval 与 si 的输出不太对，永远只有低 5 位，是环形缓冲区对于指令值的解码有问题。已修复
+>
+> 通过向 ftrace 函数传入 ra 的值，当跳转的目的地和 ra 的值一样时鉴定为退出函数。
+>
+> 对于不使用跳转语句退出函数的情况，比如 ebreak，按照实际情况直接不输出 ret。
+
+修改 /platform/nemu.mk，其中 $(IMAGE).elf 是 elf 的位置
+
+#### 不匹配的函数调用和返回
+
+反汇编结果中 f2 和 f3 的末尾都有两个 ret，f1 和 f0 的末尾仅有一个 ret。每一次函数调用并没有开辟新的栈空间，而是复用了之前开辟的栈空间。
+
+> **Tail recursion** *is defined as a recursive function in which the recursive call is the last statement that is executed by the function. So basically nothing is left to execute after the recursion call.*
+
+ftrace  的输出如下：
+
+```
+Welcome to riscv32-NEMU!
+For help, type "help"
+#1: call: _start at 80000000
+#2: call: _trm_init at 80000254
+#3: call: main at 800001c8
+#3: call: f0 at 80000010
+#3: call: f3 at 80000108
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f3 at 80000108
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f3 at 80000108
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f3 at 80000108
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f3 at 80000108
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f3 at 80000108
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f3 at 80000108
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f3 at 80000108
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f3 at 80000108
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f3 at 80000108
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f3 at 80000108
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f3 at 80000108
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f3 at 80000108
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f3 at 80000108
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f3 at 80000108
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f3 at 80000108
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f3 at 80000108
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f3 at 80000108
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f3 at 80000108
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f3 at 80000108
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f3 at 80000108
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f3 at 80000108
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f3 at 80000108
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f3 at 80000108
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f3 at 80000108
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f3 at 80000108
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f3 at 80000108
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f3 at 80000108
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f3 at 80000108
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f3 at 80000108
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f3 at 80000108
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#3: call: f2 at 800000a4
+#3: call: f1 at 8000005c
+#3: call: f0 at 80000010
+#4: call: check at 800001b0
+#4: ret:  check at 800001b4 to 80000204
+#4: call: check at 800001b0
+#4: ret:  check at 800001b4 to 8000021c
+#4: call: check at 800001b0
+#4: ret:  check at 800001b4 to 80000234
+#3: ret:  main at 80000244 to 80000268
+```
+
+#### 冗余的符号表
+
+去掉可执行文件中的符号表后， `readelf -s` 仅输出 `.dynsym`，可以执行
+
+去掉目标文件中的符号表后，无法链接。
+
+这是因为
+
+> elf 的符号包括一个 Symbol Table，其中包含一组 Symbol。这些 Symbol 在程序中要么表示定义，要么表示引用，它们的作用是在编译和链接的过程中进行定位和重定位。
+
+#### 如何生成 native 的可执行文件
+
+支持的 ARCH 在 `$(AM_HOME)/scripts/*.mk` 列出，其中包含 native。该 Makefile 包含如下代码
+
+`@g++ -pie -o $(IMAGE) -Wl,--whole-archive $(LINKAGE) -Wl,-no-whole-archive $(LDFLAGS_CXX) -lSDL2 -ldl`
+
+#### 奇怪的错误码
+
+https://www.gnu.org/software/make/manual/html_node/Running.html
+
+> The exit status of `make` is always one of three values:
+>
+> - `0`
+>
+>   The exit status is zero if `make` is successful.
+>
+> - `2`
+>
+>   The exit status is two if `make` encounters any errors. It will print messages describing the particular errors.
+>
+> - `1`
+>
+>   The exit status is one if you use the ‘-q’ flag and `make` determines that some target is not already up to date. See [Instead of Executing Recipes](https://www.gnu.org/software/make/manual/html_node/Instead-of-Execution.html).
+
+#### 这是如何实现的
+
+> 框架代码编译到`native`的时候默认链接到glibc, 我们需要把这些库函数的调用链接到我们编写的klib来进行测试. 我们可以通过在`abstract-machine/klib/include/klib.h` 中通过定义宏`__NATIVE_USE_KLIB__`来把库函数链接到klib. 如果不定义这个宏, 库函数将会链接到glibc, 可以作为正确的参考实现来进行对比.
+
+klib 文件的代码中会判断是否定义了这个宏，并用 `#if` 把 klib 的实现代码包起来。
+
+系统的 `/usr/include` 目录下包含了 glibc 的头文件
+
+klib 的 build 目录下包含生成的静态库文件 `xxx.a`，
+
+#### 编写更多的测试
+
+使用时应该先用 glibc 测试我的测试代码，再用测试代码测试 klib
 
 ## 最简单的处理器
 
