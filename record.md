@@ -1002,7 +1002,7 @@ klib 的 build 目录下包含生成的静态库文件 `xxx.a`，
 
 待填坑
 
-RISC-V作为一个RISC架构, 通常是不支持不对齐访存的, 在Spike中执行一条地址不对齐的访存指令将会抛出异常, 让PC跳转到`0`. 但NEMU为了简化, 没有实现这样的功能, 因此如果让NEMU和Spike同时执行这样的指令, DiffTest将会报错. 不过这很可能是你的软件实现(例如klib)有问题, 请检查并修改相关代码.
+> RISC-V作为一个RISC架构, 通常是不支持不对齐访存的, 在Spike中执行一条地址不对齐的访存指令将会抛出异常, 让PC跳转到`0`. 但NEMU为了简化, 没有实现这样的功能, 因此如果让NEMU和Spike同时执行这样的指令, DiffTest将会报错. 不过这很可能是你的软件实现(例如klib)有问题, 请检查并修改相关代码.
 
 #### 一键回归测试
 
@@ -1011,4 +1011,59 @@ RISC-V作为一个RISC架构, 通常是不支持不对齐访存的, 在Spike中�
 ## 最简单的处理器
 
 支持 addi 和 ebreak，参考一生一芯视频课提到的 YPC （第六节）的写法
+
+## RV32E NPC
+
+### 搭建面向riscv32e-npc的运行时环境
+
+#### 从命令行中读入NPC需要执行的程序
+
+在 verilator 外层的 C++ 文件中实现 load_img 函数即可，读入指定位置的 img 到 mem 数组中。
+
+#### 一键编译并在 NPC 上运行 AM 程序
+
+修改 verilator 外层的 C++ 文件，令其从 argv[1] 读入文件名，然后在 riscv64-npc.mk 中添加 run 目标。
+
+要实现一键编译，首先要解决 firtool 在 chisel 使用了 blackbox 后会在 top.v 中生成导致编译失败的 blackbox 文件名的问题。ysyx 助教给出的方案是为 firtool 添加 `--split-verilog` 参数，但我目前还不知道应该在哪添加。
+
+firtool 位于 `$NPC_HOME/utils`，将其加入 PATH 后可以在命令行中直接 firtool --help 查看使用说明。查看目录下的 makefile，没有发现哪个地方调用了 firtool
+
+上网搜了下 mill 的用法，在 makefile 里执行 make help 看见了 `--split-verilog` 选项，直接加在 makefile  的 verilog 目标后面就行。但这样除了 dpi-c，生成的都是 sv 文件，make sim 会报错找不到 top，需要对 makefile 中的 VSRCS 变量进行修改，令其包含 .sv 后缀的文件。
+
+关于修改 makefile 来生成所需的 bin 文件并一键仿真，参考第四期的实验记录。不过当时我修改的是 riscv64-npc.mk，这次直接对 npc.mk 进行修改，方便跨架构运行。
+
+目前 npc.mk 中部分代码如下：
+
+```makefile
+IMAGE_SPLIT = $(subst -, ,$(basename $(notdir $(IMAGE))))
+BINNAME		= $(word 1,$(IMAGE_SPLIT))
+
+run: 
+	$(MAKE) -C /home/yjmstr/ysyx-workbench/am-kernels/tests/cpu-tests ARCH=$(ARCH) ALL=$(BINNAME)
+	$(MAKE) -C $(NPC_HOME) ISA=$(ISA) run IMG=$(IMAGE).bin
+```
+
+$NPC_HOME 下的 makefile 中 相关的目标如下：
+
+```makefile
+verilog: clean
+	@echo make verilog
+	$(call git_commit, "generate verilog")
+	mill -i __.test.runMain Elaborate -td $(BUILD_DIR) --split-verilog 
+
+$(VSRCS): $(CSRCS) verilog
+
+sim: $(VSRCS) $(CSRCS) $(NVBOARD_ARCHIVE) 
+	$(call git_commit, "sim RTL") # DO NOT REMOVE THIS LINE!!!
+	$(VERILATOR) $(VERILATOR_CFLAGS) \
+	--top-module $(TOPNAME) $(VSRCS) $(CSRCS) $(NVBOARD_ARCHIVE) \
+	$(addprefix -CFLAGS , $(CXXFLAGS)) $(addprefix -LDFLAGS , $(LDFLAGS)) \
+	--Mdir $(OBJ_DIR) --exe -o $(abspath $(BIN))
+
+run: sim
+	@$(BIN) $(IMG)
+
+```
+
+现在能够稳定一键仿真了。
 

@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include "VTop__Dpi.h"
 #include "svdpi.h"
+#include <string.h>
 #define MEM_BASE 0x80000000
 #define MEM_SIZE 0x8000000
 
@@ -50,7 +51,26 @@ static void reset(int n) {
     puts("Resetting");
     single_cycle();
   }
+  for (int i = 0; i < 3; i++) {
+    printf("sleep %ds\n", i);
+    sleep(1);
+  }
   top.reset = 0;
+}
+
+char *img_file;
+
+static long load_img() {
+	printf("img == %s\n", img_file);
+	FILE *fp = fopen(img_file, "rb");
+	assert(fp);
+	fseek(fp, 0, SEEK_END);
+	long size = ftell(fp);
+	fseek(fp, 0, SEEK_SET);
+	int ret = fread(mem, 1, size, fp);
+	fclose(fp);
+  assert(ret == size);
+	return size;
 }
 
 int main(int argc, char** argv) {
@@ -62,7 +82,15 @@ int main(int argc, char** argv) {
 
 	// nvboard_bind_all_pins(&top);
 	// nvboard_init();
-
+  img_file = argv[1];
+  printf("argv[1] = %s\n", argv[1]);
+  long img_size = load_img();
+	for (long i = 0; i < img_size; i += 4) {
+		for (long j = i; j < i + 4; j++) {
+			printf("%02x ", mem[j]);
+		}
+		printf("\n");
+	}
 	reset(5);
 
   while (1) {

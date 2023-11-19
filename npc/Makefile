@@ -18,7 +18,7 @@ $(shell mkdir -p $(BUILD_DIR))
 # 	python3 $(NVBOARD_HOME)/scripts/auto_pin_bind.py $^ $@
 
 # project source
-VSRCS = $(shell find $(BUILD_DIR) -name "*.v")
+VSRCS = $(shell find $(BUILD_DIR) -name "*.v" -or -name "*.sv")
 CSRCS = $(shell find $(abspath ./) -name "*.c" -or -name "*.cc" -or -name "*.cpp")
 CSRCS += $(SRC_AUTO_BIND)
 
@@ -32,9 +32,12 @@ CXXFLAGS += $(INCFLAGS) -DTOP_NAME="\"V$(TOPNAME)\""
 test:
 	mill -i __.test
 
-verilog:
+verilog: clean
+	@echo make verilog
 	$(call git_commit, "generate verilog")
-	mill -i __.test.runMain Elaborate -td $(BUILD_DIR)
+	mill -i __.test.runMain Elaborate -td $(BUILD_DIR) --split-verilog 
+
+$(VSRCS): $(CSRCS) verilog
 
 help:
 	mill -i __.test.runMain Elaborate --help
@@ -51,10 +54,11 @@ reformat:
 checkformat:
 	mill -i __.checkFormat
 
-clean:
-	-rm -rf $(BUILD_DIR)
+.PHONY: test verilog help compile bsp reformat checkformat clean sim run
 
-.PHONY: test verilog help compile bsp reformat checkformat clean
+clean:
+	@echo make clean 
+	-rm -rf $(BUILD_DIR)
 
 sim: $(VSRCS) $(CSRCS) $(NVBOARD_ARCHIVE) 
 	$(call git_commit, "sim RTL") # DO NOT REMOVE THIS LINE!!!
@@ -63,7 +67,7 @@ sim: $(VSRCS) $(CSRCS) $(NVBOARD_ARCHIVE)
 	$(addprefix -CFLAGS , $(CXXFLAGS)) $(addprefix -LDFLAGS , $(LDFLAGS)) \
 	--Mdir $(OBJ_DIR) --exe -o $(abspath $(BIN))
 
-run: 
-	@$(BIN)
+run: sim
+	@$(BIN) $(IMG)
 
 -include ../Makefile

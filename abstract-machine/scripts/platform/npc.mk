@@ -15,7 +15,15 @@ LDFLAGS   += --gc-sections -e _start
 CFLAGS += -DMAINARGS=\"$(mainargs)\"
 .PHONY: $(AM_HOME)/am/src/riscv/npc/trm.c
 
-image: $(IMAGE).elf
-	@$(OBJDUMP) -d $(IMAGE).elf > $(IMAGE).txt
-	@echo + OBJCOPY "->" $(IMAGE_REL).bin
-	@$(OBJCOPY) -S --set-section-flags .bss=alloc,contents -O binary $(IMAGE).elf $(IMAGE).bin
+IMAGE_SPLIT = $(subst -, ,$(basename $(notdir $(IMAGE))))
+BINNAME		= $(word 1,$(IMAGE_SPLIT))
+
+
+# image: $(IMAGE).elf
+# 	@$(OBJDUMP) -d $(IMAGE).elf > $(IMAGE).txt
+# 	@echo + OBJCOPY "->" $(IMAGE_REL).bin
+# 	@$(OBJCOPY) -S --set-section-flags .bss=alloc,contents -O binary $(IMAGE).elf $(IMAGE).bin
+
+run: 
+	$(MAKE) -C /home/yjmstr/ysyx-workbench/am-kernels/tests/cpu-tests ARCH=$(ARCH) ALL=$(BINNAME)
+	$(MAKE) -C $(NPC_HOME) ISA=$(ISA) run IMG=$(IMAGE).bin
