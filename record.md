@@ -1078,3 +1078,15 @@ auipc，lui，jal，jalr，sw（可选）
 ALU 参与运算的两个数据进行选择时，JALR 指令比较复杂
 
 dummy 会在 addr = 0x8000002c 处无限循环，这是因为 npc 的 halt 函数被实现为了死循环，需要查看波形来确定 npc 是否进入了 halt 函数。
+
+现在在 cpu-tests 目录下编译 npc 时加入 vcd=1 即可生成波形
+
+#### 实现riscv32e-npc中的halt()函数
+
+用 asm("ebreak") 加入指令后再次编译，发现不生成 .bin 文件了，只生成 dummy.d 和 dummy.o，查看 npc.mk 发现之前把 image 相关的给注释掉了，不清楚之前为什么能跑起来。
+
+修改后成功 halt
+
+#### 为NPC实现HIT GOOD/BAD TRAP
+
+先看看 nemu 是怎么实现的

@@ -3,13 +3,15 @@ OBJ_DIR = $(BUILD_DIR)/obj_dir
 BIN = $(BUILD_DIR)/$(TOPNAME)
 # NXDC_FILES = constr/top.nxdc
 TOPNAME = Top
+# TOP_V = $(BUILD_DIR)/$(TOPNAME).v
+
 
 export PATH := $(PATH):$(abspath ./utils)
 
 VERILATOR = verilator
 VERILATOR_CFLAGS += -MMD --build -cc  \
 				--trace -O3 --x-assign fast --x-initial fast --noassert
-
+VERILATOR_CFLAGS += --timescale 1us/1us
 $(shell mkdir -p $(BUILD_DIR))
 
 # # constraint file
@@ -18,6 +20,7 @@ $(shell mkdir -p $(BUILD_DIR))
 # 	python3 $(NVBOARD_HOME)/scripts/auto_pin_bind.py $^ $@
 
 # project source
+SCALA_FILE = $(shell find $(abspath ./playground/src/) -name "*.scala")
 VSRCS = $(shell find $(BUILD_DIR) -name "*.v" -or -name "*.sv")
 CSRCS = $(shell find $(abspath ./) -name "*.c" -or -name "*.cc" -or -name "*.cpp")
 CSRCS += $(SRC_AUTO_BIND)
@@ -38,11 +41,12 @@ CXXFLAGS += $(INCFLAGS) -DTOP_NAME="\"V$(TOPNAME)\""
 test:
 	mill -i __.test
 
-verilog: $(VSRCS) $(CSRCS)
+$(VSRCS): $(SCALA_FILE)
+
+verilog: $(VSRCS)
 	@echo make verilog
 	$(call git_commit, "generate verilog")
 	mill -i __.test.runMain Elaborate -td $(BUILD_DIR) --split-verilog 
-
 
 help:
 	mill -i __.test.runMain Elaborate --help
@@ -63,10 +67,11 @@ checkformat:
 
 clean:
 	@echo make clean 
-	-rm -rf $(BUILD_DIR)
+	-rm -rf $(BUILD_DIR) logs
 
 sim: clean verilog $(NVBOARD_ARCHIVE) 
 	$(call git_commit, "sim RTL") # DO NOT REMOVE THIS LINE!!!
+	@rm -rf $(OBJ_DIR)
 	$(VERILATOR) $(VERILATOR_CFLAGS) \
 	--top-module $(TOPNAME) $(VSRCS) $(CSRCS) $(NVBOARD_ARCHIVE) \
 	$(addprefix -CFLAGS , $(CXXFLAGS)) $(addprefix -LDFLAGS , $(LDFLAGS)) \
