@@ -1067,3 +1067,14 @@ run: sim
 
 现在能够稳定一键仿真了。
 
+#### 在 NPC 上运行 dummy 程序
+
+auipc，lui，jal，jalr，sw（可选）
+
+现在使用 ListLookup 的方式来方便地添加指令
+
+为了方便迁移到 64 位，可以创建 chisel 的全局配置文件 Configs.scala ，在其中定义处理器的位宽等。目前仅在其中定义 XLEN 和 RESET_VECTOR。
+
+ALU 参与运算的两个数据进行选择时，JALR 指令比较复杂
+
+dummy 会在 addr = 0x8000002c 处无限循环，这是因为 npc 的 halt 函数被实现为了死循环，需要查看波形来确定 npc 是否进入了 halt 函数。

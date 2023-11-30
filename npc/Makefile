@@ -8,7 +8,7 @@ export PATH := $(PATH):$(abspath ./utils)
 
 VERILATOR = verilator
 VERILATOR_CFLAGS += -MMD --build -cc  \
-				-O3 --x-assign fast --x-initial fast --noassert
+				--trace -O3 --x-assign fast --x-initial fast --noassert
 
 $(shell mkdir -p $(BUILD_DIR))
 
@@ -26,18 +26,23 @@ CSRCS += $(SRC_AUTO_BIND)
 # include $(NVBOARD_HOME)/scripts/nvboard.mk
 
 # rules for verilator
+vcd ?= 
+ifeq ($(vcd), 1)
+  CXXFLAGS += -DVCD
+endif
+
+
 INCFLAGS = $(addprefix -I, $(INC_PATH))
 CXXFLAGS += $(INCFLAGS) -DTOP_NAME="\"V$(TOPNAME)\""
 
 test:
 	mill -i __.test
 
-verilog: clean
+verilog: $(VSRCS) $(CSRCS)
 	@echo make verilog
 	$(call git_commit, "generate verilog")
 	mill -i __.test.runMain Elaborate -td $(BUILD_DIR) --split-verilog 
 
-$(VSRCS): $(CSRCS) verilog
 
 help:
 	mill -i __.test.runMain Elaborate --help
@@ -60,7 +65,7 @@ clean:
 	@echo make clean 
 	-rm -rf $(BUILD_DIR)
 
-sim: $(VSRCS) $(CSRCS) $(NVBOARD_ARCHIVE) 
+sim: clean verilog $(NVBOARD_ARCHIVE) 
 	$(call git_commit, "sim RTL") # DO NOT REMOVE THIS LINE!!!
 	$(VERILATOR) $(VERILATOR_CFLAGS) \
 	--top-module $(TOPNAME) $(VSRCS) $(CSRCS) $(NVBOARD_ARCHIVE) \
