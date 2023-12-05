@@ -1089,4 +1089,16 @@ dummy 会在 addr = 0x8000002c 处无限循环，这是因为 npc 的 halt 函�
 
 #### 为NPC实现HIT GOOD/BAD TRAP
 
-先看看 nemu 是怎么实现的
+先看看 nemu 是怎么实现的，nemu/src/cpu/cpu-exec.c 中会在 NEMU_END 和 NEMU_ABORT 时检查 halt_ret 是否为 0，若不为 0 即 HIT BAD TRAP
+
+nemu 的 trm.c 中通过 NEMU_TRAP 
+
+```c
+asm volatile("mv a0, %0; ebreak" : :"r"(code))
+```
+
+来传递参数给 a0 寄存器
+
+后面一行的 while 不能删，不然会报错 void 函数有返回值。
+
+原先 npc 的 ebreak 的实现方式是通过 dpi-c 直接执行 exit(0)，这样会导致进程直接退出，无法进入 GOOD/BAD TRAP 的判断，应该在 npc 的 sim_main.cpp 中加入 npc_state 变量进行判断，类似 nemu 那样在执行每一条指令之前判断处理器的状态。

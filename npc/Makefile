@@ -24,7 +24,7 @@ SCALA_FILE = $(shell find $(abspath ./playground/src/) -name "*.scala")
 VSRCS = $(shell find $(BUILD_DIR) -name "*.v" -or -name "*.sv")
 CSRCS = $(shell find $(abspath ./) -name "*.c" -or -name "*.cc" -or -name "*.cpp")
 CSRCS += $(SRC_AUTO_BIND)
-
+LDFLAGS += -lreadline
 # # rules for NVBoard
 # include $(NVBOARD_HOME)/scripts/nvboard.mk
 

@@ -5,6 +5,10 @@
 #include "verilated.h"
 #include "VTop__Dpi.h"
 #include "svdpi.h"
+#include "sim.h"
+#include "VTop___024root.h"
+#include <readline/readline.h>
+#include <readline/history.h>
 #include <string.h>
 #define MEM_BASE 0x80000000
 #define MEM_SIZE 0x8000000
@@ -16,30 +20,39 @@
 #endif
 VerilatedContext* contextp = new VerilatedContext;
 VTop* topp = new VTop{contextp};
-
+enum NPC_STATES npc_state;
+int npc_ret;
 
 // void nvboard_bind_all_pins(VTop *top);
-// addi t0, $0, 128
-//     0x5, 0x0, 0x80
-// 0000100 00000  00000 000 00101 00100 11
-// 0x08000293
-// addi t1, %0, 129
-// 000010000001 00000 000 00110 00100 11
-// 0x08 10 03 13
-// ebreak
-// 00 10 00 73 
+
 static uint8_t mem[MEM_SIZE] = {
   0x93, 0x02, 0x00, 0x08, 
   0x13, 0x03, 0x10, 0x08,
   0x73, 0x00, 0x10, 0x00
 }; 
 
-uint32_t pmem_read(uint32_t addr) {
+word_t pmem_read(word_t addr) {
   printf("addr = 0x%08x\n", addr);
   return mem[addr-MEM_BASE]+(mem[addr-MEM_BASE+1]<<8)+(mem[addr-MEM_BASE+2]<<16)+(mem[addr-MEM_BASE+3]<<24);
 }
 
+word_t paddr_read(word_t addr, int len) {
+  switch (len) {
+    case 1: return mem[addr-MEM_BASE];
+    case 2: return mem[addr+-MEM_BASE]*16+mem[addr-MEM_BASE];
+    case 4: return paddr_read(addr+2, 2)*256+paddr_read(addr, 2);
+    case 8: return (paddr_read(addr+4, 4) << 32) + paddr_read(addr, 4);
+    default: return 0;
+  }
+  return 0;
+}
+
+word_t vaddr_read(word_t addr, int len) {
+  return paddr_read(addr, len);
+}
+
 static void single_cycle() {
+  if (npc_state != NPC_RUN) return;
 	contextp->timeInc(1);
   topp->clock = 0;
   topp->eval();
@@ -57,10 +70,15 @@ static void single_cycle() {
 }
 
 extern "C" void ebreak() {
-  exit(0);
+  //exit(0);
+  npc_state = NPC_STOP;
+  npc_ret = 0;
 }
 
-static void reset(int n) {
+
+static bool resetted = false;
+static void reset(int n) {  
+  npc_state = NPC_RUN;
   topp->reset = 1;
   while (n-- > 0) {
     puts("Resetting");
@@ -89,7 +107,48 @@ static long load_img() {
 	return size;
 }
 
-int main(int argc, char** argv) {
+void cpu_exec(uint32_t n) {
+  if (!resetted) {
+    resetted = true;
+    reset(5);
+  }
+  while (n--) {
+    if (npc_state != NPC_RUN) break;
+    single_cycle();
+  }
+  switch (npc_state)
+  {
+  case NPC_RUN:
+    npc_state = NPC_STOP; break;
+  case NPC_STOP: case NPC_ABORT:
+    printf("npc: %s at pc = 0x%08x\n", (npc_state == NPC_ABORT ? "abort":
+    (npc_ret == 0 ? "HIT GOOD TRAP" : "HIT BAD TRAP")),
+     topp->io_pc);
+  case NPC_QUIT: 
+    printf("QUIT!");
+  default:
+    break;
+  }
+} 
+
+const char *regs[] = {
+  "$0", "ra", "sp", "gp", "tp", "t0", "t1", "t2",
+  "s0", "s1", "a0", "a1", "a2", "a3", "a4", "a5",
+  "a6", "a7", "s2", "s3", "s4", "s5", "s6", "s7",
+  "s8", "s9", "s10", "s11", "t3", "t4", "t5", "t6"
+};
+
+word_t Rread(uint32_t idx) {
+  return topp->rootp->Top__DOT__R_ext__DOT__Memory[idx];
+}
+
+void npc_reg_display() {
+  for (int i = 0; i < 32; i++) {
+    printf("%s: %x\n", regs[i], Rread(i));
+  }
+}
+
+int sim_main(int argc, char** argv) {
   
 #ifdef VCD
   Verilated::mkdir("logs");
@@ -109,17 +168,21 @@ int main(int argc, char** argv) {
 		}
 		printf("\n");
 	}
-	reset(5);
+  printf("\033[0m\033[1;34mnpc将会先进行reset\033[0m\n");
+  npc_ret = 1;
+  
+  sdb_mainloop();
 
-  while (1) {
-  //  nvboard_update(); 
-    single_cycle();  
-  }
+  // while (npc_state == NPC_RUN) {
+  // //  nvboard_update(); 
+  //   single_cycle();  
+  // }
+
   topp->final();
 #ifdef VCD
   tfp->close();
   tfp = nullptr;
 #endif
   // nvboard_quit();
-  return 0;
+  return npc_ret;
 }
