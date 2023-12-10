@@ -1102,3 +1102,16 @@ asm volatile("mv a0, %0; ebreak" : :"r"(code))
 后面一行的 while 不能删，不然会报错 void 函数有返回值。
 
 原先 npc 的 ebreak 的实现方式是通过 dpi-c 直接执行 exit(0)，这样会导致进程直接退出，无法进入 GOOD/BAD TRAP 的判断，应该在 npc 的 sim_main.cpp 中加入 npc_state 变量进行判断，类似 nemu 那样在执行每一条指令之前判断处理器的状态。
+
+#### 为 npc 搭建 sdb
+
+把 Log 系统迁移过来了，但目前还没为 npc 搭建 kconfig
+
+#### 为 npc 搭建 trace
+
+在 makefile 里链接了 llvm 之后，提示 init_disasm 和 disassemble 函数未定义，暂时先注释掉相关代码，之后来修。
+
+我实现的 ftrace 要用到 dnpc， 把 dnpc 信号拉到顶。注意这里指的并不是 ALU 算出来的 dnpc，而是下一个 pc 的值（不管是 snpc 还是 dnpc，都输出。而 alu 在 使用 snpc 时输出的 dnpc 为 0）
+
+实际上可以利用 verilator 读两次 pc，第一次在上升沿电路状态更新之前读取，此时读出的即为 pc，第二次在上升沿电路状态更新之后读取，此时读出的即为下一个周期的pc。instval也类似，应该和 pc 同时读取。而寄存器值应该在当前周期结束后读取，即上升沿电路状态更新之后再读取寄存器。这样 ftrace 的输出结果就和 nemu 一致了。
+

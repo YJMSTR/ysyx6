@@ -1,7 +1,7 @@
-#include <common.h>
+#include <sim.h>
 #include <elf.h>
 #include <ftrace.h>
-#include "../isa/riscv32/local-include/reg.h"
+#include <stdlib.h>
 
 Func *func;
 bool ftrace_enable = false;
@@ -42,9 +42,9 @@ void init_ftrace(const char *elf_file) {
     strtab = (char *)calloc(Strh.sh_size, 1);
     assert(fseek(elf_fp, Strh.sh_offset, SEEK_SET) == 0);
     assert(fread(strtab, Strh.sh_size, 1, elf_fp));
-    Log("strtab:\n");
+    //Log("strtab:\n");
     for (int cur = 0; cur < Strh.sh_size; ) {
-        Log("%s\n", strtab+cur);
+        //Log("%s\n", strtab+cur);
         while (cur < Strh.sh_size && strtab[cur]) cur++;
         if (cur < Strh.sh_size) cur++;
     }
@@ -58,7 +58,7 @@ void init_ftrace(const char *elf_file) {
         if ((symtab[i].st_info & 0xf) == STT_FUNC) {
             funcnum++;
         }
-        Log("symtab[%d].st_info == %x st_name == %s\n", i, symtab[i].st_info, strtab+symtab[i].st_name);
+       // Log("symtab[%d].st_info == %x st_name == %s\n", i, symtab[i].st_info, strtab+symtab[i].st_name);
     }
     Log("myprintf: funcnum = %d\n", funcnum);
     func = (Func*)calloc(funcnum, sizeof(Func));
@@ -79,7 +79,7 @@ pairpc fstack[MAX_FSTACK];  //ftrace 支持的最大大小栈，默认500000
 int ftop;
 
 void ftrace(vaddr_t pc, vaddr_t dnpc, uint32_t instval, uint32_t ra) {
-    Log("ftrace pc = 0x%08x dnpc = 0x%08x instval = 0x%08x ra = 0x%08x\n",pc,dnpc,instval,ra);
+    //Log("ftrace pc = 0x%08x dnpc = 0x%08x instval = 0x%08x ra = 0x%08x",pc,dnpc,instval,ra);
     if (pc == 0x80000000) {
          for (int i = 0; i < funcnum; i++) {
             if (func[i].value == pc) {

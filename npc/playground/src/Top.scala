@@ -10,7 +10,6 @@ class Top extends Module {
     val pc = Output(UInt(XLEN.W))
     // val pcsel = Input(Bool())
     // val snpc = Input(UInt(XLEN.W))
-    // val dnpc = Input(UInt(XLEN.W))
     
     // val rs1 = Input(UInt(RIDXLEN.W))
     // val rs2 = Input(UInt(RIDXLEN.W))
@@ -28,7 +27,9 @@ class Top extends Module {
   val dnpc = Wire(UInt(XLEN.W))
   val pcsel = Wire(UInt(1.W))
   io.pc := PC
-  PC := Mux(pcsel === 1.U, dnpc, PC + 4.U)
+  val npc = Wire(UInt(XLEN.W))
+  npc := Mux(pcsel === 1.U, dnpc, PC + 4.U)
+  PC := npc
 
 
   def Rread(idx: UInt) = Mux(idx === 0.U, 0.U(XLEN.W), R(idx))

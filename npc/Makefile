@@ -20,11 +20,12 @@ $(shell mkdir -p $(BUILD_DIR))
 # 	python3 $(NVBOARD_HOME)/scripts/auto_pin_bind.py $^ $@
 
 # project source
+
 SCALA_FILE = $(shell find $(abspath ./playground/src/) -name "*.scala")
 VSRCS = $(shell find $(BUILD_DIR) -name "*.v" -or -name "*.sv")
 CSRCS = $(shell find $(abspath ./) -name "*.c" -or -name "*.cc" -or -name "*.cpp")
 CSRCS += $(SRC_AUTO_BIND)
-LDFLAGS += -lreadline
+LDFLAGS += -lreadline $(shell llvm-config --libs)
 # # rules for NVBoard
 # include $(NVBOARD_HOME)/scripts/nvboard.mk
 
@@ -34,9 +35,9 @@ ifeq ($(vcd), 1)
   CXXFLAGS += -DVCD
 endif
 
-
+INC_PATH := /home/yjmstr/ysyx-workbench/npc/include
 INCFLAGS = $(addprefix -I, $(INC_PATH))
-CXXFLAGS += $(INCFLAGS) -DTOP_NAME="\"V$(TOPNAME)\""
+CXXFLAGS += $(INCFLAGS) -DTOP_NAME="\"V$(TOPNAME)\"" $(shell llvm-config --cxxflags) -fPIE
 
 test:
 	mill -i __.test

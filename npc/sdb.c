@@ -17,11 +17,20 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 #include <cstdlib>
+#include <ftrace.h>
 // #include "sdb.h" 和 cpu.h 改为使用 sim.h
-#include "sim.h"
+#include <sim.h>
+#include <debug.h>
 #include <assert.h>
 
+void init_disasm(const char *triple);
 extern NPC_STATES npc_state;
+const char *log_file = "/home/yjmstr/ysyx-workbench/npc/log.txt";
+
+void assert_fail_msg() {
+  npc_reg_display();
+  //statistic();
+}
 
 /* We use the `readline' library to provide more flexibility to read from stdin. */
 static char* rl_gets() {
@@ -136,6 +145,11 @@ static int cmd_help(char *args) {
   return 0;
 }
 
+void init_monitor() {
+  init_log(log_file);
+  set_ftrace_enable();
+  // init_disasm("riscv32" "-pc-linux-gnu");
+}
 
 
 void sdb_mainloop() {
