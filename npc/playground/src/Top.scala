@@ -43,7 +43,7 @@ class Top extends Module {
   rs1v := Rread(rs1)
   rs2v := Rread(rs2)
   R(rd) := Mux(rd_en === 0.U(1.W), R(rd), rdv)
-  
+  R(0) := 0.U
   // 取指模块
   // 根据 PC 取出 inst 是在 C++ 里完成的
   

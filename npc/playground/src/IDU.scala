@@ -47,7 +47,7 @@ class IDU() extends Module {
   // immGen 
   val immi = io.inst(31, 20).asSInt
   val immj = Cat(io.inst(31), io.inst(19, 12), io.inst(20), io.inst(30,21), 0.U(1.W)).asSInt
-  val immu = Cat(io.inst(31, 12), 0.U(20.W)).asSInt
+  val immu = Cat(io.inst(31, 12), 0.U(12.W)).asSInt
   
   io.imm := MuxLookup(immsel, 0.S,
     Seq(IMM_I->immi, IMM_J->immj, IMM_U->immu)).asUInt

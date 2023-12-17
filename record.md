@@ -1143,3 +1143,5 @@ asm volatile("mv a0, %0; ebreak" : :"r"(code))
 todo：给difftest添加比较两边寄存器的代码
 
 测试difftest：给addi额外加1，位于 EXU.scala 的 ALU_OP === ADD 处
+
+搭建好 difftest 之后运行 dummy，发现了 U 类型指令位数错误，和 reg[0] 没有每个周期清零这两个问题。

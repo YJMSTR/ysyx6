@@ -22,6 +22,10 @@ enum NPC_STATES {
   NPC_QUIT,
 };
 
+// typedef MUXDEF(CONFIG_ISA64, uint64_t, uint32_t) word_t;
+// typedef MUXDEF(CONFIG_ISA64, int64_t, int32_t)  sword_t;
+// #define FMT_WORD MUXDEF(CONFIG_ISA64, "0x%016" PRIx64, "0x%08" PRIx32)
+#define FMT_WORD "0x%08x"
 void cpu_exec(uint32_t n);
 void sdb_mainloop();
 void init_monitor();
