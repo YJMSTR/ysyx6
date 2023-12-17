@@ -44,6 +44,7 @@ class EXU() extends Module {
 
   data_res := MuxLookup(io.alu_op, 0.U(32.W), 
   Seq(
+    //ALU_ADD->(data_A + data_B + 1.U),
     ALU_ADD->(data_A + data_B),
     ALU_JALR_OR_JAL->(io.pc + 4.U)
   ))

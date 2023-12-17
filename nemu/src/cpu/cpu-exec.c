@@ -28,12 +28,13 @@
  */
 #define MAX_INST_TO_PRINT 10
 
-
+#ifdef CONFIG_ITRACE
 struct Iringbuf {
   word_t pc[CONFIG_ITRACE_RINGBUFFER_SIZE];
   word_t inst[CONFIG_ITRACE_RINGBUFFER_SIZE];
   int cur;
 } iringbuf;
+#endif
 
 CPU_state cpu = {};
 uint64_t g_nr_guest_inst = 0;
@@ -113,6 +114,7 @@ void assert_fail_msg() {
   statistic();
 }
 
+#ifdef CONFIG_ITRACE
 void print_iringbuf() {
   for (int i = 1; i <= CONFIG_ITRACE_RINGBUFFER_SIZE; i++) {
     if (i == CONFIG_ITRACE_RINGBUFFER_SIZE) {
@@ -124,6 +126,7 @@ void print_iringbuf() {
     }   
   }
 }
+#endif
 
 /* Simulate how the CPU works. */
 void cpu_exec(uint64_t n) {

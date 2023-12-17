@@ -12,6 +12,41 @@
 #include <readline/history.h>
 #include <string.h>
 #include <debug.h>
+#include <macro.h>
+#include <dlfcn.h>
+
+#ifndef CONFIG_RVE
+#define CONFIG_RVE
+#endif
+typedef uint32_t paddr_t;
+typedef struct {
+  word_t gpr[MUXDEF(CONFIG_RVE, 16, 32)];
+  vaddr_t pc;
+} CPU_state;
+
+void (*ref_difftest_memcpy)(paddr_t addr, void *buf, size_t n, bool direction) = NULL;
+void (*ref_difftest_regcpy)(void *dut, bool direction) = NULL;
+void (*ref_difftest_exec)(uint64_t n) = NULL;
+// void (*ref_difftest_raise_intr)(uint64_t NO) = NULL;
+
+void init_difftest(char *ref_so_file, long img_size, int port) {
+  Log("------------------------init difftest!----------------------------");
+  assert(ref_so_file != NULL);
+
+  void *handle;
+  handle = dlopen(ref_so_file, RTLD_LAZY);
+  assert(handle);
+
+  ref_difftest_memcpy = (void (*)(paddr_t, void*, size_t, bool))dlsym(handle, "difftest_memcpy");
+  assert(ref_difftest_memcpy);
+
+  ref_difftest_regcpy = (void (*)(void*, bool))dlsym(handle, "difftest_regcpy");
+  assert(ref_difftest_regcpy);
+
+  ref_difftest_exec = (void (*)(uint64_t))dlsym(handle, "difftest_exec");
+  assert(ref_difftest_exec);
+}
+
 #define MEM_BASE 0x80000000
 #define MEM_SIZE 0x8000000
 
@@ -144,10 +179,12 @@ static void reset(int n) {
   topp->eval();
 }
 
-char *img_file;
-char *elf_file;
+static char *elf_file = NULL;
+static char *img_file = NULL;
+// difftest 的文件放在 sdb.c 里了，上面这两个之后也要移动过去
 
-static long load_img() {
+
+long load_img() {
 	printf("img == %s\n", img_file);
 	FILE *fp = fopen(img_file, "rb");
 	assert(fp);
@@ -214,22 +251,17 @@ int sim_main(int argc, char** argv) {
 #endif
 	// nvboard_bind_all_pins(&top);
 	// nvboard_init();
-  init_monitor();
+  
   img_file = argv[1];
   elf_file = (char *)malloc(strlen(img_file));
   memcpy(elf_file, img_file, strlen(img_file)-3);
   strcat(elf_file, "elf");
+  init_monitor();
   Log("argv[1] = %s", argv[1]);
   Log("elf_file = %s", elf_file);
-  long img_size = load_img();
   if (ftrace_is_enable())
     init_ftrace(elf_file);
-	for (long i = 0; i < img_size; i += 4) {
-		for (long j = i; j < i + 4; j++) {
-			printf("%02x ", mem[j]);
-		}
-		printf("\n");
-	}
+
   printf("\033[0m\033[1;34mnpc将会先进行reset\033[0m\n");
   npc_ret = 1;
   

@@ -1115,3 +1115,31 @@ asm volatile("mv a0, %0; ebreak" : :"r"(code))
 
 实际上可以利用 verilator 读两次 pc，第一次在上升沿电路状态更新之前读取，此时读出的即为 pc，第二次在上升沿电路状态更新之后读取，此时读出的即为下一个周期的pc。instval也类似，应该和 pc 同时读取。而寄存器值应该在当前周期结束后读取，即上升沿电路状态更新之后再读取寄存器。这样 ftrace 的输出结果就和 nemu 一致了。
 
+#### 为 npc 搭建 difftest
+
+> 为了方便实现DiffTest, 我们在DUT和REF之间定义了如下的一组API:
+>
+> ```c
+> // 在DUT host memory的`buf`和REF guest memory的`addr`之间拷贝`n`字节,
+> // `direction`指定拷贝的方向, `DIFFTEST_TO_DUT`表示往DUT拷贝, `DIFFTEST_TO_REF`表示往REF拷贝
+> void difftest_memcpy(paddr_t addr, void *buf, size_t n, bool direction);
+> // `direction`为`DIFFTEST_TO_DUT`时, 获取REF的寄存器状态到`dut`;
+> // `direction`为`DIFFTEST_TO_REF`时, 设置REF的寄存器状态为`dut`;
+> void difftest_regcpy(void *dut, bool direction);
+> // 让REF执行`n`条指令
+> void difftest_exec(uint64_t n);
+> // 初始化REF的DiffTest功能
+> void difftest_init();
+> ```
+>
+> 其中寄存器状态`dut`要求寄存器的成员按照某种顺序排列, 若未按要求顺序排列, `difftest_regcpy()`的行为是未定义的(这样就把锅甩给你们了^_^). REF需要实现这些API, DUT会使用这些API来进行DiffTest. 在这里, DUT和REF分别是NEMU和其它模拟器.
+
+在实现了相关 API 之后修改 NEMU 的 menuconfig，重新编译时报错：` src/cpu/cpu-exec.c:33:13: error: ‘CONFIG_ITRACE_RINGBUFFER_SIZE’ undeclared here (not in a function)`，此时注意到 menuconfig 中相关的配置选项都消失了。涉及到的代码是iringbuffer 的结构体定义，在定义的两头加上 ifdef CONFIG_ITRACE 即可。
+
+按照nemu中的dut写法会报错，`invalid conversion from ‘void*’ to ‘void (*)(uint64_t)’ {aka ‘void (*)(long unsigned int)’} [-fpermissive]`，这是因为g++不支持隐式转换具有不同参数的 void 类型函数指针，而gcc可以。
+
+动态链接 nemu 时报错：`==14526==ASan runtime does not come first in initial library list; you should either link runtime to your application or manually preload it with LD_PRELOAD.` 临时的解决方案是编译 nemu 时取消选中 asan 选项
+
+todo：给difftest添加比较两边寄存器的代码
+
+测试difftest：给addi额外加1，位于 EXU.scala 的 ALU_OP === ADD 处

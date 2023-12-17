@@ -25,6 +25,8 @@ enum NPC_STATES {
 void cpu_exec(uint32_t n);
 void sdb_mainloop();
 void init_monitor();
+long load_img();
+void init_difftest(char *ref_so_file, long img_size, int port);
 void npc_reg_display();
 word_t paddr_read(word_t addr, int len);
 word_t vaddr_read(word_t addr, int len);
