@@ -1103,6 +1103,8 @@ asm volatile("mv a0, %0; ebreak" : :"r"(code))
 
 原先 npc 的 ebreak 的实现方式是通过 dpi-c 直接执行 exit(0)，这样会导致进程直接退出，无法进入 GOOD/BAD TRAP 的判断，应该在 npc 的 sim_main.cpp 中加入 npc_state 变量进行判断，类似 nemu 那样在执行每一条指令之前判断处理器的状态。
 
+### 为 npc 搭建基础设施
+
 #### 为 npc 搭建 sdb
 
 把 Log 系统迁移过来了，但目前还没为 npc 搭建 kconfig
@@ -1110,6 +1112,8 @@ asm volatile("mv a0, %0; ebreak" : :"r"(code))
 #### 为 npc 搭建 trace
 
 在 makefile 里链接了 llvm 之后，提示 init_disasm 和 disassemble 函数未定义，暂时先注释掉相关代码，之后来修。
+
+> 2023.12.17 update: llvm 的函数是用 gcc 编译的 c 语言实现的，仿真文件是 cpp，用的是 g++ 生成的 .o 文件，其和 gcc 生成的 .o 文件不能同时链接，要在 cpp 文件里声明时加上 extern "C"
 
 我实现的 ftrace 要用到 dnpc， 把 dnpc 信号拉到顶。注意这里指的并不是 ALU 算出来的 dnpc，而是下一个 pc 的值（不管是 snpc 还是 dnpc，都输出。而 alu 在 使用 snpc 时输出的 dnpc 为 0）
 
@@ -1145,3 +1149,119 @@ todo：给difftest添加比较两边寄存器的代码
 测试difftest：给addi额外加1，位于 EXU.scala 的 ALU_OP === ADD 处
 
 搭建好 difftest 之后运行 dummy，发现了 U 类型指令位数错误，和 reg[0] 没有每个周期清零这两个问题。
+
+### 实现RV32E指令集
+
+在 instr.scala 里把指令的模式串先敲进去
+
+**硬件如何区分有符号数和无符号数**?
+
+```
+test.o:     file format elf32-littleriscv
+
+
+Disassembly of section .text:
+
+00000000 <fun1>:
+   0:	00b50533          	add	a0,a0,a1
+   4:	00008067          	ret
+
+00000008 <fun2>:
+   8:	00b50533          	add	a0,a0,a1
+   c:	00008067          	ret
+```
+
+没有区别
+
+实现访存指令时，按照讲义上的 verilog 代码实现 DPI-C MEM 编译时会报错：Procedural assignment to wire, perhaps intended var (IEEE 1800-2017 6.5)，STFW 得知 wire 类型的变量不能放在 always 语句块中赋值，改成 reg 可以修复这一问题，但不知道有没有其它影响，目前改成了 reg。
+
+上面的问题改好以后重新跑仿真会段错误，用 Log 调试发现在第一个周期（属于 reset 期间）的第一个 eval() 出现了段错误
+
+```c++
+static void single_cycle() {
+  if (npc_state != NPC_RUN) return;
+  char *p = logbuf;
+	contextp->timeInc(1);
+  topp->clock = 0;
+  Log("我没问题");
+  topp->eval();
+  Log("我没问题"); //-> 段错误
+  ...
+}
+```
+
+尝试在 chisel 中进行输出调试，首先看取指令，现在取指令是由 IFU 调用 pmem_read 函数实现的，
+
+```verilog
+module DPIC_IFU(valid, pc, inst);
+  input valid;
+  input [31:0] pc;
+  output reg [31:0] inst;
+  import "DPI-C" function void pmem_read(
+    input int raddr, output int rdata);
+  always @(*) begin
+    if (valid) begin 
+      pmem_read(pc, inst);
+    end else begin
+      inst = 0;
+    end
+  end
+endmodule
+```
+
+reset 期间 IFU 收到的 addr 为 0，在取指时减去基地址会导致数组越界。为访存的 C 函数添加 assert 解决，并为 reset 期间的行为增加特判：
+
+```
+wireinst := Mux(reset, 0.U, InstFetcher.io.inst)
+```
+
+此外还要为 IFU 添加 valid 信号，在 reset 期间 valid 信号始终为 0,
+
+在 listlookup 的 List 中加入了 MEM_SEXT 系列信号，该信号用于表示 ALU 的计算结果要保留几位，以及要对几位数据进行符号位扩展。
+
+目前支持的访存指令要么是读指令，要么是写指令，因此可以对讲义中给出的访存部分 verilog 进行修改，当 wen 为 0 且 valid 为 1 即为 读，否则 valid 为 1 为写
+
+在Chisel中，如果Fill函数的第一个参数为0，它将返回一个全为0的硬件节点，其位宽由第二个参数指定。例如，Fill(0, myUInt)将返回一个与myUInt具有相同位宽的全为0的硬件节点。这种用法通常用于在Chisel中创建一个全为0的硬件节点，而不是进行符号位扩展。
+
+跑测例 sum 的时候发现 bne 在该跳转的时候没有跳转 ，经检查发现是参与比较的两个数错了，比较的是 rs1v 和 rs2v 两个寄存器值，修改后 HIT GOOD TRAP。
+
+一键仿真跑 bubble-sort 时会有问题，`make[2]: *** No rule to make target 'Makefile.bubble', needed by 'all'.  Stop.`，但是将 run 目标的两条 make 命令手动分开执行没有问题，推测是因为文件名中带有 `-` 导致的。一键仿真的相关代码如下所示：
+
+```makefile
+run: image
+	$(MAKE) -C /home/yjmstr/ysyx-workbench/am-kernels/tests/cpu-tests ARCH=$(ARCH) ALL="$(BINNAME)"
+	$(MAKE) -C $(NPC_HOME) ISA=$(ISA) run IMG=$(IMAGE).bin
+```
+
+```sh
+# 运行仿真的命令（在 cpu-tests 目录下）
+make ARCH=riscv32e-npc ALL=bubble-sort run
+```
+
+经检查发现这个问题在 add-longlong 也存在，不过 add-longlong 会直接用 Makefile.add，因此没有报错
+
+对 npc.mk 进行修改，修改后如下：
+
+```makefile
+IMAGE_NAME = $(basename $(notdir $(IMAGE)))
+BINNAME		= $(word 1,$(IMAGE_NAME))
+```
+
+但这样生成的 Makefile 文件名会变为 Makefile.bubble-sort-riscv32e-npc，与所需的 Makefile.bubble-sort 不符
+
+可以用 patsubst 函数去掉指定后缀
+
+`$(patsubst pattern,replacement,text)`，例如，如果想去掉文件名中的 .txt 后缀，可以这样：
+
+```makefile
+FILE = example.txt
+FILE_WITHOUT_SUFFIX = $(patsubst %.txt,%,$(FILE))
+```
+
+那么修改之后的语句是 
+
+```makefile
+BINNAME = $(patsubst %-$(ARCH), %, $(IMAGE_NAME))
+```
+
+在跑 load-store 测例时 npc 的 ftrace 报错，找不到 elf 文件，但是 build 目录下有该文件，bin、elf、txt 都在，查看 strerror(errno) 得到的结果是文件或目录不存在, matrix-mul，quick-sort 也存在这个问题

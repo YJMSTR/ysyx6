@@ -67,9 +67,25 @@ static uint8_t mem[MEM_SIZE] = {
   0x73, 0x00, 0x10, 0x00
 }; 
 
-word_t pmem_read(word_t addr) {
+extern "C" void pmem_read(int raddr, int *rdata) {
   //printf("addr = 0x%08x\n", addr);
-  return mem[addr-MEM_BASE]+(mem[addr-MEM_BASE+1]<<8)+(mem[addr-MEM_BASE+2]<<16)+(mem[addr-MEM_BASE+3]<<24);
+  assert(raddr >= MEM_BASE && (raddr - MEM_BASE + 3) < MEM_SIZE);
+  //return mem[addr-MEM_BASE]+(mem[addr-MEM_BASE+1]<<8)+(mem[addr-MEM_BASE+2]<<16)+(mem[addr-MEM_BASE+3]<<24);
+  //int addr = raddr & ~0x3u;
+  int addr = raddr;
+  //printf("pmem_read: raddr = 0x%08x addr=0x%08x\n", raddr, addr);
+  *rdata = mem[addr-MEM_BASE]+(mem[addr-MEM_BASE+1]<<8)+(mem[addr-MEM_BASE+2]<<16)+(mem[addr-MEM_BASE+3]<<24);
+  //printf("pmem_read: *rdata = 0x%08x\n", *rdata);
+}
+
+extern "C" void pmem_write(int waddr, int wdata, char wmask) {
+  assert(waddr >= MEM_BASE && (waddr - MEM_BASE + 3) < MEM_SIZE);
+ // printf("pmem_write: waddr = 0x%08x wdata = 0x%08x wmask = 0x%x\n", waddr, wdata, wmask);
+  for (int i = 0; i < 4; i++) {
+    if (wmask & (1 << i)) {
+      mem[waddr-MEM_BASE+i] = (wdata >> (i * 8)) & 0xff;
+    }
+  }
 }
 
 word_t paddr_read(word_t addr, int len) {
@@ -143,6 +159,11 @@ void init_difftest(char *ref_so_file, long img_size, int port) {
 }
 
 bool isa_difftest_checkregs(CPU_state *ref_r, vaddr_t pc) {
+  assert(ref_r != NULL);
+  // if (ref_r->pc != pc) {
+  //   printf("difftest: reg #pc = %s err at dut pc: 0x%08x\n", ref_r->pc, pc);
+  //   printf("difftest: ref_r->pc == 0x%08x\n", ref_r->pc);
+  // }
   for (int i = 0; i < 32; i++) {
     if (ref_r->gpr[i] != cpu.gpr[i]) {
       printf("difftest: reg #%d = %s err at pc: 0x%08x\n", i, regs[i], pc);
@@ -191,22 +212,25 @@ void difftest_step(vaddr_t pc, vaddr_t npc) {
 
 
 char logbuf[128];
+extern "C" void disassemble(char *str, int size, uint64_t pc, uint8_t *code, int nbyte);
 static void single_cycle() {
   if (npc_state != NPC_RUN) return;
   char *p = logbuf;
 	contextp->timeInc(1);
   topp->clock = 0;
-  //Log("dnpc in low = 0x%08x", topp->io_npc);
+  //Log("我没问题");
   topp->eval();
-  //Log("dnpc in low2 = 0x%08x", topp->io_npc);
+  //Log("我没问题");
 #ifdef VCD
   tfp->dump(contextp->time());
 #endif
   contextp->timeInc(1);
-  topp->io_inst = topp->reset ? 0 : pmem_read(topp->io_pc);
+  //topp->io_inst = topp->reset ? 0 : pmem_read(topp->io_pc);
   topp->clock = 1;
   word_t pc = topp->io_pc, instval = topp->io_inst, npc;
+  //Log("我没问题, pc = 0x%08x, inst = 0x%08x", pc, instval);
   topp->eval();
+  //Log("我没问题");
   npc = topp->io_pc;
   if (topp->reset == 0) {
     //printf("[itrace] inst = 0x%08x\n", topp->io_inst);
@@ -222,8 +246,7 @@ static void single_cycle() {
     int space_len = 4 * 3 + 1;
     memset(p, ' ', space_len);
     p += space_len;
-    // void disassemble(char *str, int size, uint64_t pc, uint8_t *code, int nbyte);
-    // disassemble(p, logbuf + sizeof(logbuf) - p, topp->io_pc, inst, ilen);
+    disassemble(p, logbuf + sizeof(logbuf) - p, topp->io_pc, inst, ilen);
     if (ftrace_is_enable()) {
       word_t reg_val = Rread(1);
       ftrace(pc, npc, iringbuf.inst[iringbuf.cur], reg_val);
@@ -313,7 +336,7 @@ void cpu_exec(uint32_t n) {
   case NPC_STOP: case NPC_ABORT:
     Log("npc: %s at pc = 0x%08x", (npc_state == NPC_ABORT ? "abort":
     (npc_ret == 0 ? "HIT GOOD TRAP" : "HIT BAD TRAP")),
-     topp->io_pc);
+     cpu.pc);
     print_iringbuf();
   case NPC_QUIT: 
     Log("QUIT!");

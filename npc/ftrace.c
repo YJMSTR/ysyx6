@@ -2,6 +2,7 @@
 #include <elf.h>
 #include <ftrace.h>
 #include <stdlib.h>
+#include <cerrno>
 
 Func *func;
 bool ftrace_enable = false;
@@ -13,7 +14,8 @@ Elf32_Shdr Symh, Strh;
 char *shstrtab, *strtab;
 void init_ftrace(const char *elf_file) {
     FILE* elf_fp = fopen(elf_file, "r");
-    Assert(elf_fp, "Can not open '%s' ", elf_file);
+    int errNum = errno;
+    Assert(elf_fp, "Can not open '%s' , reason: %s\n", elf_file, strerror(errNum));
     assert(fseek(elf_fp, 0, SEEK_SET) == 0);
     // Ehdr
     assert(fread(&Ehdr, sizeof(Elf32_Ehdr), 1, elf_fp));

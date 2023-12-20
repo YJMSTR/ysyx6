@@ -23,7 +23,7 @@
 #include <debug.h>
 #include <assert.h>
 
-void init_disasm(const char *triple);
+extern "C" void init_disasm(const char *triple);
 void init_difftest(char *ref_so_file, long img_size, int port);
 extern NPC_STATES npc_state;
 static char *diff_so_file = "/home/yjmstr/ysyx-workbench/nemu/build/riscv32-nemu-interpreter-so";
@@ -153,7 +153,7 @@ void init_monitor() {
   set_ftrace_enable();
   long img_size = load_img();
   init_difftest(diff_so_file, img_size, difftest_port);
-  // init_disasm("riscv32" "-pc-linux-gnu");
+  init_disasm("riscv32" "-pc-linux-gnu");
 }
 
 
