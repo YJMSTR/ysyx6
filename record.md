@@ -1154,7 +1154,7 @@ todo：给difftest添加比较两边寄存器的代码
 
 在 instr.scala 里把指令的模式串先敲进去
 
-**硬件如何区分有符号数和无符号数**?
+#### **硬件如何区分有符号数和无符号数**?
 
 ```
 test.o:     file format elf32-littleriscv
@@ -1172,6 +1172,8 @@ Disassembly of section .text:
 ```
 
 没有区别
+
+#### 实现访存
 
 实现访存指令时，按照讲义上的 verilog 代码实现 DPI-C MEM 编译时会报错：Procedural assignment to wire, perhaps intended var (IEEE 1800-2017 6.5)，STFW 得知 wire 类型的变量不能放在 always 语句块中赋值，改成 reg 可以修复这一问题，但不知道有没有其它影响，目前改成了 reg。
 
@@ -1225,6 +1227,8 @@ wireinst := Mux(reset, 0.U, InstFetcher.io.inst)
 
 跑测例 sum 的时候发现 bne 在该跳转的时候没有跳转 ，经检查发现是参与比较的两个数错了，比较的是 rs1v 和 rs2v 两个寄存器值，修改后 HIT GOOD TRAP。
 
+#### 修改 makefile 以修复文件名错误
+
 一键仿真跑 bubble-sort 时会有问题，`make[2]: *** No rule to make target 'Makefile.bubble', needed by 'all'.  Stop.`，但是将 run 目标的两条 make 命令手动分开执行没有问题，推测是因为文件名中带有 `-` 导致的。一键仿真的相关代码如下所示：
 
 ```makefile
@@ -1264,4 +1268,31 @@ FILE_WITHOUT_SUFFIX = $(patsubst %.txt,%,$(FILE))
 BINNAME = $(patsubst %-$(ARCH), %, $(IMAGE_NAME))
 ```
 
+#### 用 Valgrind 修复段错误
+
 在跑 load-store 测例时 npc 的 ftrace 报错，找不到 elf 文件，但是 build 目录下有该文件，bin、elf、txt 都在，查看 strerror(errno) 得到的结果是文件或目录不存在, matrix-mul，quick-sort 也存在这个问题
+
+把 ftrace 关了（在 npc 的 init_monitor 函数里不调用 set_ftrace_enable），报错信息就变成了段错误
+
+```shell
+Top: malloc.c:2617: sysmalloc: Assertion `(old_top == initial_top (av) && old_size == 0) || ((unsigned long) (old_size) >= MINSIZE && prev_inuse (old_top) && ((unsigned long) old_end & (pagesize - 1)) == 0)' failed.
+make[2]: *** [Makefile:82: run] Aborted (core dumped)
+make[1]: *** [/home/yjmstr/ysyx-workbench/abstract-machine/scripts/platform/npc.mk:30: run] Error 2
+ load-store
+```
+
+用 Valgrind 进行检查，首先在 strcat 检测到了 `Conditional jump or move depends on uninitialised value(s)`，STFW 得知可能是有内存未初始化。检查以后发现下面这段代码有问题：
+
+```c
+	// img_file 和 elf_file 一开始都是 static char * img_file = NULL 这样的 
+	img_file = argv[1];
+  	elf_file = (char *)malloc(strlen(img_file));
+  	memcpy(elf_file, img_file, strlen(img_file)-3);
+  	strcat(elf_file, "elf");
+```
+
+给elf_file 分配的内存是 strlen(img_file)，这会导致最后一个 '\0' 存到不应该存的地方去。如果分配 strlen(img_file)+1 再进行一键仿真就不会报错了，但是这解释不了为什么之前手动输入参数运行不会报错，而一键仿真时会报错。用 Valgrind 跑测例也是手动传入参数再运行。
+
+#### 用 yosys-sta 综合
+
+样例包含一个 sdc 文件和 verilog 文件，STFW 得知 SDC 文件为设计约束文件，我的 npc 目前没有 sdc 文件，
