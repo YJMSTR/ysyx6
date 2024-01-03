@@ -1008,6 +1008,156 @@ klib 的 build 目录下包含生成的静态库文件 `xxx.a`，
 
 全部通过
 
+### 输入输出
+
+####  运行Hello World
+
+关了trace，直接运行就可以看见Hello, AbstractMachine!
+
+需要注意：
+
+>  设备和DiffTest
+>
+> 在状态机视角下, 执行一条输入指令会让状态机的状态转移变得不唯一, 新状态取决于设备的状态. 由于NEMU中设备的行为是我们自定义的, 与REF中的标准设备的行为不完全一样 (例如NEMU中的串口总是就绪的, 但QEMU中的串口也许并不是这样), 这导致**在NEMU中执行输入指令的结果会和REF有所不同**. 为了使得DiffTest可以正常工作, 框架代码在访问设备的过程中调用了`difftest_skip_ref()`函数 (见`nemu/include/device/map.h`中定义的`find_mapid_by_addr()`函数)来跳过与REF的检查.
+
+#### 实现 printf
+
+实现 vsprintf，然后
+
+```c
+int printf(const char *fmt, ...) {
+  char buf[1024];
+  va_list args;
+  va_start(args, fmt);
+  int ret = vsprintf(buf, fmt, args);
+  va_end(args);
+  for (int i = 0; i < ret; i++) {
+    putch(buf[i]);
+  }
+  return ret;
+  panic("Not implemented");
+}
+```
+
+buf 开的 1024，
+
+怎么测试呢？后面实现IOE时会用到printf，到时候就知道实现有没有问题了。实现 IOE 的 uptime 之后发现，`printf("%d-%d-%d %02d:%02d:%02d GMT (", rtc.year, rtc.month, rtc.day, rtc.hour, rtc.minute, rtc.second);` 的输出是形如 1900-- 02d:02d:02d GMT (1 second). 的，在解析了第一个 %d 之后后面的 %d 都没有正确解析。这说明 printf 的实现有问题。经检查发现 printf 在 %d 对应的值为 0 时没有输出，加一个判断即可。目前还没有实现对 %02d 的支持
+
+此外，讲义中提到不要在 native 链接到 klib 的时候运行 IOE 相关的测试，因此我们还需要将 native 链接到 glibc
+
+> 我们可以通过在`abstract-machine/klib/include/klib.h` 中通过定义宏`__NATIVE_USE_KLIB__`来把库函数链接到klib. 如果不定义这个宏, 库函数将会链接到glibc
+
+#### 实现 IOE
+
+```c
+void __am_timer_uptime(AM_TIMER_UPTIME_T *uptime) {
+  uptime->us = inl(RTC_ADDR) + (inl(RTC_ADDR+4) << 32);
+}
+```
+
+#### 看看 NEMU 跑多快
+
+ftrace 被我设置为了如果开启 ITRACE 就自动开启 FTRACE
+
+跑 dhrystone 的时候报了浮点异常，去nemu的menuconfig里开启 rv32e support，还是这样。开着这个选项时无法difftest，将其关闭随后用 difftest 进行 debug，difftest 没有报错，Dhrystone 会在输出一行 Finished in 0ms 后报浮点异常.
+
+检查发现，这几个 benchmark 从 uptime 中读出的时间始终为 0，但 am test 里的 rtc 又没有问题。
+
+经检查，下面这种写法就不会出现问题
+
+```c
+  // uint64_t clk = 0;
+  // clk = (((uint64_t)inl(RTC_ADDR + 4)) << 32ull) + inl(RTC_ADDR);
+  // uptime->us = clk;
+```
+
+而下面的写法会有错：
+
+```c
+uptime->us = (uint64_t)inl(RTC_ADDR) + (((uint64_t)inl(RTC_ADDR+4)) << 32ull);
+```
+
+经过尝试发现，必须先读取高 32 位的值，否则运行 benchmark 时 end time 读出来时钟为0,从而会导致 总时间为 0-0=0,发生除0异常
+
+coremark 得分：
+
+> CoreMark PASS       416 Marks
+>                 vs. 100000 Marks (i7-7700K @ 4.20GHz)
+
+#### RTFSC 了解一切细节
+
+做第四期的时候我没有发现这个问题，但刚才上面读取寄存器的顺序可能就是这个坑，第四期时我是先读取的高位，这次一开始我写的先读低32位就挂了.
+
+RTFSC，在调用 inl 时，模拟器会通过 map_read 访问设备，会触发相应的回调函数。时钟对应的回调函数是
+
+```c
+static void rtc_io_handler(uint32_t offset, int len, bool is_write) {
+  assert(offset == 0 || offset == 4);
+  if (!is_write && offset == 4) {
+    uint64_t us = get_time();
+    rtc_port_base[0] = (uint32_t)us;
+    rtc_port_base[1] = us >> 32;
+  }
+}
+```
+
+根据这个函数，当读取了 RTC_ADDR + 4 处后，会调用 get_time 来为下一次读取准备好数据。
+
+这些函数的调用关系是 uptime_ms->ioe_read ->__am_timer_uptime-> inl(RTC_ADDR) && inl(RTC_ADDR+4)
+
+```c
+static inline uint32_t inl(uintptr_t addr) { return *(volatile uint32_t *)addr; }
+```
+
+这个 inl 直接访问 addr 处并取回数据。
+
+开启 ftrace，先读低32位在读高32位运行dhrystone 能够正常运行且没有报错？？？
+
+ftrace 显示的调用过程是 
+
+```c
+#6: call: ioe_read at 80000cc8
+#6: call: __am_timer_uptime at 80000ce8
+#6: ret:  ioe_read at 80000cfc to 80000524
+```
+
+```c
+void __am_timer_uptime(AM_TIMER_UPTIME_T *uptime) {
+  //uptime->us = (((uint64_t)inl(RTC_ADDR+4)) << 32ull) + inl(RTC_ADDR);
+  uptime->us = inl(RTC_ADDR); //+ (((uint64_t)inl(RTC_ADDR+4)) << 32ull);
+  uptime->us += (uint64_t)((uint64_t)inl(RTC_ADDR+4) << 32ull);
+}
+```
+
+改成先读高位再试一次，即改成注释那样，再跑一次没有问题，改成下面这样再跑一次：
+
+```c
+uptime->us = (uint64_t)inl(RTC_ADDR) + (((uint64_t)inl(RTC_ADDR+4)) << 32ull);
+```
+
+又能跑了
+
+关闭 ftrace 再跑，爆了，说明这个 bug 还和 trace 有关。
+
+如果同时开启 mtrace，在跑了一段时间以后终端就会卡住。上面的“打开ftrace”都是关闭 mtrace 跑的。
+
+对比了一下第四期时的 benchmark 得分，dhrystone 的分很低只有16分，但 microbench 和 coremark 都小幅提高（25%）
+
+```
+Dhrystone PASS         16 Marks
+                   vs. 100000 Marks (i7-7700K @ 4.20GHz)
+```
+
+第四期时 dhrystone 能跑到 130 分. 
+
+换成 native 跑的得分是正常的 125842 分，复用第四期代码跑仍然只有25分。
+
+修改代码，让读取低 4 位时也能触发回调函数，得分仍然是 25 分。
+
+#### dtrace
+
+
+
 ## 最简单的处理器
 
 支持 addi 和 ebreak，参考一生一芯视频课提到的 YPC （第六节）的写法
@@ -1272,6 +1422,8 @@ BINNAME = $(patsubst %-$(ARCH), %, $(IMAGE_NAME))
 
 在跑 load-store 测例时 npc 的 ftrace 报错，找不到 elf 文件，但是 build 目录下有该文件，bin、elf、txt 都在，查看 strerror(errno) 得到的结果是文件或目录不存在, matrix-mul，quick-sort 也存在这个问题
 
+**如果不用 make 一键仿真，而是先用 Verilator 编译出可执行文件，再通过参数传递 img 的路径，就不会报错**
+
 把 ftrace 关了（在 npc 的 init_monitor 函数里不调用 set_ftrace_enable），报错信息就变成了段错误
 
 ```shell
@@ -1293,6 +1445,33 @@ make[1]: *** [/home/yjmstr/ysyx-workbench/abstract-machine/scripts/platform/npc.
 
 给elf_file 分配的内存是 strlen(img_file)，这会导致最后一个 '\0' 存到不应该存的地方去。如果分配 strlen(img_file)+1 再进行一键仿真就不会报错了，但是这解释不了为什么之前手动输入参数运行不会报错，而一键仿真时会报错。用 Valgrind 跑测例也是手动传入参数再运行。
 
+修改之后 strcat 处仍然报相同的错误，用 memset 对分配的内存进行初始化后仍报同样的错误
+
+```c
+  img_file = argv[1];
+  elf_file = (char *)malloc(strlen(img_file)+1);
+  memset(elf_file, 0, sizeof(elf_file));
+  memcpy(elf_file, img_file, strlen(img_file)-3);
+  strcat(elf_file, "elf");
+```
+
+```sh
+==64032== Memcheck, a memory error detector
+==64032== Copyright (C) 2002-2022, and GNU GPL'd, by Julian Seward et al.
+==64032== Using Valgrind-3.21.0 and LibVEX; rerun with -h for copyright info
+==64032== Command: /home/yjmstr/ysyx-workbench/npc/build/Top build/load-store-riscv32e-npc.bin
+==64032== 
+==64032== Conditional jump or move depends on uninitialised value(s)
+==64032==    at 0x8D58947: strcat (vg_replace_strmem.c:333)
+==64032==    by 0x114574: sim_main(int, char**) (in /home/yjmstr/ysyx-workbench/npc/build/Top)
+==64032==    by 0x111EA2: main (in /home/yjmstr/ysyx-workbench/npc/build/Top)
+==64032== 
+```
+
+
+
 #### 用 yosys-sta 综合
 
 样例包含一个 sdc 文件和 verilog 文件，STFW 得知 SDC 文件为设计约束文件，我的 npc 目前没有 sdc 文件，
+
+### 

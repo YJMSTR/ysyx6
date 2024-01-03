@@ -26,6 +26,12 @@ static void rtc_io_handler(uint32_t offset, int len, bool is_write) {
     rtc_port_base[0] = (uint32_t)us;
     rtc_port_base[1] = us >> 32;
   }
+  //added
+  // if (!is_write && offset == 0) {
+  //   uint64_t us = get_time();
+  //   rtc_port_base[0] = (uint32_t)us;
+  //   rtc_port_base[1] = us >> 32;
+  // }
 }
 
 #ifndef CONFIG_TARGET_AM

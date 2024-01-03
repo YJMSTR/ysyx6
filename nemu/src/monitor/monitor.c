@@ -89,7 +89,7 @@ static int parse_args(int argc, char *argv[]) {
       case 'p': sscanf(optarg, "%d", &difftest_port); break;
       case 'l': log_file = optarg; break;
       case 'd': diff_so_file = optarg; break;
-      case 'r': set_ftrace_enable(); elf_file = optarg; break;
+      case 'r': elf_file = optarg; break;
       case 1: img_file = optarg; return 0;
       default:
         printf("Usage: %s [OPTION...] IMAGE [args]\n\n", argv[0]);
@@ -136,6 +136,9 @@ void init_monitor(int argc, char *argv[]) {
   init_sdb();
 
   /* Initialize the FTrace. */
+  #ifdef CONFIG_ITRACE
+  set_ftrace_enable();
+  #endif
   if (ftrace_is_enable())
     init_ftrace(elf_file);
 

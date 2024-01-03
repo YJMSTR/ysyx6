@@ -367,6 +367,7 @@ int sim_main(int argc, char** argv) {
   
   img_file = argv[1];
   elf_file = (char *)malloc(strlen(img_file)+1);
+  memset(elf_file, '\0', sizeof(elf_file));
   memcpy(elf_file, img_file, strlen(img_file)-3);
   strcat(elf_file, "elf");
   init_monitor();

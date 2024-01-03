@@ -79,7 +79,7 @@ pairpc fstack[MAX_FSTACK];  //ftrace 支持的最大大小栈，默认500000
 int ftop;
 
 void ftrace(vaddr_t pc, vaddr_t dnpc, uint32_t instval, uint32_t ra) {
-    Log("ftrace pc = 0x%08x dnpc = 0x%08x instval = 0x%08x ra = 0x%08x\n",pc,dnpc,instval,ra);
+    //Log("ftrace pc = 0x%08x dnpc = 0x%08x instval = 0x%08x ra = 0x%08x\n",pc,dnpc,instval,ra);
     if (pc == 0x80000000) {
          for (int i = 0; i < funcnum; i++) {
             if (func[i].value == pc) {
