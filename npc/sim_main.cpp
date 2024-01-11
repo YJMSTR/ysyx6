@@ -68,17 +68,16 @@ static uint8_t mem[MEM_SIZE] = {
 }; 
 
 extern "C" void pmem_read(int raddr, int *rdata) {
-  //printf("addr = 0x%08x\n", addr);
   assert(raddr >= MEM_BASE && (raddr - MEM_BASE + 3) < MEM_SIZE);
-  //return mem[addr-MEM_BASE]+(mem[addr-MEM_BASE+1]<<8)+(mem[addr-MEM_BASE+2]<<16)+(mem[addr-MEM_BASE+3]<<24);
-  //int addr = raddr & ~0x3u;
   int addr = raddr;
+  //int addr = raddr & ~0x3u;
   //printf("pmem_read: raddr = 0x%08x addr=0x%08x\n", raddr, addr);
   *rdata = mem[addr-MEM_BASE]+(mem[addr-MEM_BASE+1]<<8)+(mem[addr-MEM_BASE+2]<<16)+(mem[addr-MEM_BASE+3]<<24);
   //printf("pmem_read: *rdata = 0x%08x\n", *rdata);
 }
 
 extern "C" void pmem_write(int waddr, int wdata, char wmask) {
+  //waddr &= ~0x3u;
   assert(waddr >= MEM_BASE && (waddr - MEM_BASE + 3) < MEM_SIZE);
  // printf("pmem_write: waddr = 0x%08x wdata = 0x%08x wmask = 0x%x\n", waddr, wdata, wmask);
   for (int i = 0; i < 4; i++) {

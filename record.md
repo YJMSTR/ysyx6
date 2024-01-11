@@ -1156,6 +1156,145 @@ Dhrystone PASS         16 Marks
 
 #### dtrace
 
+略
+
+#### 实现IOE（2）键盘
+
+review: 按下是通码，松开是断
+
+> \#键盘#
+>
+> 键盘中含有名为键盘编码器的芯片（如 i8048），用于检测按键的按下与释放，并向键盘控制器发送扫描码。
+>
+> 每个键被按下时对应的扫描码被称为通码（make code），弹起时的扫描码是断码（break code）。每个键都有唯一的通码和断码。
+>
+> 现行的扫描码有三种，所有现代键盘默认使用第二种扫描码。在第二套扫描码中，断码是在通码前多发送一帧 0xF0，共两帧进行传输，例如 `W` 键的通码为 0x1D，则其断码为 0xF0 0x1D。
+>
+> 键盘控制器（如 i8042）位于南桥芯片上，不在键盘内部。它接收键盘编码器发送来的第二种扫描码，将其解码为第一套扫描码后保存到自己的寄存器中。
+>
+> i8042 有 4 个 8 bits 寄存器，其中输入缓冲器和输出缓冲器共用 0x60 端口，状态寄存器和控制寄存器共用 0x64 处的端口。在 CPU 从 i8042 读入数据时，这两个端口分别对应输出缓冲区和状态寄存器；而在 CPU 向 i8042 写入数据时，这两个端口对应输入缓冲区和控制寄存器。
+>
+> 第一种扫描码中大部分通码和断码都是 1 字节，长度超过 1 字节的扫描码都是以 0xE0 开头，Pause Brk 键例外，它以 0xE1 开头。在第一种扫描码中，断码等于通码在数值上加上 0x80，并且通码的最低字节的最高位均为 0。因此，我们可以通过该位的值来判断按键的按下和释放
+
+AM 中读取的 keycode  是按照 amdev.h 中的映射来的。直接通过 inb 从 KBD_ADDR 读入 kbd->keycode。但如何判断断码和通码？讲义里说 keycode 是断码，但按下和释放的时候都有 keycode。
+
+讲义里说注册了 4 字节的端口，但只有最低字节是按键对应的扫描码。判断读入的4字节数据与 KEYDOWN_MASK 的与值是否为 0 以判断键盘按下与释放
+
+#### 实现IOE3 VGA
+
+nemu/src/device/vga.c 在 NEMU 层面定义了显示器的大小。vgactl 的高 2 个字节是 width，低 2 个字节是 height。用 inw 从 VGACTL_ADDR 读出数据即可。
+
+还有一个用于同步的 sync，对应 SYNC_ADDR=VGACTL_ADDR+4 处的 MMIO，即 vgactl_port_base[1]
+
+####  实现IOE(4)
+
+修改 fbdraw，把 pixels 中的东西画到 framebuffer 上，在 (x,y) 处画一个 wxh 的矩形
+
+```c
+for (int i = 0; i < ctl->h /*&& i + ctl->y < h*/; i++) {
+  for (int j = 0; j < ctl->w /*&& j + ctl->x < w*/; j++) {
+    int t = (i + ctl->y) * w + j + ctl->x;
+    fb[t] = *(pixels + i * ctl->w + j);
+  }
+}
+```
+
+### 冯诺依曼计算机系统
+
+#### 游戏是如何运行的
+
+> 请你以打字小游戏为例, 结合"程序在计算机上运行"的两个视角, 来剖析打字小游戏究竟是如何在计算机上运行的. 具体地, 当你按下一个字母并命中的时候, 整个计算机系统(NEMU, ISA, AM, 运行时环境, 程序) 是如何协同工作, 从而让打字小游戏实现出"命中"的游戏效果?
+>
+> 打字小游戏只有不到200行的简单代码, 非常适合大家RTFSC. 如果你发现自己难以理解打字小游戏的具体行为, 你需要给自己敲响警钟了: 你在做PA的时候很有可能只关注怎么把必做内容的代码写对, 而不去思考这些代码和计算机系统的关系. 从ICS和PA的角度来说, 这种做法是不及格的, 而且很快你就会吃苦头了.
+
+main 函数中有一个主循环不断检测按下的键，调用 io_read 读取 am 键盘获取按键信息。
+
+程序通过 check_hit 函数检查范围内的字符是否有与按下的字符一致的，并执行对应操作（例如 miss++）。game_logic_update 函数负责刷新字符及其位置，render 负责向 FB 写入数据，以及让字符拥有对应的颜色。这个过程中 NEMU 会模拟指令的执行以及模拟时钟、画布等设备
+
+#### 必答题
+
+编译与链接：
+
+> 在`nemu/include/cpu/ifetch.h`中, 你会看到由`static inline`开头定义的`inst_fetch()`函数. 分别尝试去掉`static`, 去掉`inline`或去掉两者, 然后重新进行编译, 你可能会看到发生错误. 请分别解释为什么这些错误会发生/不发生? 你有办法证明你的想法吗?
+
+去掉 static 没有报错，去掉 inline 也没有报错，去掉二者则会报错：
+
+```
+ /usr/bin/ld: /home/yjmstr/ysyx-workbench/nemu/build/obj-riscv32-nemu-interpreter/src/engine/interpreter/hostcall.o: in function `inst_fetch':
+hostcall.c:(.text+0x0): multiple definition of `inst_fetch'; /home/yjmstr/ysyx-workbench/nemu/build/obj-riscv32-nemu-interpreter/src/isa/riscv32/inst.o:inst.c:(.text+0xeb0): first defined here
+collect2: error: ld returned 1 exit status
+```
+
+static 关键字可以使函数变为静态函数，仅声明该函数的文件可以访问静态函数，因此不同文件中可以存在同名的 static 函数。inline 是建议编译器将函数内联，编译器最终不一定会这么做。注意到这个函数是定义在头文件里的，多处引用该头文件的话如果没加 static 的话 inline 不内联就会重复定义。对于头文件中定义的函数，其要被外部使用则不会内联，得加 static inline 才能成功内联。
+
+去掉 static 不会报错，可能是因为编译器将其内联了。去掉 inline 不报错是因为引用该头文件的 c 文件都创建了该函数的 static 副本，static 允许不同文件中的同名函数。
+
+> 在`nemu/include/common.h`中添加一行`volatile static int dummy;` 然后重新编译NEMU. 请问重新编译后的NEMU含有多少个`dummy`变量的实体? 你是如何得到这个结果的?
+
+`nm build/riscv32-nemu-interpreter | grep dummy` ，34 个。nm 可以从对象文件中读取符号
+
+> 添加上题中的代码后, 再在`nemu/include/debug.h`中添加一行`volatile static int dummy;` 然后重新编译NEMU. 请问此时的NEMU含有多少个`dummy`变量的实体? 与上题中`dummy`变量实体数目进行比较, 并解释本题的结果.
+
+还是 34 个。去掉 debug.h 中添加的代码并把 common.h 中的 volatile 去掉，则会报错 定义了未使用的变量。y
+
+> 修改添加的代码, 为两处`dummy`变量进行初始化:`volatile static int dummy = 0;` 然后重新编译NEMU. 你发现了什么问题? 为什么之前没有出现这样的问题? (回答完本题后可以删除添加的代码.)
+
+此时会报错 `error: redefinition of ‘dummy’` 。STFW，C 语言的 static 变量在编译时初始化，C++ 的 static 变量在运行时初始化，如果在头文件中定义 static 变量，其会在所有包括该头文件的源文件中都进行一次初始化。如果仅在 common.h 中进行初始化则不会报错。这涉及到 C 语言的链接决议规则：
+
+链接器的工作分为两个阶段：符号解析和重定位。对于编译器来说，函数名和变量名都可以称为符号。符号可以分为强符号和弱符号，对于 C/C++，函数名称和初始化了的变量的名称为强符号，未初始化的变量名为弱符号。
+
+- 链接器不允许强符号被多次定义
+- 链接器选择符号时，一强多弱的同名符号选择强的那个
+- 全是同名弱符号选择占空间最大的那个
+
+上述例子中，如果同时在两个头文件中进行初始化，就会有两个名为dummy的强符号，这是链接器不允许的。之前没有出现这个问题是因为之前dummy都是弱符号，链接器只会选取占空间最大的那个。
+
+> **了解Makefile**
+>
+> 请描述你在`am-kernels/kernels/hello/`目录下敲入`make ARCH=$ISA-nemu` 后, `make`程序如何组织.c和.h文件, 最终生成可执行文件`am-kernels/kernels/hello/build/hello-$ISA-nemu.elf`. (这个问题包括两个方面:`Makefile`的工作方式和编译链接的过程.) 关于`Makefile`工作方式的提示:
+>
+> - `Makefile`中使用了变量, 包含文件等特性
+> - `Makefile`运用并重写了一些implicit rules
+> - 在`man make`中搜索`-n`选项, 也许会对你有帮助
+> - RTFM
+
+hello 文件夹中的 makefile 包含了 AM_HOME 目录下的 makefile，后者定义了 `INC_PATH += $(WORK_DIR)/include $(addsuffix /include/, $(addprefix $(AM_HOME)/, $(LIBS)))`，编译器在编译时将会在 INC_PATH 下寻找头文件，包括 am 和 klib 的头文件（由 LIBS 指定）。
+
+此外还定义了 ARCH_H 变量来指定 am 的 `arch/$(ARCH).h`
+
+第二点，隐含规则例如 AS、CC 等对应的规则在 AMHOME 下的 makefile 中进行了重写，将其改为使用对应架构的交叉编译工具链。
+
+第三点，在 man 中可以通过 `/` 进行查找，`/` 后面可以跟正则表达式。查找到 -n 选项为：
+
+>  -n, --just-print, --dry-run, --recon
+>             Print the commands that would be executed, but do not execute them
+>             (except in certain circumstances).
+
+可以用来看变量展开以后的命令
+
+得到的输出如下：
+
+```
+# Building hello-image [riscv32e-nemu]
+make -s -C /home/yjmstr/ysyx-workbench/abstract-machine/am archive
+# Building am-archive [riscv32e-nemu]
+mkdir -p /home/yjmstr/ysyx-workbench/abstract-machine/am/build/riscv32e-nemu/src/platform/nemu/ && echo + CC src/platform/nemu/trm.c
+riscv64-linux-gnu-gcc -std=gnu11 -O2 -MMD -Wall -Werror -I/home/yjmstr/ysyx-workbench/abstract-machine/am/src -I/home/yjmstr/ysyx-workbench/abstract-machine/am/include -I/home/yjmstr/ysyx-workbench/abstract-machine/am/include/ -I/home/yjmstr/ysyx-workbench/abstract-machine/klib/include/ -D__ISA__=\"riscv32e\" -D__ISA_RISCV32E__ -D__ARCH__=riscv32e-nemu -D__ARCH_RISCV32E_NEMU -D__PLATFORM__=nemu -D__PLATFORM_NEMU -DARCH_H=\"arch/riscv.h\" -fno-asynchronous-unwind-tables -fno-builtin -fno-stack-protector -Wno-main -U_FORTIFY_SOURCE -fno-pic -march=rv64g -mcmodel=medany -mstrict-align -march=rv32em_zicsr -mabi=ilp32e   -static -fdata-sections -ffunction-sections -DMAINARGS=\"\" -I/home/yjmstr/ysyx-workbench/abstract-machine/am/src/platform/nemu/include -DISA_H=\"riscv/riscv.h\" -c -o /home/yjmstr/ysyx-workbench/abstract-machine/am/build/riscv32e-nemu/src/platform/nemu/trm.o /home/yjmstr/ysyx-workbench/abstract-machine/am/src/platform/nemu/trm.c
+echo + AR "->" build/am-riscv32e-nemu.a
+riscv64-linux-gnu-ar rcs /home/yjmstr/ysyx-workbench/abstract-machine/am/build/am-riscv32e-nemu.a /home/yjmstr/ysyx-workbench/abstract-machine/am/build/riscv32e-nemu/src/platform/nemu/trm.o /home/yjmstr/ysyx-workbench/abstract-machine/am/build/riscv32e-nemu/src/platform/nemu/ioe/ioe.o /home/yjmstr/ysyx-workbench/abstract-machine/am/build/riscv32e-nemu/src/platform/nemu/ioe/timer.o /home/yjmstr/ysyx-workbench/abstract-machine/am/build/riscv32e-nemu/src/platform/nemu/ioe/input.o /home/yjmstr/ysyx-workbench/abstract-machine/am/build/riscv32e-nemu/src/platform/nemu/ioe/gpu.o /home/yjmstr/ysyx-workbench/abstract-machine/am/build/riscv32e-nemu/src/platform/nemu/ioe/audio.o /home/yjmstr/ysyx-workbench/abstract-machine/am/build/riscv32e-nemu/src/platform/nemu/ioe/disk.o /home/yjmstr/ysyx-workbench/abstract-machine/am/build/riscv32e-nemu/src/platform/nemu/mpe.o /home/yjmstr/ysyx-workbench/abstract-machine/am/build/riscv32e-nemu/src/riscv/nemu/start.o /home/yjmstr/ysyx-workbench/abstract-machine/am/build/riscv32e-nemu/src/riscv/nemu/cte.o /home/yjmstr/ysyx-workbench/abstract-machine/am/build/riscv32e-nemu/src/riscv/nemu/trap.o /home/yjmstr/ysyx-workbench/abstract-machine/am/build/riscv32e-nemu/src/riscv/nemu/vme.o
+make -s -C /home/yjmstr/ysyx-workbench/abstract-machine/klib archive
+# Building klib-archive [riscv32e-nemu]
+echo + LD "->" build/hello-riscv32e-nemu.elf
+riscv64-linux-gnu-ld -z noexecstack -melf64lriscv -T /home/yjmstr/ysyx-workbench/abstract-machine/scripts/linker.ld --defsym=_pmem_start=0x80000000 --defsym=_entry_offset=0x0 --gc-sections -e _start -melf32lriscv                      -o /home/yjmstr/ysyx-workbench/am-kernels/kernels/hello/build/hello-riscv32e-nemu.elf --start-group /home/yjmstr/ysyx-workbench/am-kernels/kernels/hello/build/riscv32e-nemu/hello.o /home/yjmstr/ysyx-workbench/abstract-machine/am/build/am-riscv32e-nemu.a /home/yjmstr/ysyx-workbench/abstract-machine/klib/build/klib-riscv32e-nemu.a --end-group
+echo \# Creating image [riscv32e-nemu]
+riscv64-linux-gnu-objdump -d /home/yjmstr/ysyx-workbench/am-kernels/kernels/hello/build/hello-riscv32e-nemu.elf > /home/yjmstr/ysyx-workbench/am-kernels/kernels/hello/build/hello-riscv32e-nemu.txt
+echo + OBJCOPY "->" build/hello-riscv32e-nemu.bin
+riscv64-linux-gnu-objcopy -S --set-section-flags .bss=alloc,contents -O binary /home/yjmstr/ysyx-workbench/am-kernels/kernels/hello/build/hello-riscv32e-nemu.elf /home/yjmstr/ysyx-workbench/am-kernels/kernels/hello/build/hello-riscv32e-nemu.bin
+```
+
+am 和 klib 作为静态库被链接进最终的文件
+
+编译出的 elf 文件通过 objdump -d 去掉符号表之类的得到 bin 文件，并输出到 txt 中
 
 
 ## 最简单的处理器
@@ -1376,6 +1515,8 @@ wireinst := Mux(reset, 0.U, InstFetcher.io.inst)
 在Chisel中，如果Fill函数的第一个参数为0，它将返回一个全为0的硬件节点，其位宽由第二个参数指定。例如，Fill(0, myUInt)将返回一个与myUInt具有相同位宽的全为0的硬件节点。这种用法通常用于在Chisel中创建一个全为0的硬件节点，而不是进行符号位扩展。
 
 跑测例 sum 的时候发现 bne 在该跳转的时候没有跳转 ，经检查发现是参与比较的两个数错了，比较的是 rs1v 和 rs2v 两个寄存器值，修改后 HIT GOOD TRAP。
+
+**注意：目前访存相关函数没有进行地址对齐（NEMU也没有），如果进行地址对齐，unalign 测例会无法通过**。如果要地址对齐，那么 NEMU 的相应实现也该进行地址对齐
 
 #### 修改 makefile 以修复文件名错误
 
