@@ -51,6 +51,7 @@ class Top extends Module {
   NPC_Mem.io.waddr := memwaddr
   NPC_Mem.io.wdata := memwdata
   NPC_Mem.io.wmask := memwmask
+  NPC_Mem.io.clk := clock
 
   // 寄存器
   val R = Mem(32, UInt(XLEN.W))
@@ -85,6 +86,7 @@ class Top extends Module {
   // 现在需要额外调用一次 pmem_read() 来实现
   val InstFetcher = Module(new DPIC_IFU)
   InstFetcher.io.pc := wirepc
+  InstFetcher.io.clk := clock
   wireinst := Mux(reset.asBool, 0.U, InstFetcher.io.inst)
   InstFetcher.io.valid := Mux(reset.asBool, 0.U, 1.U)
   io.inst := wireinst

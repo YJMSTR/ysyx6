@@ -42,7 +42,7 @@ class IDU() extends Module {
   val List(alu_op, alu_sel_a, alu_sel_b, isdnpc, immsel, rden, memvalid, memwen, memwmask, memsext) = ListLookup(
     io.inst,
     List(ALU_NONE, ALU_DATA_NONE, ALU_DATA_NONE, 0.U(1.W), IMM_NONE, 0.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W), MEM_SEXT_NONE),
-    //List(ALU_OP, ALU_A, ALU_B, isdnpc, IMMSEL, RDEN, memvalid, memwen, memwmask, memsext&bits)
+    //List(ALU_OP, ALU_A, ALU_B, isdnpc, IMMSEL, RDWEN, memvalid, memwen, memwmask, memsext&bits)
     // NONE 就直接全0
     // 只用到一个数据就 none + data， op 设为 add
     Array(
@@ -110,7 +110,8 @@ class IDU() extends Module {
   // immGen 
   val immi = Cat(Fill(XLEN-12, io.inst(31)), io.inst(31, 20))
   val immj_tmp = Cat(io.inst(31), io.inst(19, 12), io.inst(20), io.inst(30,21), 0.U(1.W))
-  val immj = Cat(Fill(XLEN-12, immj_tmp(11)), immj_tmp)
+  val immj = Cat(Fill(XLEN-12, immj_tmp(20)), immj_tmp)
+  //printf("immj = %x\n", immj)
   val immu = Cat(io.inst(31, 12), 0.U(12.W))
   val imms_tmp = Cat(io.inst(31, 25), io.inst(11, 7))
   val imms = Cat(Fill(XLEN-12, imms_tmp(11)), imms_tmp)

@@ -28,7 +28,7 @@ void init_difftest(char *ref_so_file, long img_size, int port);
 extern NPC_STATES npc_state;
 static char *diff_so_file = "/home/yjmstr/ysyx-workbench/nemu/build/riscv32-nemu-interpreter-so";
 static int difftest_port = 1234;
-const char *log_file = "/home/yjmstr/ysyx-workbench/npc/log.txt";
+const char *log_file = "/home/yjmstr/ysyx-workbench/npc/logs/log.txt";
 
 void assert_fail_msg() {
   npc_reg_display();
@@ -92,9 +92,9 @@ static int cmd_x(char *args) {
   char *arg2 = arg + strlen(arg) + 1;
   sscanf(arg2, "%x", &addr);
   for (uint32_t i = 0; i < count; i++) {
-    printf("0x%08x: 0x%08x , ", addr + i * 4, vaddr_read(addr+i*4, 4));
+    printf("0x%08x: 0x%08x , ", addr + i * 4, npc_vaddr_read(addr+i*4, 4));
     for (uint32_t j = 0; j < 4; j++) {
-      printf("%02x ", vaddr_read(addr + i*4+j, 1));
+      printf("%02x ", npc_vaddr_read(addr + i*4+j, 1));
     }
     printf("\n");
   }
@@ -150,7 +150,7 @@ static int cmd_help(char *args) {
 
 void init_monitor() {
   init_log(log_file);
-  set_ftrace_enable();
+  //set_ftrace_enable();
   long img_size = load_img();
   init_difftest(diff_so_file, img_size, difftest_port);
   init_disasm("riscv32" "-pc-linux-gnu");

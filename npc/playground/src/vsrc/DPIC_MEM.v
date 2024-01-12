@@ -1,4 +1,4 @@
-module DPIC_MEM(valid, wen, raddr, rdata, waddr, wdata, wmask);
+module DPIC_MEM(valid, wen, raddr, rdata, waddr, wdata, wmask, clk);
   input valid;
   input wen;
   input [31:0] raddr;
@@ -6,16 +6,19 @@ module DPIC_MEM(valid, wen, raddr, rdata, waddr, wdata, wmask);
   input [31:0] waddr;
   input [31:0] wdata;
   input [7:0] wmask;
-  import "DPI-C" function void pmem_read(
+  input clk;
+  import "DPI-C" function void npc_pmem_read(
     input int raddr, output int rdata);
-  import "DPI-C" function void pmem_write(
+  import "DPI-C" function void npc_pmem_write(
   input int waddr, input int wdata, input byte wmask);
-  always @(*) begin
+  always @(posedge clk) begin
     if (valid) begin // 有读写请求时
       if (~wen) begin // 读
-        pmem_read(raddr, rdata);
+        npc_pmem_read(raddr, rdata);
+        //$display("npc mem pmem read."); 
       end else begin // 有写请求时
-        pmem_write(waddr, wdata, wmask);
+        npc_pmem_write(waddr, wdata, wmask);
+        //$display("npc mem pmem write."); 
         rdata = 0;
       end
     end

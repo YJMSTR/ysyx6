@@ -1,5 +1,6 @@
 #include <am.h>
 #include <klib-macros.h>
+#include <npc.h>
 
 extern char _heap_start;
 int main(const char *args);
@@ -17,6 +18,7 @@ static const char mainargs[] = MAINARGS;
 #define npc_trap(_code) asm volatile("mv a0, %0; ebreak" : :"r"(_code))
 
 void putch(char ch) {
+  outb(SERIAL_PORT, ch);
 }
 
 void halt(int code) {

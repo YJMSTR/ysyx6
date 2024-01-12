@@ -14,10 +14,24 @@
 #include <debug.h>
 #include <macro.h>
 #include <dlfcn.h>
+#include <sys/time.h>
+
 
 
 #define MEM_BASE 0x80000000
 #define MEM_SIZE 0x8000000
+#define DEVICE_BASE 0xa0000000
+
+#define MMIO_BASE 0xa0000000
+
+#define SERIAL_PORT     (DEVICE_BASE + 0x00003f8)
+#define KBD_ADDR        (DEVICE_BASE + 0x0000060)
+#define RTC_ADDR        (DEVICE_BASE + 0x0000048)
+#define VGACTL_ADDR     (DEVICE_BASE + 0x0000100)
+#define AUDIO_ADDR      (DEVICE_BASE + 0x0000200)
+#define DISK_ADDR       (DEVICE_BASE + 0x0000300)
+#define FB_ADDR         (MMIO_BASE   + 0x1000000)
+#define AUDIO_SBUF_ADDR (MMIO_BASE   + 0x1200000)
 
 #ifndef CONFIG_ITRACE_RINGBUFFER_SIZE
   #define CONFIG_ITRACE_RINGBUFFER_SIZE 16
@@ -33,6 +47,7 @@ VTop* topp = new VTop{contextp};
 enum NPC_STATES npc_state;
 word_t npc_halt_pc;
 int npc_ret;
+bool difftest_is_enable = 1;
 
 // void nvboard_bind_all_pins(VTop *top);
 const char *regs[] = {
@@ -61,48 +76,14 @@ struct CPU_state {
 } cpu;
 
 enum { DIFFTEST_TO_DUT, DIFFTEST_TO_REF };
+
+
+
 static uint8_t mem[MEM_SIZE] = {
   0x93, 0x02, 0x00, 0x08, 
   0x13, 0x03, 0x10, 0x08,
   0x73, 0x00, 0x10, 0x00
 }; 
-
-extern "C" void pmem_read(int raddr, int *rdata) {
-  assert(raddr >= MEM_BASE && (raddr - MEM_BASE + 3) < MEM_SIZE);
-  int addr = raddr;
-  //int addr = raddr & ~0x3u;
-  //printf("pmem_read: raddr = 0x%08x addr=0x%08x\n", raddr, addr);
-  *rdata = mem[addr-MEM_BASE]+(mem[addr-MEM_BASE+1]<<8)+(mem[addr-MEM_BASE+2]<<16)+(mem[addr-MEM_BASE+3]<<24);
-  //printf("pmem_read: *rdata = 0x%08x\n", *rdata);
-}
-
-extern "C" void pmem_write(int waddr, int wdata, char wmask) {
-  //waddr &= ~0x3u;
-  assert(waddr >= MEM_BASE && (waddr - MEM_BASE + 3) < MEM_SIZE);
- // printf("pmem_write: waddr = 0x%08x wdata = 0x%08x wmask = 0x%x\n", waddr, wdata, wmask);
-  for (int i = 0; i < 4; i++) {
-    if (wmask & (1 << i)) {
-      mem[waddr-MEM_BASE+i] = (wdata >> (i * 8)) & 0xff;
-    }
-  }
-}
-
-word_t paddr_read(word_t addr, int len) {
-  switch (len) {
-    case 1: return mem[addr-MEM_BASE];
-    case 2: return mem[addr-MEM_BASE]*16+mem[addr-MEM_BASE];
-    case 4: return paddr_read(addr+2, 2)*256+paddr_read(addr, 2);
-    case 8: return (paddr_read(addr+4, 4) << 32) + paddr_read(addr, 4);
-    default: return 0;
-  }
-  return 0;
-}
-
-word_t vaddr_read(word_t addr, int len) {
-  return paddr_read(addr, len);
-}
-
-
 
 void (*ref_difftest_memcpy)(paddr_t addr, void *buf, size_t n, bool direction) = NULL;
 void (*ref_difftest_regcpy)(void *dut, bool direction) = NULL;
@@ -209,6 +190,66 @@ void difftest_step(vaddr_t pc, vaddr_t npc) {
   checkregs(&ref_r, pc);
 }
 
+extern "C" void npc_pmem_read(int raddr, int *rdata) {
+  static uint64_t us = 0;
+  uint32_t addr = raddr;
+  addr = addr & ~0x3u;
+  if (addr == RTC_ADDR + 4) {
+    //Log("DTRACE RTC_ADDR + 4");
+    difftest_skip_ref();
+    struct timeval now;
+    gettimeofday(&now, NULL);
+    us = now.tv_sec * 1000000 + now.tv_usec;
+    *rdata = us >> 32ull;
+    return;
+  } else if (addr == RTC_ADDR) {
+    //Log("DTRACE RTC_ADDR");
+    difftest_skip_ref();
+    *rdata = (uint32_t)us;
+    return;
+  }
+  printf("pmem_read: raddr = 0x%08x addr=0x%08x\n", raddr, addr);
+  assert(raddr >= MEM_BASE && (raddr - MEM_BASE + 3) < MEM_SIZE);
+  
+  *rdata = mem[addr-MEM_BASE]+(mem[addr-MEM_BASE+1]<<8)+(mem[addr-MEM_BASE+2]<<16)+(mem[addr-MEM_BASE+3]<<24);
+  //printf("pmem_read: *rdata = 0x%08x\n", *rdata);
+}
+
+extern "C" void npc_pmem_write(int waddr, int wdata, char wmask) {
+  int addr = waddr & ~0x3u;
+  //printf("pmem_write: waddr = 0x%08x wdata = 0x%08x wmask = 0x%x\n", waddr, wdata, wmask);
+  if (addr == SERIAL_PORT) {
+    difftest_skip_ref();
+    //Log("dtrace: pc = 0x%08x serial wdata = %d, wmask = %d", topp->io_pc, wdata, wmask);
+    if (wmask == 1) {
+      putchar(wdata);
+    } else {
+      Log("serial don't support wmask = 0x%x putch", wmask);
+    }
+    return;
+  }
+  assert(addr >= MEM_BASE && (addr - MEM_BASE + 3) < MEM_SIZE);
+  for (int i = 0; i < 4; i++) {
+    if (wmask & (1 << i)) {
+      mem[addr-MEM_BASE+i] = (wdata >> (i * 8)) & 0xff;
+    }
+  }
+}
+
+word_t npc_paddr_read(word_t addr, int len) {
+  switch (len) {
+    case 1: return mem[addr-MEM_BASE];
+    case 2: return mem[addr-MEM_BASE]*16+mem[addr-MEM_BASE];
+    case 4: return npc_paddr_read(addr+2, 2)*256+npc_paddr_read(addr, 2);
+    case 8: return ((uint64_t)npc_paddr_read(addr+4, 4) << 32ull) + npc_paddr_read(addr, 4);
+    default: return 0;
+  }
+  return 0;
+}
+
+word_t npc_vaddr_read(word_t addr, int len) {
+  return npc_paddr_read(addr, len);
+}
 
 char logbuf[128];
 extern "C" void disassemble(char *str, int size, uint64_t pc, uint8_t *code, int nbyte);
@@ -217,20 +258,19 @@ static void single_cycle() {
   char *p = logbuf;
 	contextp->timeInc(1);
   topp->clock = 0;
-  //Log("我没问题");
   topp->eval();
-  //Log("我没问题");
 #ifdef VCD
   tfp->dump(contextp->time());
 #endif
   contextp->timeInc(1);
-  //topp->io_inst = topp->reset ? 0 : pmem_read(topp->io_pc);
   topp->clock = 1;
-  word_t pc = topp->io_pc, instval = topp->io_inst, npc;
-  //Log("我没问题, pc = 0x%08x, inst = 0x%08x", pc, instval);
+  word_t pc = topp->io_pc;
   topp->eval();
-  //Log("我没问题");
-  npc = topp->io_pc;
+  word_t instval = topp->io_inst, npc = topp->io_pc;
+  printf("pc == 0x%08x, npc == 0x%08x\n", pc, npc);
+#ifdef VCD
+  tfp->dump(contextp->time());
+#endif
   if (topp->reset == 0) {
     //printf("[itrace] inst = 0x%08x\n", topp->io_inst);
     p += snprintf(p, sizeof(logbuf), "0x%08x :", pc);
@@ -251,10 +291,6 @@ static void single_cycle() {
       ftrace(pc, npc, iringbuf.inst[iringbuf.cur], reg_val);
     }
   }
-  
-#ifdef VCD
-  tfp->dump(contextp->time());
-#endif
   //sleep(1);
 }
 
@@ -312,7 +348,9 @@ void print_iringbuf() {
 }
 static void trace_and_difftest(vaddr_t pc, vaddr_t dnpc) {
   log_write("%s\n", logbuf);
-  difftest_step(pc, dnpc);
+  printf("difftest pc == 0x%08x, dnpc == 0x%08x\n", pc, dnpc);
+  if (difftest_is_enable)
+    difftest_step(pc, dnpc);
 }
 
 void cpu_exec(uint32_t n) {

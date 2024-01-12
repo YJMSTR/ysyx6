@@ -13,6 +13,8 @@ LDFLAGS   += -T $(AM_HOME)/scripts/linker.ld \
 						 --defsym=_pmem_start=0x80000000 --defsym=_entry_offset=0x0
 LDFLAGS   += --gc-sections -e _start
 CFLAGS += -DMAINARGS=\"$(mainargs)\"
+CFLAGS += -I$(AM_HOME)/am/src/platform/npc/include
+
 .PHONY: $(AM_HOME)/am/src/riscv/npc/trm.c
 
 IMAGE_NAME = $(basename $(notdir $(IMAGE)))
@@ -26,5 +28,6 @@ image: $(IMAGE).elf
 	@$(OBJCOPY) -S --set-section-flags .bss=alloc,contents -O binary $(IMAGE).elf $(IMAGE).bin
 
 run: image
-	$(MAKE) -C /home/yjmstr/ysyx-workbench/am-kernels/tests/cpu-tests ARCH=$(ARCH) ALL="$(BINNAME)"
-	$(MAKE) -C $(NPC_HOME) ISA=$(ISA) run IMG=$(IMAGE).bin
+# $(MAKE) -C /home/yjmstr/ysyx-workbench/am-kernels/tests/cpu-tests ARCH=$(ARCH) ALL="$(BINNAME)"
+	$(MAKE) -C $(shell pwd) ARCH=$(ARCH) ALL="$(BINNAME)"
+	$(MAKE) -C $(NPC_HOME) ISA=$(ISA) run IMG=$(IMAGE).bin vcd=1

@@ -1433,11 +1433,7 @@ asm volatile("mv a0, %0; ebreak" : :"r"(code))
 
 动态链接 nemu 时报错：`==14526==ASan runtime does not come first in initial library list; you should either link runtime to your application or manually preload it with LD_PRELOAD.` 临时的解决方案是编译 nemu 时取消选中 asan 选项
 
-todo：给difftest添加比较两边寄存器的代码
-
-测试difftest：给addi额外加1，位于 EXU.scala 的 ALU_OP === ADD 处
-
-搭建好 difftest 之后运行 dummy，发现了 U 类型指令位数错误，和 reg[0] 没有每个周期清零这两个问题。
+现在 difftest 的开关是用一个全局变量定义的。且目前 nemu 没有实现对齐访存，如果 npc 实现了 4 字节对齐会导致 difftest 不一致。
 
 ### 实现RV32E指令集
 
@@ -1613,6 +1609,33 @@ make[1]: *** [/home/yjmstr/ysyx-workbench/abstract-machine/scripts/platform/npc.
 
 #### 用 yosys-sta 综合
 
-样例包含一个 sdc 文件和 verilog 文件，STFW 得知 SDC 文件为设计约束文件，我的 npc 目前没有 sdc 文件，
+样例包含一个 sdc 文件和 verilog 文件，STFW 得知 SDC 文件为设计约束文件，我的 npc 目前没有 sdc 文件， 
 
-### 
+### 设备和输入输出
+
+#### 在NPC中运行超级玛丽（为NPC添加串口和时钟）
+
+首先是时钟，修改 npc 的 pmem_read 函数之后还要在 am 一侧添加相应的代码。在 platform 文件夹中新建一个 npc 文件夹，并添加 npc.h，在其中定义 RTC_ADDR 等宏并修改 npc.mk 将其添加到 include path 中。此外，还需要 `CFLAGS  += -DISA_H=\"riscv/riscv.h\"`，这个可以放在 scripts 文件夹下 riscv32e-npc 的脚本。
+
+都改完以后发现 sim_main.cpp 里还是要重新定义一下 RTC_ADDR 在哪，am 定义的那个头文件只能在 am 里用..
+
+跑 rtc test 的时候发现 pc 跑飞了
+
+```
+[/home/yjmstr/ysyx-workbench/npc/sim_main.cpp:222 pmem_write] dtrace: pc = 0x80001090 serial wdata = 111, wmask = 1
+difftest: reg #2 = sp err at pc: 0x80200634
+difftest: ref_r->gpr[2] == 0x8009cfb0
+$0: 0
+ra: 8000106c
+sp: 8009cfe8
+```
+
+反汇编出来的文件里根本没有 0x80200634 这个地址的指令，看波形图也没有这个 pc，经检查发现是 j-type 立即数的符号位扩展写错了。修复后发现 difftest 涉及设备的部分也需要修改，在访问设备地址时应该跳过 diff。但后面发现区别还是有点大，暂时把 diff 关了
+
+串口同样要看看 am， 串口在 trm.c 里，只是实现 putch 函数的话每个字符会被输出三遍。如果给 sim_main 中的 pmem_read 函数加上地址对齐，putch 的输出不仅会重复超过3次还会乱码。在 DPIC 的 verilog 代码中添加输出，发现执行一条指令时会取指三次，且有访存指令时一条指令会访存三次
+
+目前把取指和访存都放在时钟上升沿了，但这样运行时会出现 lbu 指令越界访存，访问 0x00000008 这样的地址
+
+且看 log 时发现 取出的指令 pc 和 inst 对不上，第一条指令会是 unimp（这个已修复）
+
+给 NEMU 加了对齐访存之后运行 dummy，difftest 直接在 第一条指令处报错，单独运行NEMU 并没有问题。去掉对齐之后 difftest 会在 80000004 报错，此时 npc sp寄存器的值最后4位是0x4

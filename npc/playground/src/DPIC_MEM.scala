@@ -10,6 +10,7 @@ class DPIC_MEM extends BlackBox with HasBlackBoxPath{
     val waddr = Input(UInt(XLEN.W))
     val wdata = Input(UInt(XLEN.W))
     val wmask = Input(UInt(WMASKLEN.W))
+    val clk = Input(Clock())
   })
   addPath("./playground/src/vsrc/DPIC_MEM.v")
 }
