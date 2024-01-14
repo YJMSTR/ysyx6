@@ -86,7 +86,7 @@ class Top extends Module {
   // 现在需要额外调用一次 pmem_read() 来实现
   val InstFetcher = Module(new DPIC_IFU)
   InstFetcher.io.pc := wirepc
-  InstFetcher.io.clk := clock
+  //InstFetcher.io.clk := clock
   wireinst := Mux(reset.asBool, 0.U, InstFetcher.io.inst)
   InstFetcher.io.valid := Mux(reset.asBool, 0.U, 1.U)
   io.inst := wireinst

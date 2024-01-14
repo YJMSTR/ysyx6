@@ -19,6 +19,9 @@
 #include <cpu/decode.h>
 
 #define R(i) gpr(i)
+// #define Mr(_ADDR, _LEN) vaddr_read((_ADDR)&(~0x3u),_LEN)
+// #define Mw(_ADDR, _LEN, _DATA) vaddr_write((_ADDR)&(~0x3u), _LEN, _DATA)
+
 #define Mr vaddr_read
 #define Mw vaddr_write
 

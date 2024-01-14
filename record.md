@@ -1004,6 +1004,12 @@ klib 的 build 目录下包含生成的静态库文件 `xxx.a`，
 
 > RISC-V作为一个RISC架构, 通常是不支持不对齐访存的, 在Spike中执行一条地址不对齐的访存指令将会抛出异常, 让PC跳转到`0`. 但NEMU为了简化, 没有实现这样的功能, 因此如果让NEMU和Spike同时执行这样的指令, DiffTest将会报错. 不过这很可能是你的软件实现(例如klib)有问题, 请检查并修改相关代码.
 
+2024.01.10：
+
+感觉这段话有语病阿，看不懂“不过”这个词的上下文到底有没有关系
+
+开启 difftest spike，为 NEMU 增加对齐访存之后跑 unalign 的测例会在`80000078:	00544783          	lbu	a5,5(s0)` 处 abort，并且此时 s0 为 `s0: 80000134`
+
 #### 一键回归测试
 
 全部通过
@@ -1639,3 +1645,25 @@ sp: 8009cfe8
 且看 log 时发现 取出的指令 pc 和 inst 对不上，第一条指令会是 unimp（这个已修复）
 
 给 NEMU 加了对齐访存之后运行 dummy，difftest 直接在 第一条指令处报错，单独运行NEMU 并没有问题。去掉对齐之后 difftest 会在 80000004 报错，此时 npc sp寄存器的值最后4位是0x4
+
+检查后发现，虽然目前 log 的输出正确了，但 log 中 pc 为 x 时，pc = x 的那一条指令实际上在下一周期才会被执行。因此仿真环境 pc 的获取还要再提前，放在第一次 eval 之前。此外 NPC 内部的取值改成上升沿取指后，取出的指令会在下一个周期才被执行（什么流水线，，）。例如 0x80000004 处是 auipc sp, 9，其执行结果应该是 80009004，但目前 NPC 的执行结果是 80009008，并且 sp 在第三次 si 时才会改变
+
+把取指模块的时钟信号去掉以后，将仿真环境改为在每个周期第一次 eval 之后获取指令的值，此时可以正确读出指令值并进入后续译码执行等环节，但取指会在一个周期内重复好几次 ，暂时搁置可以通过 difftest 和测例。
+
+给 nemu 也加上地址对齐后，NEMU 取指令取出的指令会不正确，经检查发现是 difftest nemu 作为 ref 时使用了 paddr_write 来拷贝 img 数据，将其改为地址对齐后便出现了错误。给 NEMU 新增一个 unalign_paddr_write 用作 difftest 即可。
+
+改完以后开着 difftest 跑 unalign 测例，NEMU Hit Bad trap 了但是 NPC hit good trap 了..
+
+再一想，NEMU 的访存函数会被很多东西用到，不应该直接改访存函数，而应该在 NEMU 模拟指令的部分进行修改，这样才能和 NPC 对齐。于是在 inst.c 里进行修改，为访存函数添加地址对齐（改 Mr 和 Mw 这两个宏）。改完以后发现 单独运行 NEMU 的 unalign 测试还是 HIT BAD TRAP，这说明：
+
+- 要么我的 NPC 的 HIT GOOD/BAD TRAP 实现有问题
+- 要么 NEMU 的实现有问题
+
+检查以后发现，NEMU 运行 unalign 时，a0 寄存器最终的值为 1，但我的 NPC 判断 GOOD/BAD TRAP 时没有用到 a0 寄存器，而是执行到 ebreak 即让 NPC_RET = 0 并返回 HIT GOOD TRAP，因此 NPC 的判断不准确。应该将 a0 的值赋值给 NPC_RET 才对。
+
+修复以后 crc32、hello-str、unalign 等测例爆了 bad trap，但把 NEMU 和 NPC 都改成支持非对齐访存以后就可以通过测试了。并且 am-test 中的 hello test 也正常了。但 rtc-test 不太正常，时间非常快。检查以后发现是没有计算 boot_time，加入之后就正常了。
+
+运行字符版超级玛丽：一堆字符，fps 为 0, 完全不能玩，跑的时候还有申必报错`ROM 'mario' not found, using default ROM 'mario'`，启动以后 129 s 才能出现依稀可辨的界面。
+
+
+

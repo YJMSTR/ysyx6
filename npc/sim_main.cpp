@@ -47,7 +47,10 @@ VTop* topp = new VTop{contextp};
 enum NPC_STATES npc_state;
 word_t npc_halt_pc;
 int npc_ret;
-bool difftest_is_enable = 1;
+bool difftest_is_enable = 0;
+char logbuf[128];
+static uint64_t boot_time = 0;
+static uint64_t rtc_us = 0;
 
 // void nvboard_bind_all_pins(VTop *top);
 const char *regs[] = {
@@ -190,25 +193,34 @@ void difftest_step(vaddr_t pc, vaddr_t npc) {
   checkregs(&ref_r, pc);
 }
 
+static void trace_and_difftest(vaddr_t pc, vaddr_t dnpc) {
+  log_write("%s\n", logbuf);
+  //printf("difftest pc == 0x%08x, dnpc == 0x%08x\n", pc, dnpc);
+  if (difftest_is_enable)
+    difftest_step(pc, dnpc);
+}
+
 extern "C" void npc_pmem_read(int raddr, int *rdata) {
-  static uint64_t us = 0;
   uint32_t addr = raddr;
-  addr = addr & ~0x3u;
+  //addr = addr & ~0x3u;
   if (addr == RTC_ADDR + 4) {
     //Log("DTRACE RTC_ADDR + 4");
     difftest_skip_ref();
     struct timeval now;
     gettimeofday(&now, NULL);
-    us = now.tv_sec * 1000000 + now.tv_usec;
-    *rdata = us >> 32ull;
+    if (boot_time == 0) {
+      boot_time = now.tv_sec * 1000000 + now.tv_usec;
+    }
+    rtc_us = now.tv_sec * 1000000 + now.tv_usec - boot_time;
+    *rdata = rtc_us >> 32ull;
     return;
   } else if (addr == RTC_ADDR) {
     //Log("DTRACE RTC_ADDR");
     difftest_skip_ref();
-    *rdata = (uint32_t)us;
+    *rdata = (uint32_t)rtc_us;
     return;
   }
-  printf("pmem_read: raddr = 0x%08x addr=0x%08x\n", raddr, addr);
+  //printf("pmem_read: raddr = 0x%08x addr=0x%08x\n", raddr, addr);
   assert(raddr >= MEM_BASE && (raddr - MEM_BASE + 3) < MEM_SIZE);
   
   *rdata = mem[addr-MEM_BASE]+(mem[addr-MEM_BASE+1]<<8)+(mem[addr-MEM_BASE+2]<<16)+(mem[addr-MEM_BASE+3]<<24);
@@ -216,7 +228,8 @@ extern "C" void npc_pmem_read(int raddr, int *rdata) {
 }
 
 extern "C" void npc_pmem_write(int waddr, int wdata, char wmask) {
-  int addr = waddr & ~0x3u;
+  //int addr = waddr & ~0x3u;
+  int addr = waddr;
   //printf("pmem_write: waddr = 0x%08x wdata = 0x%08x wmask = 0x%x\n", waddr, wdata, wmask);
   if (addr == SERIAL_PORT) {
     difftest_skip_ref();
@@ -251,23 +264,24 @@ word_t npc_vaddr_read(word_t addr, int len) {
   return npc_paddr_read(addr, len);
 }
 
-char logbuf[128];
+
 extern "C" void disassemble(char *str, int size, uint64_t pc, uint8_t *code, int nbyte);
 static void single_cycle() {
   if (npc_state != NPC_RUN) return;
   char *p = logbuf;
+  word_t pc = topp->io_pc;
 	contextp->timeInc(1);
   topp->clock = 0;
   topp->eval();
+  word_t instval = topp->io_inst;
 #ifdef VCD
   tfp->dump(contextp->time());
 #endif
   contextp->timeInc(1);
   topp->clock = 1;
-  word_t pc = topp->io_pc;
   topp->eval();
-  word_t instval = topp->io_inst, npc = topp->io_pc;
-  printf("pc == 0x%08x, npc == 0x%08x\n", pc, npc);
+  word_t npc = topp->io_pc;
+  //printf("pc == 0x%08x, npc == 0x%08x\n", pc, npc);
 #ifdef VCD
   tfp->dump(contextp->time());
 #endif
@@ -290,6 +304,10 @@ static void single_cycle() {
       word_t reg_val = Rread(1);
       ftrace(pc, npc, iringbuf.inst[iringbuf.cur], reg_val);
     }
+    for (int i = 0; i < 32; i++) {
+      cpu.gpr[i] = Rread(i);
+    }
+    trace_and_difftest(pc, npc);
   }
   //sleep(1);
 }
@@ -297,7 +315,7 @@ static void single_cycle() {
 extern "C" void ebreak() {
   //exit(0);
   npc_state = NPC_STOP;
-  npc_ret = 0;
+  npc_ret = Rread(10);
 }
 
 
@@ -346,12 +364,6 @@ void print_iringbuf() {
     }   
   }
 }
-static void trace_and_difftest(vaddr_t pc, vaddr_t dnpc) {
-  log_write("%s\n", logbuf);
-  printf("difftest pc == 0x%08x, dnpc == 0x%08x\n", pc, dnpc);
-  if (difftest_is_enable)
-    difftest_step(pc, dnpc);
-}
 
 void cpu_exec(uint32_t n) {
   if (!resetted) {
@@ -362,17 +374,13 @@ void cpu_exec(uint32_t n) {
     if (npc_state != NPC_RUN) break;
     cpu.pc = topp->io_pc;
     single_cycle();
-    for (int i = 0; i < 32; i++) {
-      cpu.gpr[i] = Rread(i);
-    }
-    trace_and_difftest(cpu.pc, topp->io_pc);
     if (npc_state != NPC_RUN) break;
   }
   switch (npc_state)
   {
   case NPC_STOP: case NPC_ABORT:
     Log("npc: %s at pc = 0x%08x", (npc_state == NPC_ABORT ? "abort":
-    (npc_ret == 0 ? "HIT GOOD TRAP" : "HIT BAD TRAP")),
+    (npc_ret == 0 ? ANSI_FMT("HIT GOOD TRAP", ANSI_FG_GREEN) : ANSI_FMT("HIT BAD TRAP", ANSI_FG_RED))),
      cpu.pc);
     print_iringbuf();
   case NPC_QUIT: 
