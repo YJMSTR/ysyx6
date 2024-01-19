@@ -1691,27 +1691,11 @@ static void check_bound(IOMap *map, paddr_t addr) {
 
 但我实际上不需要让 NEMU 执行这些指令，只要让 NEMU 跳过这些比对即可。但这样需要修改 NEMU 的 pc 值。留个坑之后再实现
 
-# 1.14组会——————————————
+## RV64IM NPC
 
-目前进度：PA2完成所有必做题，NPC RV32E 单周期完成输入输出 （串口+时钟）
+先迁移 ISA 到 RV64IM，按照讲义中从 RV64IM 迁移到 RV32E 的部分进行反向操作.
 
-问题：
-
-目前 npc 的取指和访存都是通过 chisel blackbox 调用 verilog 代码，借助 DPI-C 实现的，
-
-npc 取指时会在一个周期内取指好几次
-
-涉及访存的指令也会，但将其改成仅在时钟上升沿访存可以暂时解决
-
-如果按照讲义里的写法在 pmem_read 和 pmem_write 中进行地址对齐，那么和 NEMU difftestt 时会出现不一致，如果给 NEMU 也加上地址对齐，那么一些测例会 HIT BAD TRAP
-
-助教答：地址对齐还要将数据移位一下，always里敏感信号不是时钟确实会每次 eval 都执行一下
-
-# 1.19
-
-昨天来开芯院了
-
-test
+首先是 NEMU，注意指令实现时的 shamt 要多一位，还有转换符号数时改用 longlong
 
 
 

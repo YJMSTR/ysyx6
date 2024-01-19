@@ -261,11 +261,11 @@ word_t eval(int p, int q) {
       return -1;
     } 
     if (tokens[op].type == TK_DEREF) {
-      Log("DEREF op = %d token (%d %d)", op, p, q);
+      //Log("DEREF op = %d token (%d %d)", op, p, q);
       word_t val = eval(op+1, q);
-      Log("DEREF addr = 0x%08x == %u", val, val);
+      //Log("DEREF addr = 0x%016lx == %u", val, val);
       word_t res = vaddr_read(val, 4);
-      Log("DEREF res = 0x%08x == %u", res, res);
+      //Log("DEREF res = 0x%016lx == %u", res, res);
       return res;
     }
     word_t val1 = eval(p, op-1);

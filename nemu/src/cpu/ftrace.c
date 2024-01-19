@@ -106,7 +106,7 @@ void ftrace(vaddr_t pc, vaddr_t dnpc, uint32_t instval, uint32_t ra) {
             if (ftop > 0 && dnpc == ra && fstack[ftop].pc + 4 == ra && func[i].value == fstack[ftop].dnpc) {
                 // prespace -= 2;
                 //for (int j = 0; j < prespace; j++) putchar(' ');
-                printf("#%d: ret:  %s at %x to %x\n", ftop, func[i].name, pc, dnpc);
+                printf("#%d: ret:  %s at %lx to %lx\n", ftop, func[i].name, pc, dnpc);
                 ftop--;
             }
         }
@@ -123,7 +123,7 @@ void ftrace(vaddr_t pc, vaddr_t dnpc, uint32_t instval, uint32_t ra) {
             if (ftop > 0 && dnpc == ra && fstack[ftop].pc + 4 == ra && func[i].value == fstack[ftop].dnpc) {
                 // prespace -= 2;
                 //for (int j = 0; j < prespace; j++) putchar(' ');
-                printf("#%d: ret:  %s at %x to %x\n", ftop, func[i].name, pc, dnpc);
+                printf("#%d: ret:  %s at %lx to %lx\n", ftop, func[i].name, pc, dnpc);
                 ftop--;
             }
         }

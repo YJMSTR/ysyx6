@@ -119,10 +119,10 @@ void print_iringbuf() {
   for (int i = 1; i <= CONFIG_ITRACE_RINGBUFFER_SIZE; i++) {
     if (i == CONFIG_ITRACE_RINGBUFFER_SIZE) {
       int pos = (iringbuf.cur + i) % CONFIG_ITRACE_RINGBUFFER_SIZE;
-      Log("     -->0x%08x : 0x%08x", iringbuf.pc[pos], iringbuf.inst[pos]);
+      Log("     -->0x%016lx : 0x%016lx", iringbuf.pc[pos], iringbuf.inst[pos]);
     } else {
       int pos = (iringbuf.cur + i) % CONFIG_ITRACE_RINGBUFFER_SIZE;
-      Log("\t0x%08x : 0x%08x", iringbuf.pc[pos], iringbuf.inst[pos]);
+      Log("\t0x%016lx : 0x%016lx", iringbuf.pc[pos], iringbuf.inst[pos]);
     }   
   }
 }
