@@ -1665,6 +1665,32 @@ sp: 8009cfe8
 
 运行字符版超级玛丽：一堆字符，fps 为 0, 完全不能玩，跑的时候还有申必报错`ROM 'mario' not found, using default ROM 'mario'`，启动以后 129 s 才能出现依稀可辨的界面。
 
+#### 修改 NEMU ，使其支持设备 difftest
+
+用 difftest_skip_ref 函数可以将当前指令 dut 的状态强行拷贝给 ref，使其不进行状态检测，但实际上 NEMU 作为 ref 时还是向下执行了一条指令，因此访问设备地址时还是会报越界
+
+NEMU 默认在编译为 TARGET_SHARE 时不开启 DEVICE 支持，暂时注释掉这行试试，重新编译并运行 hello 测例，得到如下结果：
+
+`Top: src/device/io/map.c:37: check_bound: Assertion 'map != ((void *)0)' failed`
+
+对应下列函数的第三行：
+
+```c
+static void check_bound(IOMap *map, paddr_t addr) {
+  if (map == NULL) {
+    Assert(map != NULL, "address (" FMT_PADDR ") is out of bound at pc = " FMT_WORD, addr, cpu.pc);
+  } else {
+    Assert(addr <= map->high && addr >= map->low,
+        "address (" FMT_PADDR ") is out of bound {%s} [" FMT_PADDR ", " FMT_PADDR "] at pc = " FMT_WORD,
+        addr, map->name, map->low, map->high, cpu.pc);
+  }
+}
+```
+
+说明读取串口和 RTC 时，还没有对应的 IOMap。在 init_map 函数中添加一行输出，发现并没有对应的输出，检查发现 init_device 函数也没有被调用。这些函数是在 init_monitor 函数中被调用的，由于将 NEMU 编译为 .SO 时没有 monitor，因此没有进行对应的初始化。解决方案是加一个 ifdef CONFIG_TARGET_SHARE 进行判断。
+
+但我实际上不需要让 NEMU 执行这些指令，只要让 NEMU 跳过这些比对即可。但这样需要修改 NEMU 的 pc 值。留个坑之后再实现
+
 # 1.14组会——————————————
 
 目前进度：PA2完成所有必做题，NPC RV32E 单周期完成输入输出 （串口+时钟）
