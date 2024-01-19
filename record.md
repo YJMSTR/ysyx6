@@ -1695,11 +1695,11 @@ static void check_bound(IOMap *map, paddr_t addr) {
 
 先迁移 ISA 到 RV64IM，按照讲义中从 RV64IM 迁移到 RV32E 的部分进行反向操作.
 
-首先是 NEMU，注意指令实现时的 shamt 要多一位，还有转换符号数时改用 longlong
+首先是 NEMU，注意指令实现时的 shamt 要多一位，还有转换符号数时改用 longlong。ftrace 要把 Elf32 等数据结构改回 Elf64
 
+然后重新 clone abstract-machine ？我的 init.sh 并没有把 ics2023 改成 ysyx2204
 
-
-
+dhrystone 跑了几次，最高分只有 20 分，但第四期的时候虚拟机里跑都有 130 分，用 native 跑分数是正常的。coremark 430 分也挺正常(第四期 coremark 是 200多分)
 
 
 
