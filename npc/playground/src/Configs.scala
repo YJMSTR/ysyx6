@@ -43,6 +43,8 @@ object Configs {
   val ALU_MULHU             = 19.U(ALUCtrlWidth.W)
   val ALU_SRAW              = 20.U(ALUCtrlWidth.W)
   val ALU_SRLW              = 21.U(ALUCtrlWidth.W)
+  val ALU_REMW              = 22.U(ALUCtrlWidth.W)
+  val ALU_REMUW             = 23.U(ALUCtrlWidth.W)
 
   // ALU 的数据来源:
   val ALU_DATA_NONE         = 0.U(ALUCtrlWidth.W)

@@ -45,6 +45,9 @@ class EXU() extends Module {
   val mul_res = data_A * data_B
   val mulh_res = (data_A.asSInt*data_B.asSInt)(63, 32).asUInt
   val mulhu_res = mul_res(63, 32)
+  val rem_res = (data_A.asSInt % data_B.asSInt).asUInt
+  val remw_res = (data_A(31, 0).asSInt % data_B(31, 0).asSInt).asUInt
+  val remuw_res = (data_A(31, 0) % data_B(31, 0))
   data_res := MuxLookup(io.alu_op, 0.U(XLEN.W))(Seq(
     //ALU_ADD->(data_A + data_B + 1.U),
     ALU_ADD          -> (data_A + data_B),
@@ -63,10 +66,12 @@ class EXU() extends Module {
     ALU_MULHU        -> (Cat(Fill(XLEN-32, mulhu_res(31)), mulhu_res)),
     ALU_DIVU         -> (data_A/data_B),
     ALU_DIV          -> ((data_A.asSInt/data_B.asSInt).asUInt),
-    ALU_REM          -> ((data_A.asSInt % data_B.asSInt).asUInt),
+    ALU_REM          -> (rem_res),
     ALU_REMU         -> (data_A % data_B),
     ALU_SRAW         -> Cat(Fill(32, 0.U), (data_A(31, 0).asSInt >> data_B(4, 0).asUInt)),
     ALU_SRLW         -> Cat(Fill(32, 0.U), (data_A(31, 0) >> data_B(4, 0))),
+    ALU_REMW         -> Cat(Fill(32, 0.U), remw_res),
+    ALU_REMUW        -> Cat(Fill(32, 0.U), remuw_res),
   ))
   
   val data_resw = Cat(Fill(XLEN-32, data_res(31)), data_res(31, 0))

@@ -11,6 +11,8 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 #include <string.h>
+#include <stdlib.h>
+#include <typeinfo>
 #include <debug.h>
 #include <macro.h>
 #include <dlfcn.h>
@@ -48,6 +50,7 @@ enum NPC_STATES npc_state;
 word_t npc_halt_pc;
 int npc_ret;
 bool difftest_is_enable = 1;
+bool is_batch_mode = 1;
 char logbuf[128];
 static uint64_t boot_time = 0;
 static uint64_t rtc_us = 0;
@@ -72,9 +75,10 @@ struct Iringbuf
 } iringbuf;
 
 
-typedef uint32_t paddr_t;
+typedef word_t paddr_t;
 struct CPU_state {
   word_t gpr[32];
+  //uint32_t gpr[32];
   vaddr_t pc;
 } cpu;
 
@@ -148,9 +152,10 @@ bool isa_difftest_checkregs(CPU_state *ref_r, vaddr_t pc) {
   //   printf("difftest: ref_r->pc == 0x%08x\n", ref_r->pc);
   // }
   for (int i = 0; i < 32; i++) {
+    assert(typeid(ref_r->gpr[i]) == typeid(cpu.gpr[i]));
     if (ref_r->gpr[i] != cpu.gpr[i]) {
       printf("difftest: reg #%d = %s err at pc: 0x%016x\n", i, regs[i], pc);
-      printf("difftest: ref_r->gpr[%d] == 0x%016x\n", i, ref_r->gpr[i]);
+      printf("difftest: ref_r->gpr[%d] == 0x%016lx cpu.gpr[%d] == 0x%016lx\n", i, ref_r->gpr[i], i, cpu.gpr[i]);
       return false;
     }
   }
@@ -223,8 +228,11 @@ extern "C" void npc_pmem_read(long long raddr, long long *rdata) {
   }
   //printf("pmem_read: raddr = %lld = 0x%016lx raddr-MEM_BASE = %lld MEM_SIZE-addr+MEM_BASE-7=%lld\n", raddr, raddr, raddr-MEM_BASE, MEM_SIZE-addr+MEM_BASE-7);
   assert((word_t)raddr >= (word_t)MEM_BASE && ((word_t)(raddr - MEM_BASE + 7)) < (word_t)MEM_SIZE);
-  
-  *rdata = mem[addr-MEM_BASE]+(mem[addr-MEM_BASE+1]<<8)+(mem[addr-MEM_BASE+2]<<16)+(mem[addr-MEM_BASE+3]<<24);
+  word_t res = 0;
+  for (int i = 0; i < 8; i++) {
+    res = res + ((word_t)mem[addr-MEM_BASE+i] << (i*8));
+  }
+  *rdata = res;
   //printf("pmem_read: *rdata = 0x%08x\n", *rdata);
 }
 
@@ -369,7 +377,7 @@ void print_iringbuf() {
 void cpu_exec(uint32_t n) {
   if (!resetted) {
     resetted = true;
-    reset(5);
+    reset(2);
   }
   while (n--) {
     if (npc_state != NPC_RUN) break;

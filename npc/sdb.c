@@ -157,8 +157,12 @@ void init_monitor() {
   init_disasm("riscv64" "-pc-linux-gnu");
 }
 
-
+extern bool is_batch_mode;
 void sdb_mainloop() {
+  if (is_batch_mode) {
+    cmd_c(NULL);
+    return;
+  }
 
   for (char *str; (str = rl_gets()) != NULL; ) {
     char *str_end = str + strlen(str);
