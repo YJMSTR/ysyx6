@@ -18,7 +18,7 @@
 
 
 
-#define MEM_BASE 0x80000000
+#define MEM_BASE 0x80000000u
 #define MEM_SIZE 0x8000000
 #define DEVICE_BASE 0xa0000000
 
@@ -47,7 +47,7 @@ VTop* topp = new VTop{contextp};
 enum NPC_STATES npc_state;
 word_t npc_halt_pc;
 int npc_ret;
-bool difftest_is_enable = 0;
+bool difftest_is_enable = 1;
 char logbuf[128];
 static uint64_t boot_time = 0;
 static uint64_t rtc_us = 0;
@@ -201,8 +201,8 @@ static void trace_and_difftest(vaddr_t pc, vaddr_t dnpc) {
     difftest_step(pc, dnpc);
 }
 
-extern "C" void npc_pmem_read(int raddr, int *rdata) {
-  uint32_t addr = raddr;
+extern "C" void npc_pmem_read(long long raddr, long long *rdata) {
+  uint64_t addr = raddr;
   //addr = addr & ~0x3u;
   if (addr == RTC_ADDR + 4) {
     //Log("DTRACE RTC_ADDR + 4");
@@ -221,14 +221,14 @@ extern "C" void npc_pmem_read(int raddr, int *rdata) {
     *rdata = (uint32_t)rtc_us;
     return;
   }
-  //printf("pmem_read: raddr = 0x%08x addr=0x%08x\n", raddr, addr);
-  assert(raddr >= MEM_BASE && (raddr - MEM_BASE + 3) < MEM_SIZE);
+  //printf("pmem_read: raddr = %lld = 0x%016lx raddr-MEM_BASE = %lld MEM_SIZE-addr+MEM_BASE-7=%lld\n", raddr, raddr, raddr-MEM_BASE, MEM_SIZE-addr+MEM_BASE-7);
+  assert((word_t)raddr >= (word_t)MEM_BASE && ((word_t)(raddr - MEM_BASE + 7)) < (word_t)MEM_SIZE);
   
   *rdata = mem[addr-MEM_BASE]+(mem[addr-MEM_BASE+1]<<8)+(mem[addr-MEM_BASE+2]<<16)+(mem[addr-MEM_BASE+3]<<24);
   //printf("pmem_read: *rdata = 0x%08x\n", *rdata);
 }
 
-extern "C" void npc_pmem_write(int waddr, int wdata, char wmask) {
+extern "C" void npc_pmem_write(long long waddr, long long wdata, char wmask) {
   //int addr = waddr & ~0x3u;
   int addr = waddr;
   //printf("pmem_write: waddr = 0x%08x wdata = 0x%08x wmask = 0x%x\n", waddr, wdata, wmask);
@@ -238,12 +238,12 @@ extern "C" void npc_pmem_write(int waddr, int wdata, char wmask) {
     if (wmask == 1) {
       putchar(wdata);
     } else {
-      Log("serial don't support wmask = 0x%x putch", wmask);
+      Log("serial don't support wmask = 0x%lx putch", wmask);
     }
     return;
   }
-  assert(addr >= MEM_BASE && (addr - MEM_BASE + 3) < MEM_SIZE);
-  for (int i = 0; i < 4; i++) {
+  assert((word_t)addr >= MEM_BASE && ((word_t)(addr - MEM_BASE + 7)) < MEM_SIZE);
+  for (int i = 0; i < 8; i++) {
     if (wmask & (1 << i)) {
       mem[addr-MEM_BASE+i] = (wdata >> (i * 8)) & 0xff;
     }
@@ -395,7 +395,7 @@ void cpu_exec(uint32_t n) {
 
 void npc_reg_display() {
   for (int i = 0; i < 32; i++) {
-    printf("%s: %x\n", regs[i], Rread(i));
+    printf("%s: %lx\n", regs[i], Rread(i));
   }
 }
 

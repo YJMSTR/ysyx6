@@ -1,16 +1,16 @@
 module DPIC_MEM(valid, wen, raddr, rdata, waddr, wdata, wmask, clk);
   input valid;
   input wen;
-  input [31:0] raddr;
-  output reg [31:0] rdata;
-  input [31:0] waddr;
-  input [31:0] wdata;
+  input [63:0] raddr;
+  output reg [63:0] rdata;
+  input [63:0] waddr;
+  input [63:0] wdata;
   input [7:0] wmask;
   input clk;
   import "DPI-C" function void npc_pmem_read(
-    input int raddr, output int rdata);
+    input longint raddr, output longint rdata);
   import "DPI-C" function void npc_pmem_write(
-  input int waddr, input int wdata, input byte wmask);
+  input longint waddr, input longint wdata, input byte wmask);
   always @(posedge clk) begin
     if (valid) begin // 有读写请求时
       if (~wen) begin // 读

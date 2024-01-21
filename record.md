@@ -1701,15 +1701,31 @@ static void check_bound(IOMap *map, paddr_t addr) {
 
 dhrystone 跑了几次，最高分只有 20 分，但第四期的时候虚拟机里跑都有 130 分，用 native 跑分数是正常的。coremark 430 分也挺正常(第四期 coremark 是 200多分)
 
+然后是改 RTL，除修改一些位置的位数以外还要添加新指令，例如字版本的加减法指令 addw、addiw、subw 指令还要增加额外的符号扩展处理，要和 ADDI 等指令进行区分
 
+字版本的指令有大约十几条，可以加个译码信号来表示
 
+原先一些 U 后缀的命令我是单独加了 ALU 控制信号来控制的，现在 U 后缀的指令多了，可能可以用额外的译码信号来表示。不过目前先不进行优化，怎么简单怎么写，先给加 ALU 控制信号
 
+SRAW 这样的指令的结果不仅仅是 SRA 的低 32 位进行符号位扩展，其行为与 SRA 不同，不仅仅要加 isword 信号进行字指令的判断，还要给 ALU 加新的 op SRAW，SRLW 也类似，
 
+注意 RTL 代码中移位量要同时在 EXU 和 IDU 进行修改
 
+### 修改 am 里的编译脚本
 
+加完 RTL 指令准备跑个 ARCH=riscv64-npc 的 dummy 进行测试，结果发现 scripts 目录下没有 riscv64-npc.mk。。，得对着第四期的 am 写一下
 
+第四期 isa 目录下有 riscv32.mk 和 riscv64.mk 两个脚本，到了第六期全部合为 riscv.mk 了，riscv.mk 中 march 参数为 rv64g，riscv32e-npc.mk 中会用 `march=rv32e_zicsr  mabi=ilp32e` 覆盖掉这些。现在我们要新建一个 riscv64-npc.mk。
 
+其中的 AM_SRCS 也要进行修改，在没有实现 M 扩展时要把 riscv/npc 这个目录下 libgcc 文件夹内的文件加到 AM_SRCS 变量里，libgcc 文件夹外的文件是在 platform/npc.mk 里加进来的
 
+写掩码的宽度也要改为 8，并且在原来 0b1, 0b11, 0xF 的基础上加入 0xFF
+
+之前仿真环境访存模拟的是 32 位总线，现在也改 64 的。但 RV32 和 RV64 的指令长度都是 32 位，pmem_write 函数改成 64 位
+
+### difftest
+
+npc 的 difftest 之前加载 so 文件的位置是被我写死的，直接用绝对路径找 rv32 的 NEMU 的 so 文件，现在要把相应的字符串改成 riscv64
 
 
 

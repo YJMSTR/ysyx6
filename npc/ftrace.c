@@ -7,10 +7,10 @@
 Func *func;
 bool ftrace_enable = false;
 int funcnum;
-Elf32_Ehdr Ehdr;
-Elf32_Shdr *Shdr;   // 所有的 Section Header
-Elf32_Shdr Shstrh;
-Elf32_Shdr Symh, Strh;
+Elf64_Ehdr Ehdr;
+Elf64_Shdr *Shdr;   // 所有的 Section Header
+Elf64_Shdr Shstrh;
+Elf64_Shdr Symh, Strh;
 char *shstrtab, *strtab;
 void init_ftrace(const char *elf_file) {
     FILE* elf_fp = fopen(elf_file, "r");
@@ -18,9 +18,9 @@ void init_ftrace(const char *elf_file) {
     Assert(elf_fp, "Can not open '%s' , reason: %s\n", elf_file, strerror(errNum));
     assert(fseek(elf_fp, 0, SEEK_SET) == 0);
     // Ehdr
-    assert(fread(&Ehdr, sizeof(Elf32_Ehdr), 1, elf_fp));
+    assert(fread(&Ehdr, sizeof(Elf64_Ehdr), 1, elf_fp));
     // Shdr
-    Shdr = (Elf32_Shdr*)calloc(Ehdr.e_shnum, sizeof(Elf32_Shdr));
+    Shdr = (Elf64_Shdr*)calloc(Ehdr.e_shnum, sizeof(Elf64_Shdr));
     assert(fseek(elf_fp, Ehdr.e_shoff, SEEK_SET) == 0);
     assert(fread(Shdr, Ehdr.e_shentsize, Ehdr.e_shnum, elf_fp));
     // Shstrh
@@ -53,7 +53,7 @@ void init_ftrace(const char *elf_file) {
      //找出 symtab 中 类型为 func 的所有项 存到外面去
     int symnum = Symh.sh_size / Symh.sh_entsize;
     funcnum = 0;
-    Elf32_Sym symtab[symnum];
+    Elf64_Sym symtab[symnum];
     assert(fseek(elf_fp, Symh.sh_offset, SEEK_SET) == 0);
     assert(fread(symtab, Symh.sh_entsize, symnum, elf_fp));
     for (int i = 0; i < symnum; i++) {
@@ -80,7 +80,7 @@ void init_ftrace(const char *elf_file) {
 pairpc fstack[MAX_FSTACK];  //ftrace 支持的最大大小栈，默认500000
 int ftop;
 
-void ftrace(vaddr_t pc, vaddr_t dnpc, uint32_t instval, uint32_t ra) {
+void ftrace(vaddr_t pc, vaddr_t dnpc, uint32_t instval, vaddr_t ra) {
     //Log("ftrace pc = 0x%08x dnpc = 0x%08x instval = 0x%08x ra = 0x%08x",pc,dnpc,instval,ra);
     if (pc == 0x80000000) {
          for (int i = 0; i < funcnum; i++) {

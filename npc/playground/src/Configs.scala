@@ -1,7 +1,7 @@
 import chisel3._ 
 
 object Configs {
-  val XLEN                  = 32
+  val XLEN                  = 64
   val WMASKLEN              = 8
   val RESET_VECTOR          = "x80000000"
   val RIDXLEN               = 5
@@ -40,6 +40,9 @@ object Configs {
   val ALU_DIVU              = 16.U(ALUCtrlWidth.W)
   val ALU_REMU              = 17.U(ALUCtrlWidth.W)
   val ALU_REM               = 18.U(ALUCtrlWidth.W)
+  val ALU_MULHU             = 19.U(ALUCtrlWidth.W)
+  val ALU_SRAW              = 20.U(ALUCtrlWidth.W)
+  val ALU_SRLW              = 21.U(ALUCtrlWidth.W)
 
   // ALU 的数据来源:
   val ALU_DATA_NONE         = 0.U(ALUCtrlWidth.W)

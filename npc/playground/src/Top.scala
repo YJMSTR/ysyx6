@@ -39,11 +39,11 @@ class Top extends Module {
   memrdata := MuxLookup(memsext, NPC_Mem.io.rdata)(Seq(
     MEM_NSEXT_8 ->  Cat(Fill(XLEN-8, 0.U), NPC_Mem.io.rdata(7, 0)),
     MEM_NSEXT_16->  Cat(Fill(XLEN-16, 0.U), NPC_Mem.io.rdata(15, 0)),
-    //MEM_NSEXT_32->  Cat(Fill(XLEN-32, 0.U), NPC_Mem.io.rdata(31, 0)),
+    MEM_NSEXT_32->  Cat(Fill(XLEN-32, 0.U), NPC_Mem.io.rdata(31, 0)),
     MEM_SEXT_8  ->  Cat(Fill(XLEN-8, rdata7), NPC_Mem.io.rdata(7, 0)),
     MEM_SEXT_16 ->  Cat(Fill(XLEN-16, rdata15), NPC_Mem.io.rdata(15, 0)),
     //rv64 only: 
-    //MEM_SEXT_32 ->  Cat(Fill(XLEN-32, rdata31), NPC_Mem.io.rdata(31, 0))
+    MEM_SEXT_32 ->  Cat(Fill(XLEN-32, rdata31), NPC_Mem.io.rdata(31, 0)),
   ))
   NPC_Mem.io.valid := memvalid
   NPC_Mem.io.wen := memwen
@@ -61,7 +61,7 @@ class Top extends Module {
   val dnpc = Wire(UInt(XLEN.W))
   val pcsel = Wire(UInt(1.W))
   val wirepc = Wire(UInt(XLEN.W))
-  val wireinst = Wire(UInt(XLEN.W))
+  val wireinst = Wire(UInt(32.W))
   wirepc := PC
   io.pc := PC
   val npc = Wire(UInt(XLEN.W))
@@ -106,9 +106,10 @@ class Top extends Module {
   memwdata := MuxLookup(memwmask, rs2v)(Seq(
     1.U  -> rs2v(7, 0),
     3.U  -> rs2v(15, 0),
-    15.U -> rs2v(31, 0)
+    15.U -> rs2v(31, 0),
+    255.U-> rs2v(63, 0)
   ))
-
+  val isword = Decoder.io.isword
   // 执行模块
   val ALU = Module(new EXU)
   ALU.io.inst := wireinst
@@ -120,6 +121,7 @@ class Top extends Module {
   ALU.io.rs1v := rs1v
   ALU.io.rs2v := rs2v
   dnpc := ALU.io.dnpc
+  ALU.io.isword := isword
   
   memraddr := ALU.io.res
   memwaddr := ALU.io.res

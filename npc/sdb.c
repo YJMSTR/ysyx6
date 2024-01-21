@@ -26,7 +26,8 @@
 extern "C" void init_disasm(const char *triple);
 void init_difftest(char *ref_so_file, long img_size, int port);
 extern NPC_STATES npc_state;
-static char *diff_so_file = "/home/yjmstr/ysyx-workbench/nemu/build/riscv32-nemu-interpreter-so";
+// static char *diff_so_file = "/home/yjmstr/ysyx-workbench/nemu/build/riscv32-nemu-interpreter-so";
+static char *diff_so_file = "/home/yjmstr/ysyx-workbench/nemu/build/riscv64-nemu-interpreter-so";
 static int difftest_port = 1234;
 const char *log_file = "/home/yjmstr/ysyx-workbench/npc/logs/log.txt";
 
