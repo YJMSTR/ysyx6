@@ -142,7 +142,6 @@ void init_monitor(int argc, char *argv[]) {
   #endif
   if (ftrace_is_enable())
     init_ftrace(elf_file);
-
 #ifndef CONFIG_ISA_loongarch32r
   IFDEF(CONFIG_ITRACE, init_disasm(
     MUXDEF(CONFIG_ISA_x86,     "i686",

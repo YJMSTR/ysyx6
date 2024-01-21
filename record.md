@@ -1723,13 +1723,13 @@ SRAW 这样的指令的结果不仅仅是 SRA 的低 32 位进行符号位扩展
 
 之前仿真环境访存模拟的是 32 位总线，现在也改 64 的。但 RV32 和 RV64 的指令长度都是 32 位，pmem_write 函数改成 64 位
 
-### difftest
+### 修复 NPC 的基础设施
 
 npc 的 difftest 之前加载 so 文件的位置是被我写死的，直接用绝对路径找 rv32 的 NEMU 的 so 文件，现在要把相应的字符串改成 riscv64
 
+目前能够成功用 difftest 比对 RV64NPC 和 64位 NEMU 的 dummy
 
-
-
+看 log 发现一些指令的反汇编消失了，发现是 init_disasm 时传入的参数不对，应该改成 RV64
 
 
 
