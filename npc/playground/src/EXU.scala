@@ -9,8 +9,6 @@ import Instr._
 class EXU() extends Module {
   val io = IO(new Bundle {
     val inst = Input(UInt(32.W))
-    // val isAddi = Input(Bool())
-    // val isEbreak = Input(Bool())
     val rs1v = Input(UInt(XLEN.W))
     val rs2v = Input(UInt(XLEN.W))
     val pc   = Input(UInt(XLEN.W))

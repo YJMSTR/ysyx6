@@ -4,23 +4,15 @@ import Configs._
 import Instr._
 import chisel3.util.experimental.loadMemoryFromFileInline
 
+
+
 class Top extends Module {
   val io = IO(new Bundle {
     // IFU
     val inst = Output(UInt(32.W))
     val pc = Output(UInt(XLEN.W))
-    // val pcsel = Input(Bool())
-    // val snpc = Input(UInt(XLEN.W))
-    
-    // val rs1 = Input(UInt(RIDXLEN.W))
-    // val rs2 = Input(UInt(RIDXLEN.W))
-    // val rd = Input(UInt(RIDXLEN.W))
-    // val rd_en = Input(Bool()) 
-    // val rdv = Input(UInt(XLEN.W))
-    // val rs1v = Output(UInt(XLEN.W))
-    // val rs2v = Output(UInt(XLEN.W))
   })
-  
+
   // 内存模块
   // 译码器需要判断当前指令是否为访存，生成对应的 valid 和 wen 信号
   val NPC_Mem = Module(new DPIC_MEM)

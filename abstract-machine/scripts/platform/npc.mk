@@ -30,4 +30,5 @@ image: $(IMAGE).elf
 run: image
 # $(MAKE) -C /home/yjmstr/ysyx-workbench/am-kernels/tests/cpu-tests ARCH=$(ARCH) ALL="$(BINNAME)"
 	$(MAKE) -C $(shell pwd) ARCH=$(ARCH) ALL="$(BINNAME)"
-	$(MAKE) -C $(NPC_HOME) ISA=$(ISA) run IMG=$(IMAGE).bin vcd=1
+	$(MAKE) -C $(NPC_HOME) ISA=$(ISA) run IMG=$(IMAGE).bin 
+  # vcd=1

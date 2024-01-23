@@ -1733,7 +1733,126 @@ npc 的 difftest 之前加载 so 文件的位置是被我写死的，直接用�
 
 给 NPC 加了批处理和一键回归测试，现在 RV64 NPC 可以过所有测例了。
 
+### 流水化
 
+首先对单周期进行流水化，在每一级之间加入级间寄存器【理想流水线，不存在冒险和跳转指令】
+
+#### chisel 复习 & 优化 NPC 代码
+
+参考：
+
+- [dinocpu/assignments/assignment-3.md at main · jlpteaching/dinocpu (github.com)](https://github.com/jlpteaching/dinocpu/blob/main/assignments/assignment-3.md#updating-the-dino-cpu-code)
+
+按照 dinocpu 的写法，每一个流水级间寄存器可以用 chisel 中的 Bundle 来表示，在一个 Bundle 中定义若干个 val 来表示该流水级间寄存器所包含的数据内容
+
+dinocpu 利用了一些 scala/chisel 语法，诸如用 Bundle 打包流水级间寄存器的数据内容，之前我写单周期的时候没有用到 Bundle 来打包 IO，于是要手动连一堆控制信号，写流水段寄存器把它们断开以后又要重新连一遍，非常丑陋。可以先参考https://blog.csdn.net/weixin_43681766/article/details/125573400复习一下 chisel，对着目前写好的单周期 NPC 练练手，再动手流水化；
+
+Bundle 类似结构体，可以打包一堆变量
+
+```scala
+class Channel() extends Bundle {
+    val data = UInt(32.W)
+    val valid = Bool()
+}
+```
+
+用 Bundle 打包连线的时候，可以创建一个 Wire 变量，将 Bundle 包在里面，然后就可以像结构体访问成员一样对 Bundle 中的信号进行访问了
+
+```scala
+val ch = Wire(new Channel())
+
+ch.data := xxx
+ch.valid := xxx
+
+val xxx = ch.xxx
+```
+
+还有一个是 Vec 类型，类似数组，可以打包一堆同类型变量，用来写寄存器组之类的
+
+```scala
+val regfile = Reg(Vec(32, UInt(XLEN.W)))
+```
+
+可以通过下标访问，注意下标用的是圆括号：
+
+```scala
+regfile(rd) := rdv
+```
+
+类似于 C 语言可以开一个结构体作为元素的数组，Chisel 也可以用 Bundle 作为 Vec 的元素，同样地 Bundle 里也可以包括 Vec
+
+```scala
+val VecBundle = Wire(Vec(8, new Channel()))
+```
+
+用 Bundle + Wire 可以实现带有复位值的寄存器，可用于写流水级间寄存器，但是需要先声明一个该 Bundle 对象的 Wire，给 Wire 赋值后作为 init 值传给 RegInit
+
+```
+val initVal = Wire(new Channel())
+
+initVal.data := XXX
+initVal.valid := XXX
+
+val channelReg = RegInit(init)
+```
+
+chisel 中不能进行局部赋值（chisel2 可以），但可以借助 Bundle 实现局部赋值。Bundle 可以通过 asUInt 或类似方法转为可直接赋值的类型，先对 Bundle 中的每个字段进行赋值，再这样转换后赋给目标值即可：
+
+```scala
+val assignWord = Wire(UInt(16.W))
+
+class Split extends Bundle {
+    val high = UInt(8.W)
+    val low = UInt(8.W)
+}
+
+val split = Wire(new Split()) 
+split.low := lowByte
+split.high := highByte
+
+assignWord := split.asUInt
+```
+
+需要注意 Bundle 里的字段合并成位向量以后的顺序。
+
+一根一根线连信号非常麻烦，chisel 提供了整体连接运算符 `<>` 来连接多端口的模块，可以将 Bundle 部分双向连接。但是 chisel3 中 `<>` 的用法发生了变化，现在如果 `<>` 的两边端口不一致会报错，而不是仅连接同名端口。
+
+使用例：流水线级间寄存器可以用 Bundle 中定义普通变量的方式定义，参考 riscv-mini
+
+```scala
+class FetchExecutePipelineRegister(xlen: Int) extends Bundle {
+  val inst = chiselTypeOf(Instructions.NOP)
+  val pc = UInt(xlen.W)
+}
+
+...
+// IF/ID reg
+val fe_reg = RegInit(
+    // 此处 .Lit 需要 import chisel3.experimental.BundleLiterals._
+    // 其可以
+	(new FetchExecutePipelineRegister(conf.xlen)).Lit(
+      _.inst -> Instructions.NOP,
+      _.pc -> 0.U
+    )
+)
+```
+
+`.Lit` 用法参考 https://www.chisel-lang.org/docs/appendix/experimental-features#bundle-literals- ，其可以用于为 Bundle 中的成员进行赋值，并且可以仅对某些成员赋值。这样我们定义级间寄存器的 Bundle 时就不用指定方向，也不用搞 Wire 来给 RegInit 了，直接在 RegInit 传初值的时候传一个 (new mybundle).Lit(_.a->xxx, _.b->xxx) 即可。结合“可以仅对部分成员赋值”这一特性，.Lit 可以和 RegInit 结合使用来构造一个“部分初始化寄存器”
+
+### 添加级间寄存器
+
+RV 中的访存指令地址总是在 rs2v，addr 总是在指令中（可以直接走 ALU->res 这个数据通路）
+
+每一级级间寄存器都加 inst 和 pc，方便 debug
+
+各级流水线寄存器要保持的内容：
+
+|        | 控制内容 | 数据内容                                                     |
+| ------ | -------- | ------------------------------------------------------------ |
+| ID reg | valid    | inst, pc,                                                    |
+| EX reg | valid    | inst,pc,各种控制信号,rs1v,rs2v,                              |
+| LS reg | valid    | inst,pc,alures(作为 addr),rs2v（作为wdata），控制信号（wen，wmask，sext，） |
+| WB reg | valid    |                                                              |
 
 
 

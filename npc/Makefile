@@ -77,6 +77,8 @@ sim: clean verilog $(NVBOARD_ARCHIVE)
 	--top-module $(TOPNAME) $(VSRCS) $(CSRCS) $(NVBOARD_ARCHIVE) \
 	$(addprefix -CFLAGS , $(CXXFLAGS)) $(addprefix -LDFLAGS , $(LDFLAGS)) \
 	--Mdir $(OBJ_DIR) --exe -o $(abspath $(BIN))
+	mkdir -p logs 
+	touch logs/log.txt
 
 run: sim
 	@$(BIN) $(IMG)

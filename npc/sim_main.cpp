@@ -49,8 +49,9 @@ VTop* topp = new VTop{contextp};
 enum NPC_STATES npc_state;
 word_t npc_halt_pc;
 int npc_ret;
-bool difftest_is_enable = 1;
+bool difftest_is_enable = 0;
 bool is_batch_mode = 1;
+bool is_itrace = 0;
 char logbuf[128];
 static uint64_t boot_time = 0;
 static uint64_t rtc_us = 0;
@@ -294,7 +295,7 @@ static void single_cycle() {
 #ifdef VCD
   tfp->dump(contextp->time());
 #endif
-  if (topp->reset == 0) {
+  if (topp->reset == 0 && is_itrace) {
     //printf("[itrace] inst = 0x%08x\n", topp->io_inst);
     p += snprintf(p, sizeof(logbuf), "0x%08x :", pc);
     int ilen = 4;
@@ -410,7 +411,7 @@ void npc_reg_display() {
 int sim_main(int argc, char** argv) {
   
 #ifdef VCD
-  Verilated::mkdir("logs");
+  //Verilated::mkdir("logs");
   Verilated::traceEverOn(true);
   tfp = new VerilatedVcdC;
   topp->trace(tfp, 99); // Trace 99 levels of hierarchy
