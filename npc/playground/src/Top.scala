@@ -82,7 +82,7 @@ class Top extends Module {
       //_.en    = 1.B,
       _.valid -> 1.B,
       _.inst -> 0.U,
-      _.pc   -> RESET_VECTOR.U
+      _.pc   -> "x7ffffffc".U
     )
   )
   // EX Reg
@@ -142,26 +142,25 @@ class Top extends Module {
   // 根据 PC 取出 inst 之前是在 C++ 里完成的
   // 现在需要额外调用一次 pmem_read() 来实现
   // PC 模块
-  val PC = RegInit(RESET_VECTOR.U(XLEN.W))
+  // val PC = RegInit(RESET_VECTOR.U(XLEN.W))
   val dnpc = Wire(UInt(XLEN.W))
   val pcsel = Wire(UInt(1.W))
   // val wirepc = Wire(UInt(XLEN.W))
   // val wireinst = Wire(UInt(32.W))
   // wirepc := PC
-  io.pc := PC
+  // io.pc := PC
   // val npc = Wire(UInt(XLEN.W))
   // npc := 
-  PC := Mux(pcsel === 1.U, dnpc, PC + 4.U)
   val InstFetcher = Module(new DPIC_IFU)
-  InstFetcher.io.pc := PC
-  io.inst := InstFetcher.io.inst
+  InstFetcher.io.pc := Mux(pcsel === 1.U, dnpc, IDReg.pc + 4.U)
+  IDReg.pc := InstFetcher.io.pc
   //InstFetcher.io.clk := clock
   // wireinst := Mux(reset.asBool, 0.U, InstFetcher.io.inst)
   InstFetcher.io.valid := Mux(reset.asBool, 0.U, 1.U)
   IDReg.inst := InstFetcher.io.inst
-  IDReg.pc := PC
   
-  
+  io.inst := InstFetcher.io.inst
+  io.pc := InstFetcher.io.pc
   // 译码模块
   // 寄存器
   val R = Mem(32, UInt(XLEN.W))
@@ -175,6 +174,20 @@ class Top extends Module {
   
   R(0) := 0.U
   val Decoder = Module(new IDU)
+  val pc_plus_imm = Decoder.io.pc + Decoder.io.imm
+  val rs1v = Rread(Decoder.io.rs1)
+  val rs2v = Rread(Decoder.io.rs2)
+  val snpc = Decoder.io.pc + 4.U
+  dnpc := MuxCase(0.U, Array(
+    (Decoder.io.inst === JALR)  -> (rs1v + Decoder.io.imm),
+    (Decoder.io.inst === JAL)   -> (pc_plus_imm),
+    (Decoder.io.inst === BEQ)   -> Mux(rs1v === rs2v, pc_plus_imm, snpc),
+    (Decoder.io.inst === BNE)   -> Mux(rs1v === rs2v, snpc, pc_plus_imm),
+    (Decoder.io.inst === BGE)   -> Mux(rs1v.asSInt >= rs2v.asSInt, pc_plus_imm, snpc),
+    (Decoder.io.inst === BGEU)  -> Mux(rs1v >= rs2v, pc_plus_imm, snpc),
+    (Decoder.io.inst === BLT)   -> Mux(rs1v.asSInt < rs2v.asSInt, pc_plus_imm, snpc),
+    (Decoder.io.inst === BLTU)  -> Mux(rs1v < rs2v, pc_plus_imm, snpc)
+  ))
   EXReg.inst := IDReg.inst
   EXReg.rs1v := Rread(Decoder.io.rs1)
   EXReg.rs2v := Rread(Decoder.io.rs2)
@@ -189,7 +202,6 @@ class Top extends Module {
   EXReg.memwmask := Decoder.io.memwmask 
   EXReg.memsext  := Decoder.io.memsext
 
-  EXReg.isdnpc := Decoder.io.isdnpc
   EXReg.isEbreak := Decoder.io.isEbreak
   EXReg.isword := Decoder.io.isword
   EXReg.rden := Decoder.io.rd_en
@@ -198,6 +210,8 @@ class Top extends Module {
   EXReg.inst := IDReg.inst
   EXReg.pc := IDReg.pc
   Decoder.io.inst := IDReg.inst
+  Decoder.io.pc := IDReg.pc
+  pcsel := Decoder.io.isdnpc
 
   // rs1 := Decoder.io.rs1
   // rs2 := Decoder.io.rs2 
@@ -220,7 +234,6 @@ class Top extends Module {
 
   // 执行模块
   val ALU = Module(new EXU)
-  pcsel := EXReg.isdnpc
   ALU.io.inst := EXReg.inst
   ALU.io.pc := EXReg.pc
   ALU.io.alu_op := EXReg.aluop
@@ -229,7 +242,6 @@ class Top extends Module {
   ALU.io.imm := EXReg.imm
   ALU.io.rs1v := EXReg.rs1v
   ALU.io.rs2v := EXReg.rs2v
-  dnpc := ALU.io.dnpc
   ALU.io.isword := EXReg.isword
   LSReg.inst := EXReg.inst
   LSReg.pc := EXReg.pc

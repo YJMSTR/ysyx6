@@ -15,7 +15,7 @@ class EXU() extends Module {
     val asel = Input(UInt(ALU_DATASEL_WIDTH.W))
     val bsel = Input(UInt(ALU_DATASEL_WIDTH.W))
     val alu_op = Input(UInt(ALUCtrlWidth.W))
-    val dnpc = Output(UInt(XLEN.W))
+    // val dnpc = Output(UInt(XLEN.W))
     val imm = Input(UInt(XLEN.W))
     val res = Output(UInt(XLEN.W))
     val isword = Input(Bool())
@@ -82,14 +82,5 @@ class EXU() extends Module {
   // }.otherwise {
   //   io.dnpc := 0.U
   // }
-  io.dnpc := MuxCase(0.U, Array(
-    (io.inst === JALR)  -> (io.rs1v + io.imm),
-    (io.inst === JAL)   -> (io.pc + io.imm),
-    (io.inst === BEQ)   -> Mux(io.rs1v === io.rs2v, data_res, snpc),
-    (io.inst === BNE)   -> Mux(io.rs1v === io.rs2v, snpc, data_res),
-    (io.inst === BGE)   -> Mux(io.rs1v.asSInt >= io.rs2v.asSInt, data_res, snpc),
-    (io.inst === BGEU)  -> Mux(io.rs1v >= io.rs2v, data_res, snpc),
-    (io.inst === BLT)   -> Mux(io.rs1v.asSInt < io.rs2v.asSInt, data_res, snpc),
-    (io.inst === BLTU)  -> Mux(io.rs1v < io.rs2v, data_res, snpc)
-  ))
+  
 }

@@ -9,6 +9,7 @@ class IDU() extends Module {
   val io = IO(new Bundle {
     // RV32 和 64 的指令都是 32 位长，除非是 C 扩展
     val inst = Input(UInt(32.W))
+    val pc = Input(UInt(XLEN.W))
     // 这两个信号拉到顶，去访问寄存器堆
     val rs1 = Output(UInt(RIDXLEN.W))
     val rs2 = Output(UInt(RIDXLEN.W))
@@ -21,6 +22,7 @@ class IDU() extends Module {
     // pc 由其它模块传给 alu
     
     val isdnpc = Output(Bool())
+    //val dnpc = Output(UInt(XLEN.W))
     val isEbreak = Output(Bool())
 
     val memvalid = Output(Bool())
@@ -30,7 +32,7 @@ class IDU() extends Module {
     
     val isword = Output(Bool())
   })
-
+  
   io.rs1 := io.inst(19, 15)
   io.rs2 := io.inst(24, 20)
   io.rd  := io.inst(11, 7) 
@@ -154,4 +156,5 @@ class IDU() extends Module {
   }.otherwise {
     io.isEbreak := 0.U(1.W)
   }
+  
 }
