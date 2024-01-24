@@ -51,7 +51,7 @@ word_t npc_halt_pc;
 int npc_ret;
 bool difftest_is_enable = 0;
 bool is_batch_mode = 1;
-bool is_itrace = 0;
+bool is_itrace = 1;
 char logbuf[128];
 static uint64_t boot_time = 0;
 static uint64_t rtc_us = 0;
@@ -88,9 +88,13 @@ enum { DIFFTEST_TO_DUT, DIFFTEST_TO_REF };
 
 
 static uint8_t mem[MEM_SIZE] = {
-  0x93, 0x02, 0x00, 0x08, 
-  0x13, 0x03, 0x10, 0x08,
-  0x73, 0x00, 0x10, 0x00
+  0x93, 0x02, 0x00, 0x08, //addi	t0, zero, 128
+  0x13, 0x03, 0x10, 0x08, //addi	t1, zero, 129
+  0x13, 0x05, 0x10, 0x00, //li a0, 1
+  0x13, 0x07, 0xb0, 0x00, //li a4, 11 
+  0x13, 0x06, 0x10, 0x3a, //li a2, 929
+  0x93, 0x05, 0x10, 0x3a, //li a1, 929
+  0x73, 0x00, 0x10, 0x00  //ebreak
 }; 
 
 void (*ref_difftest_memcpy)(paddr_t addr, void *buf, size_t n, bool direction) = NULL;
@@ -227,7 +231,7 @@ extern "C" void npc_pmem_read(long long raddr, long long *rdata) {
     *rdata = (uint32_t)rtc_us;
     return;
   }
-  //printf("pmem_read: raddr = %lld = 0x%016lx raddr-MEM_BASE = %lld MEM_SIZE-addr+MEM_BASE-7=%lld\n", raddr, raddr, raddr-MEM_BASE, MEM_SIZE-addr+MEM_BASE-7);
+  printf("pmem_read: raddr = %lld = 0x%016lx raddr-MEM_BASE = %lld MEM_SIZE-addr+MEM_BASE-7=%lld\n", raddr, raddr, raddr-MEM_BASE, MEM_SIZE-addr+MEM_BASE-7);
   assert((word_t)raddr >= (word_t)MEM_BASE && ((word_t)(raddr - MEM_BASE + 7)) < (word_t)MEM_SIZE);
   word_t res = 0;
   for (int i = 0; i < 8; i++) {
@@ -351,6 +355,10 @@ static char *img_file = NULL;
 
 
 long load_img() {
+  if (img_file == NULL) {
+    Log("no image found, use default img");
+    return 0;
+  }
 	printf("img == %s\n", img_file);
 	FILE *fp = fopen(img_file, "rb");
 	assert(fp);
@@ -419,12 +427,13 @@ int sim_main(int argc, char** argv) {
 #endif
 	// nvboard_bind_all_pins(&top);
 	// nvboard_init();
-  
-  img_file = argv[1];
-  elf_file = (char *)malloc(strlen(img_file)+1);
-  memset(elf_file, '\0', sizeof(elf_file));
-  memcpy(elf_file, img_file, strlen(img_file)-3);
-  strcat(elf_file, "elf");
+  if (argc > 1) {
+    img_file = argv[1];
+    elf_file = (char *)malloc(strlen(img_file)+1);
+    memset(elf_file, '\0', sizeof(elf_file));
+    memcpy(elf_file, img_file, strlen(img_file)-3);
+    strcat(elf_file, "elf");
+  }
   init_monitor();
   Log("argv[1] = %s", argv[1]);
   Log("elf_file = %s", elf_file);

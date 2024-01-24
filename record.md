@@ -1843,22 +1843,31 @@ val fe_reg = RegInit(
 
 RV 中的访存指令地址总是在 rs2v，addr 总是在指令中（可以直接走 ALU->res 这个数据通路）
 
-每一级级间寄存器都加 inst 和 pc，方便 debug
+每一级级间寄存器都加 inst 和 pc，方便 debug，目前不考虑冒险，所有的 en 信号都初始化为 1 且保持为 1 
 
-各级流水线寄存器要保持的内容：
+目前不考虑跳转和分支指令，因此 isdnpc 时钟为 0, pc 直接取 snpc 作为 nextpc
 
-|        | 控制内容 | 数据内容                                                     |
-| ------ | -------- | ------------------------------------------------------------ |
-| ID reg | valid    | inst, pc,                                                    |
-| EX reg | valid    | inst,pc,各种控制信号,rs1v,rs2v,                              |
-| LS reg | valid    | inst,pc,alures(作为 addr),rs2v（作为wdata），控制信号（wen，wmask，sext，） |
-| WB reg | valid    |                                                              |
+测例：
+
+```c
+static uint8_t mem[MEM_SIZE] = {
+  0x93, 0x02, 0x00, 0x08, //addi	t0, zero, 128
+  0x13, 0x03, 0x10, 0x08, //addi	t1, zero, 129
+  0x13, 0x05, 0x10, 0x00, //li a0, 1
+  0x13, 0x07, 0xb0, 0x00, //li a4, 11 
+  0x13, 0x06, 0x10, 0x3a, //li a2, 929
+  0x93, 0x05, 0x10, 0x3a, //li a1, 929
+  0x73, 0x00, 0x10, 0x00  //ebreak
+}; 
+```
+
+ebreak 在 EX 阶段检测到当前指令为 ebreak 则直接退出程序（即，上一个译码阶段结束后直接退出）。因此正确的五级流水应当成功写入a0，a4, 但没有写回 a2, a1
+
+### 实现考虑跳转指令的流水线
 
 
 
-
-
-
+原先 dnpc 的计算是放在 ALU 里算的，现在要提前到译码级算出要不要跳转
 
 
 
