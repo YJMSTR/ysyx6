@@ -74,7 +74,7 @@ class Top extends Module {
     (new EXRegBundle).Lit(
       _.valid     -> 1.B,
       _.inst      -> 0.U,
-      _.pc        -> RESET_VECTOR.U,
+      _.pc        -> 0.U,
       _.rs1v      -> 0.U,
       _.rs2v      -> 0.U,
       _.imm       -> 0.U,
@@ -96,7 +96,7 @@ class Top extends Module {
     (new LSRegBundle).Lit(
       _.valid     -> 1.B,
       _.inst      -> 0.U,
-      _.pc        -> RESET_VECTOR.U,
+      _.pc        -> 0.U,
       _.alures    -> 0.U,
       _.rs2v      -> 0.U,
       _.memvalid  -> 0.B,
@@ -111,7 +111,7 @@ class Top extends Module {
     (new WBRegBundle).Lit(
       _.valid     -> 1.B,
       _.inst      -> 0.U,
-      _.pc        -> RESET_VECTOR.U,
+      _.pc        -> 0.U,
       _.memvalid  -> 0.B,
       _.alures    -> 0.U,
       _.sextrdata -> 0.U,
@@ -127,8 +127,11 @@ class Top extends Module {
   val dnpc = Wire(UInt(XLEN.W))
   val pcsel = Wire(UInt(1.W))
   val InstFetcher = Module(new DPIC_IFU)
-  
-  InstFetcher.io.pc := Mux(pcsel === 1.U, dnpc, IDReg.pc + 4.U)
+  val PC = RegInit(UInt(XLEN.W), RESET_VECTOR.U)
+  val PCNext = Wire(UInt(XLEN.W))
+  PCNext := PC + 4.U
+  PC := Mux(IDRegen, Mux(pcsel === 1.U, dnpc, PCNext), PC)
+  InstFetcher.io.pc := PC
   InstFetcher.io.valid := Mux(reset.asBool, 0.U, 1.U)
   
   when (IDRegen) {
@@ -140,16 +143,10 @@ class Top extends Module {
     IDReg.pc := IDReg.pc
     IDReg.valid := IDReg.valid
   }
-  when (IDReg.valid) {
-    io.inst := IDReg.inst
-    io.pc := IDReg.pc
-  }.otherwise {
-    io.inst := 0.U
-    io.pc := 0.U
-  }
+  
   val R = Mem(32, UInt(XLEN.W))
   val scoreboard = Mem(32, Bool())
-  val dataHazard = WireInit(Bool(), 0.B)
+  val dataHazard = RegInit(Bool(), 0.B)
   val stall = dataHazard
   def Rread(idx: UInt) = Mux(idx === 0.U, 0.U(XLEN.W), R(idx))
   
@@ -351,12 +348,16 @@ class Top extends Module {
     wbrdmemvalid := WBReg.memvalid
     wbrdsextrdata := WBReg.sextrdata
     wbrdalures := WBReg.alures
+    io.inst := WBReg.inst
+    io.pc := WBReg.pc
   } .otherwise {
     wbrd := 0.U
     wbrden := 0.B
     wbrdmemvalid := 0.B
     wbrdsextrdata := 0.U
     wbrdalures := 0.U
+    io.inst := 0.U
+    io.pc := 0.U
   }
 
   R(wbrd) := Mux(wbrden === 0.B, R(wbrd), rdv)
@@ -364,7 +365,7 @@ class Top extends Module {
   scoreboard(wbrd) := 0.B
 
   when(Decoder.io.alu_sel_a === ALU_DATA_RS1 || Decoder.io.alu_sel_b === ALU_DATA_RS2) {
-    dataHazard := (Decoder.io.alu_sel_a === ALU_DATA_RS1 && scoreboard(Decoder.io.rs1)) | (Decoder.io.alu_sel_b === ALU_DATA_RS2 && scoreboard(Decoder.io.rs2))
+    dataHazard := (Decoder.io.alu_sel_a === ALU_DATA_RS1 && scoreboard(Decoder.io.rs1) && Decoder.io.rs1 =/= 0.U) | (Decoder.io.alu_sel_b === ALU_DATA_RS2 && scoreboard(Decoder.io.rs2) && Decoder.io.rs2 =/= 0.U)
   }.otherwise {
     dataHazard := 0.B
   }
