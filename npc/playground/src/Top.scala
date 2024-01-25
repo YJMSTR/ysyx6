@@ -7,22 +7,17 @@ import chisel3.experimental.BundleLiterals._
 
 class IDRegBundle extends Bundle {
   val valid = Bool()
-  //val en    = Bool()
   val inst  = UInt(32.W)
   val pc    = UInt(XLEN.W)
 }
 
 class EXRegBundle extends Bundle {
   val valid = Bool()
-  //val en    = Bool()
-  // debug
   val inst  = UInt(32.W)
   val pc    = UInt(XLEN.W)
-  // data
   val rs1v  = UInt(XLEN.W)
   val rs2v  = UInt(XLEN.W)
   val imm   = UInt(XLEN.W)
-  // ctrl
   val dataAsel  = UInt(ALU_DATASEL_WIDTH.W)
   val dataBsel  = UInt(ALU_DATASEL_WIDTH.W)
   val aluop     = UInt(ALUCtrlWidth.W)
@@ -39,14 +34,10 @@ class EXRegBundle extends Bundle {
 
 class LSRegBundle extends Bundle {
   val valid = Bool()
-  //val en    = Bool()
-  // debug
   val inst = UInt(32.W)
   val pc = UInt(XLEN.W)
-  // data 
   val alures = UInt(XLEN.W)
   val rs2v = UInt(XLEN.W)
-  // ctrl
   val memvalid = Bool()
   val memwen = Bool()
   val memwmask = UInt(WMASKLEN.W)
@@ -57,14 +48,10 @@ class LSRegBundle extends Bundle {
 
 class WBRegBundle extends Bundle {
   val valid = Bool()
-  //val en    = Bool()
-  // debug 
   val inst = UInt(32.W)
   val pc = UInt(XLEN.W)
-  // data
   val alures = UInt(XLEN.W)
   val sextrdata = UInt(XLEN.W)
-  // ctrl 
   val rden = Bool()
   val rd = UInt(RIDXLEN.W)
   val memvalid = Bool()
@@ -76,20 +63,16 @@ class Top extends Module {
     val pc = Output(UInt(XLEN.W))
   })
   
-  // ID Reg
   val IDReg = RegInit(
     (new IDRegBundle).Lit(
-      //_.en    = 1.B,
       _.valid -> 1.B,
       _.inst -> 0.U,
       _.pc   -> "x7ffffffc".U
     )
   )
-  // EX Reg
   val EXReg = RegInit(
     (new EXRegBundle).Lit(
       _.valid     -> 1.B,
-      //_.en        = 1.B,
       _.inst      -> 0.U,
       _.pc        -> RESET_VECTOR.U,
       _.rs1v      -> 0.U,
@@ -124,11 +107,9 @@ class Top extends Module {
       _.rd        -> 0.U
     )
   )
-  // WB Reg
   val WBReg = RegInit(
     (new WBRegBundle).Lit(
       _.valid     -> 1.B,
-      //_.en        = 1.B,
       _.inst      -> 0.U,
       _.pc        -> RESET_VECTOR.U,
       _.memvalid  -> 0.B,
@@ -139,38 +120,38 @@ class Top extends Module {
     )
   )
 
-  // 根据 PC 取出 inst 之前是在 C++ 里完成的
-  // 现在需要额外调用一次 pmem_read() 来实现
-  // PC 模块
-  // val PC = RegInit(RESET_VECTOR.U(XLEN.W))
+  val IDRegen = WireInit(Bool(), 1.B)
+  val EXRegen = WireInit(Bool(), 1.B)
+  val LSRegen = WireInit(Bool(), 1.B)
+  val WBRegen = WireInit(Bool(), 1.B)
   val dnpc = Wire(UInt(XLEN.W))
   val pcsel = Wire(UInt(1.W))
-  // val wirepc = Wire(UInt(XLEN.W))
-  // val wireinst = Wire(UInt(32.W))
-  // wirepc := PC
-  // io.pc := PC
-  // val npc = Wire(UInt(XLEN.W))
-  // npc := 
   val InstFetcher = Module(new DPIC_IFU)
-  InstFetcher.io.pc := Mux(pcsel === 1.U, dnpc, IDReg.pc + 4.U)
-  IDReg.pc := InstFetcher.io.pc
-  //InstFetcher.io.clk := clock
-  // wireinst := Mux(reset.asBool, 0.U, InstFetcher.io.inst)
-  InstFetcher.io.valid := Mux(reset.asBool, 0.U, 1.U)
-  IDReg.inst := InstFetcher.io.inst
   
-  io.inst := InstFetcher.io.inst
-  io.pc := InstFetcher.io.pc
-  // 译码模块
-  // 寄存器
+  InstFetcher.io.pc := Mux(pcsel === 1.U, dnpc, IDReg.pc + 4.U)
+  InstFetcher.io.valid := Mux(reset.asBool, 0.U, 1.U)
+  
+  when (IDRegen) {
+    IDReg.inst := InstFetcher.io.inst
+    IDReg.pc := InstFetcher.io.pc
+    IDReg.valid := 1.B
+  } .otherwise {
+    IDReg.inst := IDReg.inst
+    IDReg.pc := IDReg.pc
+    IDReg.valid := IDReg.valid
+  }
+  when (IDReg.valid) {
+    io.inst := IDReg.inst
+    io.pc := IDReg.pc
+  }.otherwise {
+    io.inst := 0.U
+    io.pc := 0.U
+  }
   val R = Mem(32, UInt(XLEN.W))
+  val scoreboard = Mem(32, Bool())
+  val dataHazard = WireInit(Bool(), 0.B)
+  val stall = dataHazard
   def Rread(idx: UInt) = Mux(idx === 0.U, 0.U(XLEN.W), R(idx))
-  //val rs1v = Wire(UInt(XLEN.W))
-  //val rs2v = Wire(UInt(XLEN.W))
-  //val rs1 = Wire(UInt(RIDXLEN.W))
-  //val rs2 = Wire(UInt(RIDXLEN.W))
-  //val rd = Wire(UInt(RIDXLEN.W))
-  //val rd_en = Wire(UInt(1.W))
   
   R(0) := 0.U
   val Decoder = Module(new IDU)
@@ -178,6 +159,12 @@ class Top extends Module {
   val rs1v = Rread(Decoder.io.rs1)
   val rs2v = Rread(Decoder.io.rs2)
   val snpc = Decoder.io.pc + 4.U
+  when(Decoder.io.rd =/= 0.U) {
+    scoreboard(Decoder.io.rd) := scoreboard(Decoder.io.rd) | Decoder.io.rd_en
+  } .otherwise {
+    scoreboard(Decoder.io.rd) := 0.B
+  }
+  
   dnpc := MuxCase(0.U, Array(
     (Decoder.io.inst === JALR)  -> (rs1v + Decoder.io.imm),
     (Decoder.io.inst === JAL)   -> (pc_plus_imm),
@@ -188,120 +175,209 @@ class Top extends Module {
     (Decoder.io.inst === BLT)   -> Mux(rs1v.asSInt < rs2v.asSInt, pc_plus_imm, snpc),
     (Decoder.io.inst === BLTU)  -> Mux(rs1v < rs2v, pc_plus_imm, snpc)
   ))
-  EXReg.inst := IDReg.inst
-  EXReg.rs1v := Rread(Decoder.io.rs1)
-  EXReg.rs2v := Rread(Decoder.io.rs2)
-  EXReg.imm  := Decoder.io.imm
+  when(EXRegen) {
+    EXReg.inst := Mux(IDReg.valid, IDReg.inst, 0.U)
+    EXReg.rs1v := Rread(Decoder.io.rs1)
+    EXReg.rs2v := Rread(Decoder.io.rs2)
+    EXReg.imm  := Decoder.io.imm
+    EXReg.aluop := Decoder.io.alu_op
+    EXReg.dataAsel := Decoder.io.alu_sel_a
+    EXReg.dataBsel := Decoder.io.alu_sel_b
 
-  EXReg.aluop := Decoder.io.alu_op
-  EXReg.dataAsel := Decoder.io.alu_sel_a
-  EXReg.dataBsel := Decoder.io.alu_sel_b
+    EXReg.memvalid := Decoder.io.memvalid
+    EXReg.memwen   := Decoder.io.memwen
+    EXReg.memwmask := Decoder.io.memwmask 
+    EXReg.memsext  := Decoder.io.memsext
 
-  EXReg.memvalid := Decoder.io.memvalid
-  EXReg.memwen   := Decoder.io.memwen
-  EXReg.memwmask := Decoder.io.memwmask 
-  EXReg.memsext  := Decoder.io.memsext
+    EXReg.isEbreak := Decoder.io.isEbreak
+    EXReg.isword := Decoder.io.isword
+    EXReg.rden := Decoder.io.rd_en
+    EXReg.rd := Decoder.io.rd
 
-  EXReg.isEbreak := Decoder.io.isEbreak
-  EXReg.isword := Decoder.io.isword
-  EXReg.rden := Decoder.io.rd_en
-  EXReg.rd := Decoder.io.rd
-
-  EXReg.inst := IDReg.inst
-  EXReg.pc := IDReg.pc
-  Decoder.io.inst := IDReg.inst
-  Decoder.io.pc := IDReg.pc
+    EXReg.inst := IDReg.inst
+    EXReg.pc := IDReg.pc
+  } .otherwise {
+    EXReg.inst := EXReg.inst
+    EXReg.pc := EXReg.pc
+    EXReg.rs1v := EXReg.rs1v
+    EXReg.rs2v := EXReg.rs2v
+    EXReg.imm := EXReg.imm
+    EXReg.aluop := EXReg.aluop
+    EXReg.dataAsel := EXReg.dataAsel
+    EXReg.dataBsel := EXReg.dataBsel
+    EXReg.memvalid := EXReg.memvalid
+    EXReg.memwen := EXReg.memwen
+    EXReg.memwmask := EXReg.memwmask
+    EXReg.memsext := EXReg.memsext
+    EXReg.isEbreak := EXReg.isEbreak
+    EXReg.isword := EXReg.isword
+    EXReg.rden := EXReg.rden
+    EXReg.rd := EXReg.rd  
+  }
+  
+  when (IDReg.valid) {
+    Decoder.io.inst := IDReg.inst
+    Decoder.io.pc := IDReg.pc
+  } .otherwise {
+    // 否则按照空指令进行输入
+    Decoder.io.inst := 0.U
+    Decoder.io.pc := 0.U
+  }
   pcsel := Decoder.io.isdnpc
 
-  // rs1 := Decoder.io.rs1
-  // rs2 := Decoder.io.rs2 
-  // pcsel := Decoder.io.isdnpc
-  // rd := Decoder.io.rd 
-  // memvalid := Decoder.io.memvalid
-  // memwen := Decoder.io.memwen
-  // memwmask := Decoder.io.memwmask
-  // memsext := Decoder.io.memsext
-  // memwdata := MuxLookup(memwmask, rs2v)(Seq(
-  //   1.U  -> rs2v(7, 0),
-  //   3.U  -> rs2v(15, 0),
-  //   15.U -> rs2v(31, 0),
-  //   255.U-> rs2v(63, 0)
-  // ))
-  // val isword = Decoder.io.isword
-
-
-
-
-  // 执行模块
   val ALU = Module(new EXU)
-  ALU.io.inst := EXReg.inst
-  ALU.io.pc := EXReg.pc
-  ALU.io.alu_op := EXReg.aluop
-  ALU.io.asel := EXReg.dataAsel
-  ALU.io.bsel := EXReg.dataBsel
-  ALU.io.imm := EXReg.imm
-  ALU.io.rs1v := EXReg.rs1v
-  ALU.io.rs2v := EXReg.rs2v
-  ALU.io.isword := EXReg.isword
-  LSReg.inst := EXReg.inst
-  LSReg.pc := EXReg.pc
-  LSReg.alures := ALU.io.res
-  LSReg.rs2v := EXReg.rs2v
-  LSReg.memvalid := EXReg.memvalid
-  LSReg.memwen := EXReg.memwen
-  LSReg.memwmask := EXReg.memwmask
-  LSReg.memsext := EXReg.memsext 
-  LSReg.rden := EXReg.rden
-  LSReg.rd := EXReg.rd
-  // 访存模块
-  // 译码器需要判断当前指令是否为访存，生成对应的 valid 和 wen 信号
-  val NPC_Mem = Module(new DPIC_MEM)
-  // val memvalid = Wire(UInt(1.W))
-  // val memwen = Wire(UInt(1.W))
-  // val memrdata = Wire(UInt(XLEN.W)) 
-  // val memsext = Wire(UInt(MEM_SEXT_SEL_WIDTH.W))
-  // val memraddr = Wire(UInt(XLEN.W))
-  // val memwaddr = Wire(UInt(XLEN.W))
-  // val memwdata = Wire(UInt(XLEN.W))
+  when(EXReg.valid) {
+    ALU.io.inst := EXReg.inst
+    ALU.io.pc := EXReg.pc
+    ALU.io.alu_op := EXReg.aluop
+    ALU.io.asel := EXReg.dataAsel
+    ALU.io.bsel := EXReg.dataBsel
+    ALU.io.imm := EXReg.imm
+    ALU.io.rs1v := EXReg.rs1v
+    ALU.io.rs2v := EXReg.rs2v
+    ALU.io.isword := EXReg.isword
+    when (LSRegen) {
+      LSReg.inst := EXReg.inst
+      LSReg.pc := EXReg.pc
+      LSReg.rs2v := EXReg.rs2v
+      LSReg.memvalid := EXReg.memvalid
+      LSReg.memwen := EXReg.memwen
+      LSReg.memwmask := EXReg.memwmask
+      LSReg.memsext := EXReg.memsext 
+      LSReg.rden := EXReg.rden
+      LSReg.rd := EXReg.rd
+    }.otherwise {
+      LSReg.inst := LSReg.inst
+      LSReg.pc := LSReg.pc
+      LSReg.rs2v := LSReg.rs2v
+      LSReg.memvalid := LSReg.memvalid
+      LSReg.memwen := LSReg.memwen
+      LSReg.memwmask := LSReg.memwmask
+      LSReg.memsext := LSReg.memsext 
+      LSReg.rden := LSReg.rden
+      LSReg.rd := LSReg.rd
+    }
+  } .otherwise {
+    ALU.io.inst := 0.U 
+    ALU.io.pc := 0.U 
+    ALU.io.alu_op := ALU_NONE
+    ALU.io.asel := ALU_DATA_NONE
+    ALU.io.bsel := ALU_DATA_NONE
+    ALU.io.imm := 0.U
+    ALU.io.rs1v := 0.U
+    ALU.io.rs2v := 0.U
+    ALU.io.isword := 0.B
+    LSReg.inst := 0.U
+    LSReg.pc := 0.U
+    LSReg.rs2v := 0.U
+    LSReg.memvalid := 0.B
+    LSReg.memwen := 0.B
+    LSReg.memwmask := 0.U
+    LSReg.memsext := MEM_SEXT_NONE
+    LSReg.rden := 0.B
+    LSReg.rd := 0.U
+  }
+  when (LSRegen) {
+    LSReg.alures := ALU.io.res
+  } .otherwise {
+    LSReg.alures := LSReg.alures
+  }
   
-  // val memwmask = Wire(UInt(WMASKLEN.W))
-  NPC_Mem.io.valid := LSReg.memvalid
-  NPC_Mem.io.wen := LSReg.memwen
-  NPC_Mem.io.raddr := LSReg.alures
-  NPC_Mem.io.waddr := LSReg.alures
-  NPC_Mem.io.wdata := LSReg.rs2v
-  NPC_Mem.io.wmask := LSReg.memwmask
+  val NPC_Mem = Module(new DPIC_MEM)
   NPC_Mem.io.clk := clock
-
-  WBReg.inst := LSReg.inst
-  WBReg.pc := LSReg.pc
-  WBReg.memvalid := LSReg.memvalid
-  WBReg.alures := LSReg.alures
   val rdata7 = NPC_Mem.io.rdata(7)
   val rdata15 = NPC_Mem.io.rdata(15)
   val rdata31 = NPC_Mem.io.rdata(31)
-  WBReg.sextrdata := MuxLookup(LSReg.memsext, NPC_Mem.io.rdata)(Seq(
-    MEM_NSEXT_8 ->  Cat(Fill(XLEN-8, 0.U), NPC_Mem.io.rdata(7, 0)),
-    MEM_NSEXT_16->  Cat(Fill(XLEN-16, 0.U), NPC_Mem.io.rdata(15, 0)),
-    MEM_NSEXT_32->  Cat(Fill(XLEN-32, 0.U), NPC_Mem.io.rdata(31, 0)),
-    MEM_SEXT_8  ->  Cat(Fill(XLEN-8, rdata7), NPC_Mem.io.rdata(7, 0)),
-    MEM_SEXT_16 ->  Cat(Fill(XLEN-16, rdata15), NPC_Mem.io.rdata(15, 0)),
-    //rv64 only: 
-    MEM_SEXT_32 ->  Cat(Fill(XLEN-32, rdata31), NPC_Mem.io.rdata(31, 0)),
-  ))
-  WBReg.rden := LSReg.rden
-  WBReg.rd := LSReg.rd
+  when (LSReg.valid) {
+    NPC_Mem.io.valid := LSReg.memvalid
+    NPC_Mem.io.wen := LSReg.memwen
+    NPC_Mem.io.raddr := LSReg.alures
+    NPC_Mem.io.waddr := LSReg.alures
+    NPC_Mem.io.wdata := LSReg.rs2v
+    NPC_Mem.io.wmask := LSReg.memwmask
+    when (WBRegen) {
+      WBReg.inst := LSReg.inst
+      WBReg.pc := LSReg.pc
+      WBReg.memvalid := LSReg.memvalid
+      WBReg.valid := LSReg.valid
+      WBReg.alures := LSReg.alures
+      WBReg.sextrdata := MuxLookup(LSReg.memsext, NPC_Mem.io.rdata)(Seq(
+        MEM_NSEXT_8 ->  Cat(Fill(XLEN-8, 0.U), NPC_Mem.io.rdata(7, 0)),
+        MEM_NSEXT_16->  Cat(Fill(XLEN-16, 0.U), NPC_Mem.io.rdata(15, 0)),
+        MEM_NSEXT_32->  Cat(Fill(XLEN-32, 0.U), NPC_Mem.io.rdata(31, 0)),
+        MEM_SEXT_8  ->  Cat(Fill(XLEN-8, rdata7), NPC_Mem.io.rdata(7, 0)),
+        MEM_SEXT_16 ->  Cat(Fill(XLEN-16, rdata15), NPC_Mem.io.rdata(15, 0)),
+        MEM_SEXT_32 ->  Cat(Fill(XLEN-32, rdata31), NPC_Mem.io.rdata(31, 0)),
+      ))
+      WBReg.rden := LSReg.rden
+      WBReg.rd := LSReg.rd
+    } .otherwise {
+      WBReg.valid := WBReg.valid
+      WBReg.inst := WBReg.inst
+      WBReg.pc := WBReg.pc
+      WBReg.memvalid := WBReg.memvalid
+      WBReg.alures := WBReg.alures
+      WBReg.sextrdata := WBReg.sextrdata
+      WBReg.rden := WBReg.rden
+      WBReg.rd := WBReg.rd
+    }
+  } .otherwise {
+    NPC_Mem.io.valid := 0.U
+    NPC_Mem.io.wen := 0.U
+    NPC_Mem.io.raddr := 0.U
+    NPC_Mem.io.waddr := 0.U
+    NPC_Mem.io.wdata := 0.U
+    NPC_Mem.io.wmask := 0.U
+    WBReg.inst := 0.U 
+    WBReg.valid := 0.B
+    WBReg.pc := 0.U
+    WBReg.memvalid := 0.B
+    WBReg.alures := 0.U
+    WBReg.sextrdata := 0.U
+    WBReg.rden := 0.B
+    WBReg.rd := 0.U
+  }
 
-  // memraddr := ALU.io.res
-  // memwaddr := ALU.io.res
-
-
-  // 写回模块
   val rdv = Wire(UInt(XLEN.W))
-  R(WBReg.rd) := Mux(WBReg.rden === 0.B, R(WBReg.rd), rdv)
-  rdv := Mux(WBReg.memvalid === 1.U, WBReg.sextrdata, WBReg.alures)
+  val wbrd = Wire(UInt(RIDXLEN.W))
+  val wbrden = Wire(Bool())
+  val wbrdmemvalid = Wire(Bool())
+  val wbrdsextrdata = Wire(UInt(XLEN.W))
+  val wbrdalures = Wire(UInt(XLEN.W))
+
+  when (WBReg.valid) {
+    wbrd := WBReg.rd
+    wbrden := WBReg.rden
+    wbrdmemvalid := WBReg.memvalid
+    wbrdsextrdata := WBReg.sextrdata
+    wbrdalures := WBReg.alures
+  } .otherwise {
+    wbrd := 0.U
+    wbrden := 0.B
+    wbrdmemvalid := 0.B
+    wbrdsextrdata := 0.U
+    wbrdalures := 0.U
+  }
+
+  R(wbrd) := Mux(wbrden === 0.B, R(wbrd), rdv)
+  rdv := Mux(wbrdmemvalid === 1.U, wbrdsextrdata, wbrdalures)
+  scoreboard(wbrd) := 0.B
+
+  when(Decoder.io.alu_sel_a === ALU_DATA_RS1 || Decoder.io.alu_sel_b === ALU_DATA_RS2) {
+    dataHazard := (Decoder.io.alu_sel_a === ALU_DATA_RS1 && scoreboard(Decoder.io.rs1)) | (Decoder.io.alu_sel_b === ALU_DATA_RS2 && scoreboard(Decoder.io.rs2))
+  }.otherwise {
+    dataHazard := 0.B
+  }
+  when (stall) {
+    IDRegen := 0.B 
+    EXRegen := 0.B 
+    LSReg.valid := 0.B
+  } .otherwise {
+    IDRegen := 1.B 
+    EXRegen := 1.B
+    LSReg.valid := 1.B
+  }
   
-  // Ebreak 要放在EX阶段执行，防止前面有指令未执行完成就退出了
   val Ebreak = Module(new DPIC_EBREAK)
   Ebreak.io.isEbreak := EXReg.isEbreak
   Ebreak.io.clk := clock
