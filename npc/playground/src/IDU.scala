@@ -10,7 +10,6 @@ class IDU() extends Module {
     // RV32 和 64 的指令都是 32 位长，除非是 C 扩展
     val inst = Input(UInt(32.W))
     val pc = Input(UInt(XLEN.W))
-    // 这两个信号拉到顶，去访问寄存器堆
     val rs1 = Output(UInt(RIDXLEN.W))
     val rs2 = Output(UInt(RIDXLEN.W))
     val rd  = Output(UInt(RIDXLEN.W))
@@ -31,95 +30,98 @@ class IDU() extends Module {
     val memsext = Output(UInt(MEM_SEXT_SEL_WIDTH.W))
     
     val isword = Output(Bool())
+    // 是否读取了 rs1 rs2
+    val rrs1 = Output(Bool())
+    val rrs2 = Output(Bool())
   })
   
   io.rs1 := io.inst(19, 15)
   io.rs2 := io.inst(24, 20)
   io.rd  := io.inst(11, 7) 
   // isword (RV64Only)：判断是否为字运算指令（例如addiw),如果是则为1
-  val List(alu_op, alu_sel_a, alu_sel_b, isdnpc, immsel, rden, memvalid, memwen, memwmask, memsext, isword) = ListLookup(
+  val List(alu_op, alu_sel_a, alu_sel_b, isdnpc, immsel, rden, memvalid, memwen, memwmask, memsext, isword, rrs1, rrs2) = ListLookup(
     io.inst,
-    List(ALU_NONE, ALU_DATA_NONE, ALU_DATA_NONE, 0.U(1.W), IMM_NONE, 0.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W), MEM_SEXT_NONE, 0.U(1.W)),
-    //List(ALU_OP, ALU_A, ALU_B, isdnpc, IMMSEL, RDWEN, memvalid, memwen, memwmask, memsext&bits, isword)
+    List(ALU_NONE, ALU_DATA_NONE, ALU_DATA_NONE, 0.U(1.W), IMM_NONE, 0.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W), MEM_SEXT_NONE, 0.U(1.W), 0.B, 0.B),
+    //List(ALU_OP, ALU_A, ALU_B, isdnpc, IMMSEL, RDWEN, memvalid, memwen, memwmask, memsext&bits, isword, rrs1, rrs2)
     // NONE 就直接全0
     // 只用到一个数据就 none + data， op 设为 add
     Array(
       // U-type
-      LUI     -> List(ALU_ADD,          ALU_DATA_NONE,  ALU_DATA_IMM,   0.U(1.W), IMM_U,    1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W)),
-      AUIPC   -> List(ALU_ADD,          ALU_DATA_PC,    ALU_DATA_IMM,   0.U(1.W), IMM_U,    1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W)),
+      LUI     -> List(ALU_ADD,          ALU_DATA_NONE,  ALU_DATA_IMM,   0.U(1.W), IMM_U,    1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W),  0.B, 0.B),
+      AUIPC   -> List(ALU_ADD,          ALU_DATA_PC,    ALU_DATA_IMM,   0.U(1.W), IMM_U,    1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W),  0.B, 0.B),
       // I-type 
-      LH      -> List(ALU_ADD,          ALU_DATA_RS1,   ALU_DATA_IMM,   0.U(1.W), IMM_I,    1.U(1.W), 1.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_16,   0.U(1.W)),
-      LHU     -> List(ALU_ADD,          ALU_DATA_RS1,   ALU_DATA_IMM,   0.U(1.W), IMM_I,    1.U(1.W), 1.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_NSEXT_16,  0.U(1.W)),
-      LB      -> List(ALU_ADD,          ALU_DATA_RS1,   ALU_DATA_IMM,   0.U(1.W), IMM_I,    1.U(1.W), 1.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_8,    0.U(1.W)),
-      LBU     -> List(ALU_ADD,          ALU_DATA_RS1,   ALU_DATA_IMM,   0.U(1.W), IMM_I,    1.U(1.W), 1.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_NSEXT_8,   0.U(1.W)),
-      LW      -> List(ALU_ADD,          ALU_DATA_RS1,   ALU_DATA_IMM,   0.U(1.W), IMM_I,    1.U(1.W), 1.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_32,   0.U(1.W)),
-      LWU     -> List(ALU_ADD,          ALU_DATA_RS1,   ALU_DATA_IMM,   0.U(1.W), IMM_I,    1.U(1.W), 1.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_NSEXT_32,  0.U(1.W)),
-      LD      -> List(ALU_ADD,          ALU_DATA_RS1,   ALU_DATA_IMM,   0.U(1.W), IMM_I,    1.U(1.W), 1.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W)),
+      LH      -> List(ALU_ADD,          ALU_DATA_RS1,   ALU_DATA_IMM,   0.U(1.W), IMM_I,    1.U(1.W), 1.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_16,   0.U(1.W),  1.B, 0.B),
+      LHU     -> List(ALU_ADD,          ALU_DATA_RS1,   ALU_DATA_IMM,   0.U(1.W), IMM_I,    1.U(1.W), 1.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_NSEXT_16,  0.U(1.W),  1.B, 0.B),
+      LB      -> List(ALU_ADD,          ALU_DATA_RS1,   ALU_DATA_IMM,   0.U(1.W), IMM_I,    1.U(1.W), 1.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_8,    0.U(1.W),  1.B, 0.B),
+      LBU     -> List(ALU_ADD,          ALU_DATA_RS1,   ALU_DATA_IMM,   0.U(1.W), IMM_I,    1.U(1.W), 1.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_NSEXT_8,   0.U(1.W),  1.B, 0.B),
+      LW      -> List(ALU_ADD,          ALU_DATA_RS1,   ALU_DATA_IMM,   0.U(1.W), IMM_I,    1.U(1.W), 1.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_32,   0.U(1.W),  1.B, 0.B),
+      LWU     -> List(ALU_ADD,          ALU_DATA_RS1,   ALU_DATA_IMM,   0.U(1.W), IMM_I,    1.U(1.W), 1.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_NSEXT_32,  0.U(1.W),  1.B, 0.B),
+      LD      -> List(ALU_ADD,          ALU_DATA_RS1,   ALU_DATA_IMM,   0.U(1.W), IMM_I,    1.U(1.W), 1.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W),  1.B, 0.B),
        
-      ADDI    -> List(ALU_ADD,          ALU_DATA_RS1,   ALU_DATA_IMM,   0.U(1.W), IMM_I,    1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W)),
-      SLTI    -> List(ALU_SLT,          ALU_DATA_RS1,   ALU_DATA_IMM,   0.U(1.W), IMM_I,    1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W)),
-      SLTIU   -> List(ALU_SLTU,         ALU_DATA_RS1,   ALU_DATA_IMM,   0.U(1.W), IMM_I,    1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W)),
-      JALR    -> List(ALU_JALR_OR_JAL,  ALU_DATA_RS1,   ALU_DATA_IMM,   1.U(1.W), IMM_I,    1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W)),
-      //rv64: ADDIW 
-      ADDIW   -> List(ALU_ADD,          ALU_DATA_RS1,   ALU_DATA_IMM,   0.U(1.W), IMM_I,    1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 1.U(1.W)),
-      SRAI    -> List(ALU_SRA,          ALU_DATA_RS1,   ALU_DATA_SHAMT, 0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W)),
-      ANDI    -> List(ALU_AND,          ALU_DATA_RS1,   ALU_DATA_IMM,   0.U(1.W), IMM_I,    1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W)),
-      ORI     -> List(ALU_OR,           ALU_DATA_RS1,   ALU_DATA_IMM,   0.U(1.W), IMM_I,    1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W)),
-      XORI    -> List(ALU_XOR,          ALU_DATA_RS1,   ALU_DATA_IMM,   0.U(1.W), IMM_I,    1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W)),
-      SLLI    -> List(ALU_SLL,          ALU_DATA_RS1,   ALU_DATA_SHAMT, 0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W)),
-      SRLI    -> List(ALU_SRL,          ALU_DATA_RS1,   ALU_DATA_SHAMT, 0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W)), 
-      SLLIW   -> List(ALU_SLL,          ALU_DATA_RS1,   ALU_DATA_SHAMT, 0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 1.U(1.W)),
-      SRAIW   -> List(ALU_SRAW,         ALU_DATA_RS1,   ALU_DATA_SHAMT, 0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 1.U(1.W)),
-      SRLIW   -> List(ALU_SRLW,         ALU_DATA_RS1,   ALU_DATA_SHAMT, 0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 1.U(1.W)),
+      ADDI    -> List(ALU_ADD,          ALU_DATA_RS1,   ALU_DATA_IMM,   0.U(1.W), IMM_I,    1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W), 1.B, 0.B),
+      SLTI    -> List(ALU_SLT,          ALU_DATA_RS1,   ALU_DATA_IMM,   0.U(1.W), IMM_I,    1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W), 1.B, 0.B),
+      SLTIU   -> List(ALU_SLTU,         ALU_DATA_RS1,   ALU_DATA_IMM,   0.U(1.W), IMM_I,    1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W), 1.B, 0.B),
+      JALR    -> List(ALU_JALR_OR_JAL,  ALU_DATA_RS1,   ALU_DATA_IMM,   1.U(1.W), IMM_I,    1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W), 1.B, 0.B),
+      //rv64: ADDIW , 1.B, 0.B
+      ADDIW   -> List(ALU_ADD,          ALU_DATA_RS1,   ALU_DATA_IMM,   0.U(1.W), IMM_I,    1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 1.U(1.W), 1.B, 0.B),
+      SRAI    -> List(ALU_SRA,          ALU_DATA_RS1,   ALU_DATA_SHAMT, 0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W), 1.B, 0.B),
+      ANDI    -> List(ALU_AND,          ALU_DATA_RS1,   ALU_DATA_IMM,   0.U(1.W), IMM_I,    1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W), 1.B, 0.B),
+      ORI     -> List(ALU_OR,           ALU_DATA_RS1,   ALU_DATA_IMM,   0.U(1.W), IMM_I,    1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W), 1.B, 0.B),
+      XORI    -> List(ALU_XOR,          ALU_DATA_RS1,   ALU_DATA_IMM,   0.U(1.W), IMM_I,    1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W), 1.B, 0.B),
+      SLLI    -> List(ALU_SLL,          ALU_DATA_RS1,   ALU_DATA_SHAMT, 0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W), 1.B, 0.B),
+      SRLI    -> List(ALU_SRL,          ALU_DATA_RS1,   ALU_DATA_SHAMT, 0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W), 1.B, 0.B), 
+      SLLIW   -> List(ALU_SLL,          ALU_DATA_RS1,   ALU_DATA_SHAMT, 0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 1.U(1.W), 1.B, 0.B),
+      SRAIW   -> List(ALU_SRAW,         ALU_DATA_RS1,   ALU_DATA_SHAMT, 0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 1.U(1.W), 1.B, 0.B),
+      SRLIW   -> List(ALU_SRLW,         ALU_DATA_RS1,   ALU_DATA_SHAMT, 0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 1.U(1.W), 1.B, 0.B),
 
       // J-type
-      JAL     -> List(ALU_JALR_OR_JAL,  ALU_DATA_PC,    ALU_DATA_IMM,   1.U(1.W), IMM_J,    1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W)),
+      JAL     -> List(ALU_JALR_OR_JAL,  ALU_DATA_PC,    ALU_DATA_IMM,   1.U(1.W), IMM_J,    1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W), 0.B, 0.B),
 
       // S-type
-      SB      -> List(ALU_ADD,          ALU_DATA_RS1,   ALU_DATA_IMM,   0.U(1.W), IMM_S,    0.U(1.W), 1.U(1.W), 1.U(1.W), 1.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W)),
-      SH      -> List(ALU_ADD,          ALU_DATA_RS1,   ALU_DATA_IMM,   0.U(1.W), IMM_S,    0.U(1.W), 1.U(1.W), 1.U(1.W), 3.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W)),
-      SW      -> List(ALU_ADD,          ALU_DATA_RS1,   ALU_DATA_IMM,   0.U(1.W), IMM_S,    0.U(1.W), 1.U(1.W), 1.U(1.W), 15.U(WMASKLEN.W), MEM_SEXT_NONE, 0.U(1.W)),
-      SD      -> List(ALU_ADD,          ALU_DATA_RS1,   ALU_DATA_IMM,   0.U(1.W), IMM_S,    0.U(1.W), 1.U(1.W), 1.U(1.W), 255.U(WMASKLEN.W),MEM_SEXT_NONE, 0.U(1.W)),
+      SB      -> List(ALU_ADD,          ALU_DATA_RS1,   ALU_DATA_IMM,   0.U(1.W), IMM_S,    0.U(1.W), 1.U(1.W), 1.U(1.W), 1.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W), 1.B, 1.B),
+      SH      -> List(ALU_ADD,          ALU_DATA_RS1,   ALU_DATA_IMM,   0.U(1.W), IMM_S,    0.U(1.W), 1.U(1.W), 1.U(1.W), 3.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W), 1.B, 1.B),
+      SW      -> List(ALU_ADD,          ALU_DATA_RS1,   ALU_DATA_IMM,   0.U(1.W), IMM_S,    0.U(1.W), 1.U(1.W), 1.U(1.W), 15.U(WMASKLEN.W), MEM_SEXT_NONE, 0.U(1.W), 1.B, 1.B),
+      SD      -> List(ALU_ADD,          ALU_DATA_RS1,   ALU_DATA_IMM,   0.U(1.W), IMM_S,    0.U(1.W), 1.U(1.W), 1.U(1.W), 255.U(WMASKLEN.W),MEM_SEXT_NONE, 0.U(1.W), 1.B, 1.B),
       // R-type
-      ADD     -> List(ALU_ADD,          ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W)),
-      SUB     -> List(ALU_SUB,          ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W)),
-      ADDW    -> List(ALU_ADD,          ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 1.U(1.W)),
-      SUBW    -> List(ALU_SUB,          ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 1.U(1.W)),
-      SLL     -> List(ALU_SLL,          ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W)),
-      SLLW    -> List(ALU_SLL,          ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 1.U(1.W)),
-      AND     -> List(ALU_AND,          ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W)),
-      SLTU    -> List(ALU_SLTU,         ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W)),
-      OR      -> List(ALU_OR,           ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W)),
-      XOR     -> List(ALU_XOR,          ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W)),
-      MUL     -> List(ALU_MUL,          ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W)),
-      MULH    -> List(ALU_MULH,         ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W)),
-      MULW    -> List(ALU_MUL,          ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 1.U(1.W)),
-      MULHU   -> List(ALU_MULHU,        ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W)),
-      DIVU    -> List(ALU_DIVU,         ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W)),
-      DIV     -> List(ALU_DIV,          ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W)),
-      DIVW    -> List(ALU_DIV,          ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 1.U(1.W)),
-      DIVUW   -> List(ALU_DIVU,         ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 1.U(1.W)),
-      REM     -> List(ALU_REM,          ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W)),
-      REMU    -> List(ALU_REMU,         ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W)),
-      REMW    -> List(ALU_REMW,         ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 1.U(1.W)),
-      REMUW   -> List(ALU_REMUW,        ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 1.U(1.W)),
-      SLT     -> List(ALU_SLT,          ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W)),
-      SRA     -> List(ALU_SRA,          ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W)),
-      SRAW    -> List(ALU_SRAW,         ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 1.U(1.W)),
-      SRL     -> List(ALU_SRL,          ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W)),
-      SRLW    -> List(ALU_SRLW,         ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 1.U(1.W)),
+      ADD     -> List(ALU_ADD,          ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W), 1.B, 1.B),
+      SUB     -> List(ALU_SUB,          ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W), 1.B, 1.B),
+      ADDW    -> List(ALU_ADD,          ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 1.U(1.W), 1.B, 1.B),
+      SUBW    -> List(ALU_SUB,          ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 1.U(1.W), 1.B, 1.B),
+      SLL     -> List(ALU_SLL,          ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W), 1.B, 1.B),
+      SLLW    -> List(ALU_SLL,          ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 1.U(1.W), 1.B, 1.B),
+      AND     -> List(ALU_AND,          ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W), 1.B, 1.B),
+      SLTU    -> List(ALU_SLTU,         ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W), 1.B, 1.B),
+      OR      -> List(ALU_OR,           ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W), 1.B, 1.B),
+      XOR     -> List(ALU_XOR,          ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W), 1.B, 1.B),
+      MUL     -> List(ALU_MUL,          ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W), 1.B, 1.B),
+      MULH    -> List(ALU_MULH,         ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W), 1.B, 1.B),
+      MULW    -> List(ALU_MUL,          ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 1.U(1.W), 1.B, 1.B),
+      MULHU   -> List(ALU_MULHU,        ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W), 1.B, 1.B),
+      DIVU    -> List(ALU_DIVU,         ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W), 1.B, 1.B),
+      DIV     -> List(ALU_DIV,          ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W), 1.B, 1.B),
+      DIVW    -> List(ALU_DIV,          ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 1.U(1.W), 1.B, 1.B),
+      DIVUW   -> List(ALU_DIVU,         ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 1.U(1.W), 1.B, 1.B),
+      REM     -> List(ALU_REM,          ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W), 1.B, 1.B),
+      REMU    -> List(ALU_REMU,         ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W), 1.B, 1.B),
+      REMW    -> List(ALU_REMW,         ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 1.U(1.W), 1.B, 1.B),
+      REMUW   -> List(ALU_REMUW,        ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 1.U(1.W), 1.B, 1.B),
+      SLT     -> List(ALU_SLT,          ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W), 1.B, 1.B),
+      SRA     -> List(ALU_SRA,          ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W), 1.B, 1.B),
+      SRAW    -> List(ALU_SRAW,         ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 1.U(1.W), 1.B, 1.B),
+      SRL     -> List(ALU_SRL,          ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W), 1.B, 1.B),
+      SRLW    -> List(ALU_SRLW,         ALU_DATA_RS1,   ALU_DATA_RS2,   0.U(1.W), IMM_NONE, 1.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 1.U(1.W), 1.B, 1.B),
 
 
       //B-type
-      BEQ     -> List(ALU_ADD,          ALU_DATA_PC,    ALU_DATA_IMM,   1.U(1.W), IMM_B,    0.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W)),
-      BNE     -> List(ALU_ADD,          ALU_DATA_PC,    ALU_DATA_IMM,   1.U(1.W), IMM_B,    0.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W)),
-      BGE     -> List(ALU_ADD,          ALU_DATA_PC,    ALU_DATA_IMM,   1.U(1.W), IMM_B,    0.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W)),
-      BLT     -> List(ALU_ADD,          ALU_DATA_PC,    ALU_DATA_IMM,   1.U(1.W), IMM_B,    0.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W)),
-      BLTU    -> List(ALU_ADD,          ALU_DATA_PC,    ALU_DATA_IMM,   1.U(1.W), IMM_B,    0.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W)),
-      BGEU    -> List(ALU_ADD,          ALU_DATA_PC,    ALU_DATA_IMM,   1.U(1.W), IMM_B,    0.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W)),
+      BEQ     -> List(ALU_ADD,          ALU_DATA_PC,    ALU_DATA_IMM,   1.U(1.W), IMM_B,    0.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W), 1.B, 1.B),
+      BNE     -> List(ALU_ADD,          ALU_DATA_PC,    ALU_DATA_IMM,   1.U(1.W), IMM_B,    0.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W), 1.B, 1.B),
+      BGE     -> List(ALU_ADD,          ALU_DATA_PC,    ALU_DATA_IMM,   1.U(1.W), IMM_B,    0.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W), 1.B, 1.B),
+      BLT     -> List(ALU_ADD,          ALU_DATA_PC,    ALU_DATA_IMM,   1.U(1.W), IMM_B,    0.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W), 1.B, 1.B),
+      BLTU    -> List(ALU_ADD,          ALU_DATA_PC,    ALU_DATA_IMM,   1.U(1.W), IMM_B,    0.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W), 1.B, 1.B),
+      BGEU    -> List(ALU_ADD,          ALU_DATA_PC,    ALU_DATA_IMM,   1.U(1.W), IMM_B,    0.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W), 1.B, 1.B),
 
-      EBREAK  -> List(ALU_NONE,         ALU_DATA_NONE,  ALU_DATA_NONE,  0.U(1.W), IMM_NONE, 0.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W)),
-      NOP     -> List(ALU_NONE,         ALU_DATA_NONE,  ALU_DATA_NONE,  0.U(1.W), IMM_NONE, 0.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W)),
+      EBREAK  -> List(ALU_NONE,         ALU_DATA_NONE,  ALU_DATA_NONE,  0.U(1.W), IMM_NONE, 0.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W), 0.B, 0.B),
+      NOP     -> List(ALU_NONE,         ALU_DATA_NONE,  ALU_DATA_NONE,  0.U(1.W), IMM_NONE, 0.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.U(1.W), 0.B, 0.B),
     ),
   )
 
@@ -152,6 +154,8 @@ class IDU() extends Module {
   io.memwmask := memwmask 
   io.memsext := memsext
   io.isword := isword
+  io.rrs1 := rrs1
+  io.rrs2 := rrs2
   when(io.inst === EBREAK) {
     io.isEbreak := 1.U(1.W)
   }.otherwise {

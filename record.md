@@ -1906,7 +1906,62 @@ static uint8_t mem[MEM_SIZE] = {
 
 接下来用计分板实现判断冒险的逻辑：当一条指令进入译码阶段，我们可以得到这条指令是否包含 rs1, rs2，是否要对 rd 进行写入。如果其要对 rd 进行写入，那么 scoreboard(rd) 就在当前周期结束后记为 1（所以 scoreboard 用多端口的 Reg（即 chisel 的 Mem）实现）。如果其要读取的 rs1，rs2 对应的 scoreboard 已经为 1，那么就进行阻塞，将 EXReg.valid 置为 0，IDReg 和 EXReg 的 en 置为 0。
 
-注意特判 rd 为 0 或 rs1,rs2 为 0 的情况，这种情况下不会冒险
+注意特判 rd 为 0 或 rs1,rs2 为 0 的情况，这种情况下不会冒险。
+
+如何处理同一条指令中 rd == rs1 或 rs2 的情况？
+
+- 这种指令不应阻塞
+
+流水线要怎么开 difftest？在 difftest 函数里判断 pc 是否小于 RESET_VECTOR，是的话 ref 就不执行指令。
+
+debug：原先没有阻塞流水线时，译码阶段发现当前指令需要跳转就直接计算出跳转地址，并写入
+
+debug：运行 add 和 add-longlong 时
+
+```c
+0x80000098 : 00 15 35 13             sltiu	a0, a0, 1
+0x8000009c : f7 5f f0 ef             jal	ra, 0x80000010
+0x80000010 : 00 05 04 63             beq	a0, zero, 0x80000018
+0x80000018 : ff 01 01 13             addi	sp, sp, -16
+```
+
+sltiu 和 beq 之间应当多停顿一个周期的，sltiu 还没有写回，beq 就进行跳转了。查看波形图发现 0x80000010 处的指令进入译码阶段时本应检测到 hazard，但是没有检测到，此时 sltiu 指令并未完成写入
+
+如果在同一个周期内要对 scoreboard 的同一个寄存器同时写入 0 和 1（例如，处于译码阶段的指令要向 scoreboard(a0) 写入 1，但目前处于写回阶段的指令要向 scoreboard(a0) 写入 0）应该怎么办？不如一起阻塞了，当当前指令未来要写入某个目前 scoreboard 为 1 的寄存器，阻塞，直到其 scoreboard 为 0。即，译码阶段对 rd，rs1，rs2 都进行检测
+
+改完以后运行 add-longlong，会无限阻塞下去。 经检查发现是在下一条指令卡死：挨着的两条指令第一条将 s0 作为 rd，第二条也是。当第一条指令处于执行阶段时，scoreboard(rd) 为 1，此时第二条指令处于译码阶段，检测到了 scoreboard(rd) 为 1，于是将 hazard 设为 1 进行阻塞。当第一条指令执行完成时，需要写入 rd 并清空对应的 scoreboard(rd)。如果此时处于译码阶段的指令马上又写入了 scoreboard(rd) = 1，就会导致一直卡死，应当在**清除 scoreboard 后再停一个周期再让流水线动起来**。
+
+现在流水线动不动是根据 hazard 变量进行判断的，目前这是一个 Wire，其输入是若干 Reg，将其改成 Reg 类型，这样 scoreboard 清除后的下一个周期才会检测是否阻塞已经消失。但这样如果当前译码阶段的指令和当前执行阶段的指令有冒险会无法检测到。
+
+问题：
+
+- case1：rd == rs1 或 rd == rs2
+- case2：要写回的 rd 等于当前译码阶段的 rd，因此目前的写法同一个周期内要对 scoreboard(rd) 进行两次写入一次读出，需要保证顺序
+  - sol：仅当要写入的 rd 对应的 scoreboard 不为 1 时才进行写入，但这样写入还是会一直阻塞
+  - sol2：检测到这种情况以后将 IDRegen 设为 false，检测条件为 IDReg.rd == WBReg.rd
+  - 太蠢了，把计分板删了就行。
+
+删除计分板，直接用组合逻辑进行判断，当前指令如果包含 rd，rs1，rs2，就在译码阶段检查流水线中更前面阶段（执行、访存、写回）是否包含非0目的寄存器并且是否和当前译码的指令的 rs1，rs2，rd 相关。
+
+1. 当前的 rs1/rs2 等于 EX 的 rd
+2. 当前的 rs1/rs2 等于 LS 的 rd
+3. 当前的 rs1/rs2 等于 WB 的 rd
+
+bug 找到了，beq 的 alu_sel 并不是 rs1 和 rs2，但这类指令还是读取了 rs1 和 rs2，需要特殊判断。即：(decoder.io.isdnpc && inst != JAL) 则有读取 rs1，额外加上 inst != JALR 则有读取 rs2
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

@@ -17,6 +17,8 @@ class EXRegBundle extends Bundle {
   val pc    = UInt(XLEN.W)
   val rs1v  = UInt(XLEN.W)
   val rs2v  = UInt(XLEN.W)
+  val rs1   = UInt(RIDXLEN.W)
+  val rs2   = UInt(RIDXLEN.W)
   val imm   = UInt(XLEN.W)
   val dataAsel  = UInt(ALU_DATASEL_WIDTH.W)
   val dataBsel  = UInt(ALU_DATASEL_WIDTH.W)
@@ -75,6 +77,8 @@ class Top extends Module {
       _.valid     -> 1.B,
       _.inst      -> 0.U,
       _.pc        -> 0.U,
+      _.rs1       -> 0.U,
+      _.rs2       -> 0.U,
       _.rs1v      -> 0.U,
       _.rs2v      -> 0.U,
       _.imm       -> 0.U,
@@ -127,11 +131,8 @@ class Top extends Module {
   val dnpc = Wire(UInt(XLEN.W))
   val pcsel = Wire(UInt(1.W))
   val InstFetcher = Module(new DPIC_IFU)
-  val PC = RegInit(UInt(XLEN.W), RESET_VECTOR.U)
-  val PCNext = Wire(UInt(XLEN.W))
-  PCNext := PC + 4.U
-  PC := Mux(IDRegen, Mux(pcsel === 1.U, dnpc, PCNext), PC)
-  InstFetcher.io.pc := PC
+  val pcnext = Mux(pcsel === 1.B, dnpc, Mux(IDReg.valid, IDReg.pc + 4.U, 0.U))
+  InstFetcher.io.pc := pcnext
   InstFetcher.io.valid := Mux(reset.asBool, 0.U, 1.U)
   
   when (IDRegen) {
@@ -145,22 +146,28 @@ class Top extends Module {
   }
   
   val R = Mem(32, UInt(XLEN.W))
-  val scoreboard = Mem(32, Bool())
-  val dataHazard = RegInit(Bool(), 0.B)
-  val stall = dataHazard
+  // val scoreboard = Mem(32, Bool())
+  
+  val dataHazard = WireInit(Bool(), 0.B)
+  
+  val stall = WireInit(Bool(), 0.B)
+  stall := dataHazard
   def Rread(idx: UInt) = Mux(idx === 0.U, 0.U(XLEN.W), R(idx))
   
   R(0) := 0.U
   val Decoder = Module(new IDU)
+  // when(Decoder.io.rd =/= 0.U && scoreboard(Decoder.io.rd) =/= 1.B && Decoder.io.rd_en) {
+  //   scoreboard(Decoder.io.rd) := 1.B
+  // } .otherwise {
+  //   scoreboard(Decoder.io.rd) := scoreboard(Decoder.io.rd)
+  // }
   val pc_plus_imm = Decoder.io.pc + Decoder.io.imm
-  val rs1v = Rread(Decoder.io.rs1)
+  //printf("decoder pc = %x, imm = %x, pc_plus_imm = %x\n", Decoder.io.pc, Decoder.io.imm, pc_plus_imm)
   val rs2v = Rread(Decoder.io.rs2)
+  val rs1v = Rread(Decoder.io.rs1)
+  
   val snpc = Decoder.io.pc + 4.U
-  when(Decoder.io.rd =/= 0.U) {
-    scoreboard(Decoder.io.rd) := scoreboard(Decoder.io.rd) | Decoder.io.rd_en
-  } .otherwise {
-    scoreboard(Decoder.io.rd) := 0.B
-  }
+  
   
   dnpc := MuxCase(0.U, Array(
     (Decoder.io.inst === JALR)  -> (rs1v + Decoder.io.imm),
@@ -174,9 +181,12 @@ class Top extends Module {
   ))
   when(EXRegen) {
     EXReg.inst := Mux(IDReg.valid, IDReg.inst, 0.U)
-    EXReg.rs1v := Rread(Decoder.io.rs1)
-    EXReg.rs2v := Rread(Decoder.io.rs2)
+    EXReg.rs1v := rs1v
+    EXReg.rs1 := Decoder.io.rs1
+    EXReg.rs2 := Decoder.io.rs2
+    EXReg.rs2v := rs2v
     EXReg.imm  := Decoder.io.imm
+    
     EXReg.aluop := Decoder.io.alu_op
     EXReg.dataAsel := Decoder.io.alu_sel_a
     EXReg.dataBsel := Decoder.io.alu_sel_b
@@ -198,6 +208,8 @@ class Top extends Module {
     EXReg.pc := EXReg.pc
     EXReg.rs1v := EXReg.rs1v
     EXReg.rs2v := EXReg.rs2v
+    EXReg.rs1 := EXReg.rs1 
+    EXReg.rs2 := EXReg.rs2
     EXReg.imm := EXReg.imm
     EXReg.aluop := EXReg.aluop
     EXReg.dataAsel := EXReg.dataAsel
@@ -211,7 +223,7 @@ class Top extends Module {
     EXReg.rden := EXReg.rden
     EXReg.rd := EXReg.rd  
   }
-  
+
   when (IDReg.valid) {
     Decoder.io.inst := IDReg.inst
     Decoder.io.pc := IDReg.pc
@@ -222,8 +234,11 @@ class Top extends Module {
   }
   pcsel := Decoder.io.isdnpc
 
+  
+
   val ALU = Module(new EXU)
   when(EXReg.valid) {
+    
     ALU.io.inst := EXReg.inst
     ALU.io.pc := EXReg.pc
     ALU.io.alu_op := EXReg.aluop
@@ -234,6 +249,7 @@ class Top extends Module {
     ALU.io.rs2v := EXReg.rs2v
     ALU.io.isword := EXReg.isword
     when (LSRegen) {
+      LSReg.valid := EXReg.valid
       LSReg.inst := EXReg.inst
       LSReg.pc := EXReg.pc
       LSReg.rs2v := EXReg.rs2v
@@ -244,6 +260,7 @@ class Top extends Module {
       LSReg.rden := EXReg.rden
       LSReg.rd := EXReg.rd
     }.otherwise {
+      LSReg.valid := LSReg.valid
       LSReg.inst := LSReg.inst
       LSReg.pc := LSReg.pc
       LSReg.rs2v := LSReg.rs2v
@@ -360,23 +377,34 @@ class Top extends Module {
     io.pc := 0.U
   }
 
-  R(wbrd) := Mux(wbrden === 0.B, R(wbrd), rdv)
-  rdv := Mux(wbrdmemvalid === 1.U, wbrdsextrdata, wbrdalures)
-  scoreboard(wbrd) := 0.B
-
-  when(Decoder.io.alu_sel_a === ALU_DATA_RS1 || Decoder.io.alu_sel_b === ALU_DATA_RS2) {
-    dataHazard := (Decoder.io.alu_sel_a === ALU_DATA_RS1 && scoreboard(Decoder.io.rs1) && Decoder.io.rs1 =/= 0.U) | (Decoder.io.alu_sel_b === ALU_DATA_RS2 && scoreboard(Decoder.io.rs2) && Decoder.io.rs2 =/= 0.U)
-  }.otherwise {
-    dataHazard := 0.B
-  }
-  when (stall) {
-    IDRegen := 0.B 
-    EXRegen := 0.B 
-    LSReg.valid := 0.B
+  rdv := Mux(wbrdmemvalid === 1.B, wbrdsextrdata, wbrdalures)
+  //printf("wbrdmemvalid: %d, wbrdsextrdata: %x, wbrdalures: %x, wbrden: %d, rdv: %x\n", wbrdmemvalid, wbrdsextrdata, wbrdalures, wbrden, rdv)
+  
+  //scoreboard(wbrd) := 0.B
+  when(wbrd =/= 0.U) {
+    R(wbrd) := Mux(wbrden === 0.B, R(wbrd), rdv)
   } .otherwise {
-    IDRegen := 1.B 
-    EXRegen := 1.B
-    LSReg.valid := 1.B
+    R(wbrd) := 0.U
+  }
+  val rs1ren = Decoder.io.rrs1 && Decoder.io.rs1 =/= 0.U && IDReg.valid
+  val rs2ren = Decoder.io.rrs2 && Decoder.io.rs2 =/= 0.U && IDReg.valid
+  val EX_RS1_Hazard = Decoder.io.rs1 === Mux(EXReg.valid, EXReg.rd, 0.U) && EXReg.rden
+  val EX_RS2_Hazard = Decoder.io.rs2 === Mux(EXReg.valid, EXReg.rd, 0.U) && EXReg.rden
+  val WB_RS1_Hazard = Decoder.io.rs1 === Mux(WBReg.valid, WBReg.rd, 0.U) && WBReg.rden
+  val WB_RS2_Hazard = Decoder.io.rs2 === Mux(WBReg.valid, WBReg.rd, 0.U) && WBReg.rden
+  val LS_RS1_Hazard = Decoder.io.rs1 === Mux(LSReg.valid, LSReg.rd, 0.U) && LSReg.rden
+  val LS_RS2_Hazard = Decoder.io.rs2 === Mux(LSReg.valid, LSReg.rd, 0.U) && LSReg.rden
+  dataHazard := MuxCase(0.U, Array (
+    (rs1ren && (EX_RS1_Hazard | LS_RS1_Hazard | WB_RS1_Hazard)) -> 1.B,
+    (rs2ren && (EX_RS2_Hazard | LS_RS2_Hazard | WB_RS2_Hazard)) -> 1.B,
+  ))
+  //printf("IDUpc=%x rs1ren: %d, rs2ren: %d, EX_RS1_Hazard: %d, EX_RS2_Hazard: %d, WB_RS1_Hazard: %d, WB_RS2_Hazard: %d, LS_RS1_Hazard: %d, LS_RS2_Hazard: %d\n", IDReg.pc, rs1ren, rs2ren, EX_RS1_Hazard, EX_RS2_Hazard, WB_RS1_Hazard, WB_RS2_Hazard, LS_RS1_Hazard, LS_RS2_Hazard)
+  when (stall) {
+    IDRegen := 0.B
+    EXReg.valid := 0.B
+  } .otherwise { 
+    IDRegen := 1.B
+    EXReg.valid := 1.B
   }
   
   val Ebreak = Module(new DPIC_EBREAK)

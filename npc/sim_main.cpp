@@ -49,8 +49,8 @@ VTop* topp = new VTop{contextp};
 enum NPC_STATES npc_state;
 word_t npc_halt_pc;
 int npc_ret;
-bool difftest_is_enable = 0;
-bool is_batch_mode = 0;
+bool difftest_is_enable = 1;
+bool is_batch_mode = 1;
 bool is_itrace = 1;
 char logbuf[128];
 static uint64_t boot_time = 0;
@@ -157,15 +157,16 @@ bool isa_difftest_checkregs(CPU_state *ref_r, vaddr_t pc) {
   //   printf("difftest: reg #pc = %s err at dut pc: 0x%08x\n", ref_r->pc, pc);
   //   printf("difftest: ref_r->pc == 0x%08x\n", ref_r->pc);
   // }
+  bool ret = true;
   for (int i = 0; i < 32; i++) {
     assert(typeid(ref_r->gpr[i]) == typeid(cpu.gpr[i]));
     if (ref_r->gpr[i] != cpu.gpr[i]) {
       printf("difftest: reg #%d = %s err at pc: 0x%016x\n", i, regs[i], pc);
       printf("difftest: ref_r->gpr[%d] == 0x%016lx cpu.gpr[%d] == 0x%016lx\n", i, ref_r->gpr[i], i, cpu.gpr[i]);
-      return false;
+      ret = false;
     }
   }
-  return true;
+  return ret;
 }
 
 static void checkregs(CPU_state *ref, vaddr_t pc) {
@@ -198,11 +199,11 @@ void difftest_step(vaddr_t pc, vaddr_t npc) {
     is_skip_ref = false;
     return;
   }
-
-  ref_difftest_exec(1);
-  ref_difftest_regcpy(&ref_r, DIFFTEST_TO_DUT);
-
-  checkregs(&ref_r, pc);
+  if (pc >= 0x80000000) {
+    ref_difftest_exec(1);
+    ref_difftest_regcpy(&ref_r, DIFFTEST_TO_DUT);
+    checkregs(&ref_r, pc);
+  }
 }
 
 static void trace_and_difftest(vaddr_t pc, vaddr_t dnpc) {
@@ -232,7 +233,7 @@ extern "C" void npc_pmem_read(long long raddr, long long *rdata) {
     *rdata = (uint32_t)rtc_us;
     return;
   }
-  printf("pmem_read: raddr = %lld = 0x%016lx raddr-MEM_BASE = %lld MEM_SIZE-addr+MEM_BASE-7=%lld\n", raddr, raddr, raddr-MEM_BASE, MEM_SIZE-addr+MEM_BASE-7);
+  //printf("pmem_read: raddr = %lld = 0x%016lx raddr-MEM_BASE = %lld MEM_SIZE-addr+MEM_BASE-7=%lld\n", raddr, raddr, raddr-MEM_BASE, MEM_SIZE-addr+MEM_BASE-7);
   assert((word_t)raddr >= (word_t)MEM_BASE && ((word_t)(raddr - MEM_BASE + 7)) < (word_t)MEM_SIZE);
   word_t res = 0;
   for (int i = 0; i < 8; i++) {
@@ -314,7 +315,7 @@ static void single_cycle() {
     int space_len = 4 * 3 + 1;
     memset(p, ' ', space_len);
     p += space_len;
-    disassemble(p, logbuf + sizeof(logbuf) - p, topp->io_pc, inst, ilen);
+    disassemble(p, logbuf + sizeof(logbuf) - p, pc, inst, ilen);
     if (ftrace_is_enable()) {
       word_t reg_val = Rread(1);
       ftrace(pc, npc, iringbuf.inst[iringbuf.cur], reg_val);
