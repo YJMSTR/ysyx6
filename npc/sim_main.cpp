@@ -49,9 +49,9 @@ VTop* topp = new VTop{contextp};
 enum NPC_STATES npc_state;
 word_t npc_halt_pc;
 int npc_ret;
-bool difftest_is_enable = 1;
-bool is_batch_mode = 1;
-bool is_itrace = 1;
+bool difftest_is_enable = 0;
+bool is_batch_mode = 0;
+bool is_itrace = 0;
 char logbuf[128];
 static uint64_t boot_time = 0;
 static uint64_t rtc_us = 0;
@@ -161,7 +161,7 @@ bool isa_difftest_checkregs(CPU_state *ref_r, vaddr_t pc) {
   for (int i = 0; i < 32; i++) {
     assert(typeid(ref_r->gpr[i]) == typeid(cpu.gpr[i]));
     if (ref_r->gpr[i] != cpu.gpr[i]) {
-      printf("difftest: reg #%d = %s err at pc: 0x%016x\n", i, regs[i], pc);
+      printf("difftest: reg #%d = %s err at pc: 0x%016lx\n", i, regs[i], pc);
       printf("difftest: ref_r->gpr[%d] == 0x%016lx cpu.gpr[%d] == 0x%016lx\n", i, ref_r->gpr[i], i, cpu.gpr[i]);
       ret = false;
     }
@@ -233,7 +233,10 @@ extern "C" void npc_pmem_read(long long raddr, long long *rdata) {
     *rdata = (uint32_t)rtc_us;
     return;
   }
-  //printf("pmem_read: raddr = %lld = 0x%016lx raddr-MEM_BASE = %lld MEM_SIZE-addr+MEM_BASE-7=%lld\n", raddr, raddr, raddr-MEM_BASE, MEM_SIZE-addr+MEM_BASE-7);
+  if (!((word_t)raddr >= (word_t)MEM_BASE && ((word_t)(raddr - MEM_BASE + 7)) < (word_t)MEM_SIZE)) {
+    printf("pmem_read: raddr = %lld = 0x%016llx raddr-MEM_BASE = %lld MEM_SIZE-addr+MEM_BASE-7=%ld\n", raddr, raddr, raddr-MEM_BASE, MEM_SIZE-addr+MEM_BASE-7);
+    npc_reg_display();
+  }
   assert((word_t)raddr >= (word_t)MEM_BASE && ((word_t)(raddr - MEM_BASE + 7)) < (word_t)MEM_SIZE);
   word_t res = 0;
   for (int i = 0; i < 8; i++) {
@@ -246,14 +249,14 @@ extern "C" void npc_pmem_read(long long raddr, long long *rdata) {
 extern "C" void npc_pmem_write(long long waddr, long long wdata, char wmask) {
   //int addr = waddr & ~0x3u;
   int addr = waddr;
-  //printf("pmem_write: waddr = 0x%08x wdata = 0x%08x wmask = 0x%x\n", waddr, wdata, wmask);
+  //printf("pmem_write: waddr = 0x%08llx wdata = 0x%08llx wmask = 0x%x\n", waddr, wdata, 0xff & wmask);
   if (addr == SERIAL_PORT) {
     difftest_skip_ref();
     //Log("dtrace: pc = 0x%08x serial wdata = %d, wmask = %d", topp->io_pc, wdata, wmask);
-    if (wmask == 1) {
+    if ((wmask & 0xff) == 1) {
       putchar(wdata);
     } else {
-      Log("serial don't support wmask = 0x%lx putch", wmask);
+      Log("serial don't support wmask = 0x%x putch", wmask & 0xff);
     }
     return;
   }
@@ -268,10 +271,12 @@ extern "C" void npc_pmem_write(long long waddr, long long wdata, char wmask) {
 word_t npc_paddr_read(word_t addr, int len) {
   switch (len) {
     case 1: return mem[addr-MEM_BASE];
-    case 2: return mem[addr-MEM_BASE]*16+mem[addr-MEM_BASE];
-    case 4: return npc_paddr_read(addr+2, 2)*256+npc_paddr_read(addr, 2);
+    case 2: return (mem[addr-MEM_BASE+1] << 8ull) + mem[addr-MEM_BASE];
+    case 4: return (npc_paddr_read(addr+2, 2) << 16ull) + npc_paddr_read(addr, 2);
     case 8: return ((uint64_t)npc_paddr_read(addr+4, 4) << 32ull) + npc_paddr_read(addr, 4);
-    default: return 0;
+    default:
+      Log("unsupport paddr read len, exit"); 
+      return 0;
   }
   return 0;
 }
@@ -303,7 +308,7 @@ static void single_cycle() {
 #endif
   if (topp->reset == 0 && is_itrace) {
     //printf("[itrace] inst = 0x%08x\n", topp->io_inst);
-    p += snprintf(p, sizeof(logbuf), "0x%08x :", pc);
+    p += snprintf(p, sizeof(logbuf), "0x%08lx :", pc);
     int ilen = 4;
     uint8_t *inst = (uint8_t *)&instval;
     for (int i = ilen - 1; i >= 0; i--) {
@@ -361,6 +366,7 @@ long load_img() {
     Log("no image found, use default img");
     return 0;
   }
+  memset(mem, 0, sizeof(mem));
 	printf("img == %s\n", img_file);
 	FILE *fp = fopen(img_file, "rb");
 	assert(fp);
@@ -399,7 +405,7 @@ void cpu_exec(uint32_t n) {
   switch (npc_state)
   {
   case NPC_STOP: case NPC_ABORT:
-    Log("npc: %s at pc = 0x%08x", (npc_state == NPC_ABORT ? "abort":
+    Log("npc: %s at pc = 0x%08lx", (npc_state == NPC_ABORT ? "abort":
     (npc_ret == 0 ? ANSI_FMT("HIT GOOD TRAP", ANSI_FG_GREEN) : ANSI_FMT("HIT BAD TRAP", ANSI_FG_RED))),
      cpu.pc);
     print_iringbuf();

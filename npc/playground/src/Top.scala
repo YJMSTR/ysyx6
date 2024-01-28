@@ -168,17 +168,6 @@ class Top extends Module {
   
   val snpc = Decoder.io.pc + 4.U
   
-  
-  dnpc := MuxCase(0.U, Array(
-    (Decoder.io.inst === JALR)  -> (rs1v + Decoder.io.imm),
-    (Decoder.io.inst === JAL)   -> (pc_plus_imm),
-    (Decoder.io.inst === BEQ)   -> Mux(rs1v === rs2v, pc_plus_imm, snpc),
-    (Decoder.io.inst === BNE)   -> Mux(rs1v === rs2v, snpc, pc_plus_imm),
-    (Decoder.io.inst === BGE)   -> Mux(rs1v.asSInt >= rs2v.asSInt, pc_plus_imm, snpc),
-    (Decoder.io.inst === BGEU)  -> Mux(rs1v >= rs2v, pc_plus_imm, snpc),
-    (Decoder.io.inst === BLT)   -> Mux(rs1v.asSInt < rs2v.asSInt, pc_plus_imm, snpc),
-    (Decoder.io.inst === BLTU)  -> Mux(rs1v < rs2v, pc_plus_imm, snpc)
-  ))
   when(EXRegen) {
     EXReg.inst := Mux(IDReg.valid, IDReg.inst, 0.U)
     EXReg.rs1v := rs1v
@@ -402,9 +391,20 @@ class Top extends Module {
   when (stall) {
     IDRegen := 0.B
     EXReg.valid := 0.B
+    dnpc := IDReg.pc
   } .otherwise { 
     IDRegen := 1.B
     EXReg.valid := 1.B
+    dnpc := MuxCase(0.U, Array(
+    (Decoder.io.inst === JALR)  -> (rs1v + Decoder.io.imm),
+    (Decoder.io.inst === JAL)   -> (pc_plus_imm),
+    (Decoder.io.inst === BEQ)   -> Mux(rs1v === rs2v, pc_plus_imm, snpc),
+    (Decoder.io.inst === BNE)   -> Mux(rs1v === rs2v, snpc, pc_plus_imm),
+    (Decoder.io.inst === BGE)   -> Mux(rs1v.asSInt >= rs2v.asSInt, pc_plus_imm, snpc),
+    (Decoder.io.inst === BGEU)  -> Mux(rs1v >= rs2v, pc_plus_imm, snpc),
+    (Decoder.io.inst === BLT)   -> Mux(rs1v.asSInt < rs2v.asSInt, pc_plus_imm, snpc),
+    (Decoder.io.inst === BLTU)  -> Mux(rs1v < rs2v, pc_plus_imm, snpc)
+  ))
   }
   
   val Ebreak = Module(new DPIC_EBREAK)

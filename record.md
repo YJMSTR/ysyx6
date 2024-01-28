@@ -1947,11 +1947,13 @@ sltiu 和 beq 之间应当多停顿一个周期的，sltiu 还没有写回，beq
 2. 当前的 rs1/rs2 等于 LS 的 rd
 3. 当前的 rs1/rs2 等于 WB 的 rd
 
-bug 找到了，beq 的 alu_sel 并不是 rs1 和 rs2，但这类指令还是读取了 rs1 和 rs2，需要特殊判断。即：(decoder.io.isdnpc && inst != JAL) 则有读取 rs1，额外加上 inst != JALR 则有读取 rs2
+bug 找到了，beq 的 alu_sel 并不是 rs1 和 rs2，但这类指令还是读取了 rs1 和 rs2，需要特殊判断。即：(decoder.io.isdnpc && inst != JAL) 则有读取 rs1，额外加上 inst != JALR 则有读取 rs2，这样判断容易漏，直接给每条指令标记是否用了 rs1, rs2, 即可通过所有测例
 
+## 输入输出
 
+跑 am-test 跑不起来
 
-
+bug：译码阶段计算 JALR 等跳转指令的地址的时候要访问 rs1、rs2 等寄存器，但此时可能流水线已经阻塞，寄存器有未完成的写入，此时读取会读到错误的值。因此计算跳转地址之前要先判断当前指令是否已被阻塞，若是则不计算跳转地址
 
 
 

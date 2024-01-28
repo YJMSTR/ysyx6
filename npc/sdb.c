@@ -86,16 +86,16 @@ static int cmd_x(char *args) {
   // little-endian
   // usage：x $count $expr
   // expr 必须是 0x 开头的16进制数
-  uint32_t addr = 0;
+  word_t addr = 0;
   char *arg = strtok(args, " ");
   assert(arg);
   int count = atoi(arg);
   char *arg2 = arg + strlen(arg) + 1;
-  sscanf(arg2, "%x", &addr);
-  for (uint32_t i = 0; i < count; i++) {
-    printf("0x%08x: 0x%08x , ", addr + i * 4, npc_vaddr_read(addr+i*4, 4));
-    for (uint32_t j = 0; j < 4; j++) {
-      printf("%02x ", npc_vaddr_read(addr + i*4+j, 1));
+  sscanf(arg2, "%lx", &addr);
+  for (word_t i = 0; i < count; i++) {
+    printf("0x%016lx: 0x%016lx , ", addr + i * 8, npc_vaddr_read(addr+i*8, 8));
+    for (word_t j = 0; j < 8; j++) {
+      printf("%02lx ", npc_vaddr_read(addr + i*8+j, 1));
     }
     printf("\n");
   }
@@ -152,7 +152,7 @@ extern bool difftest_is_enable;
 extern bool is_itrace;
 void init_monitor() {
   init_log(log_file);
-  //set_ftrace_enable();
+  // set_ftrace_enable();
   long img_size = load_img();
   if (difftest_is_enable)
     init_difftest(diff_so_file, img_size, difftest_port);

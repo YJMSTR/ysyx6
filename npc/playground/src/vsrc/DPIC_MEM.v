@@ -17,7 +17,7 @@ module DPIC_MEM(valid, wen, raddr, rdata, waddr, wdata, wmask, clk);
         npc_pmem_read(raddr, rdata);
         //$display("npc mem pmem read."); 
       end else begin // 有写请求时
-        $display("npc mem pmem write. addr = %h, data = %h, mask = %h", waddr, wdata, wmask); 
+        //$display("npc mem pmem write. addr = %h, data = %h, mask = %h", waddr, wdata, wmask); 
         npc_pmem_write(waddr, wdata, wmask);
         
         rdata = 0;
