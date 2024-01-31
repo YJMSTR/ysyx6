@@ -131,12 +131,16 @@ class Top extends Module {
   val ifu_dnpc = Wire(UInt(XLEN.W))
   val pcsel = Wire(Bool())
   val InstFetcher = Module(new IFU)
-  InstFetcher.io.in.valid := 1.B
-  val PC = RegInit(RESET_VECTOR.U(XLEN.W))
-  InstFetcher.io.in.bits.pc := PC
+  val PC = RegInit(UInt(XLEN.W), RESET_VECTOR.U)
+  val R = Mem(32, UInt(XLEN.W))
+  val dataHazard = WireInit(Bool(), 0.B)
+  val stall = WireInit(Bool(), 0.B)
+  InstFetcher.io.in.valid := PC =/= 0.U
+  InstFetcher.io.in.bits.pc := Mux(stall, InstFetcher.io.out.bits.pc, PC)
   InstFetcher.io.out.ready := IDRegen
-  
-  when (pcsel) {
+  when (stall) {
+    PC := PC
+  }.elsewhen (pcsel) {
     PC := ifu_dnpc
   } .otherwise {
     // 如果没有指令，那么就不应该更新 PC
@@ -153,12 +157,7 @@ class Top extends Module {
     IDReg.valid := IDReg.valid
   }
 
-  val R = Mem(32, UInt(XLEN.W))
-  
-  
-  val dataHazard = WireInit(Bool(), 0.B)
-  
-  val stall = WireInit(Bool(), 0.B)
+ 
   stall := dataHazard
   def Rread(idx: UInt) = Mux(idx === 0.U, 0.U(XLEN.W), R(idx))
   
@@ -398,7 +397,7 @@ class Top extends Module {
   when (stall) {
     IDRegen := 0.B
     EXReg.valid := 0.B
-    ifu_dnpc := IDReg.pc
+    ifu_dnpc := "x114514".U
   } .otherwise { 
     IDRegen := 1.B
     EXReg.valid := 1.B
