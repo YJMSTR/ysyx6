@@ -51,7 +51,7 @@ word_t npc_halt_pc;
 int npc_ret;
 bool difftest_is_enable = 0;
 bool is_batch_mode = 0;
-bool is_itrace = 0;
+bool is_itrace = 1;
 char logbuf[128];
 static uint64_t boot_time = 0;
 static uint64_t rtc_us = 0;

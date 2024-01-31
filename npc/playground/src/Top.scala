@@ -69,7 +69,7 @@ class Top extends Module {
     (new IDRegBundle).Lit(
       _.valid -> 1.B,
       _.inst -> 0.U,
-      _.pc   -> "x7ffffffc".U
+      _.pc   -> 0.U
     )
   )
   val EXReg = RegInit(
@@ -128,25 +128,33 @@ class Top extends Module {
   val EXRegen = WireInit(Bool(), 1.B)
   val LSRegen = WireInit(Bool(), 1.B)
   val WBRegen = WireInit(Bool(), 1.B)
-  val dnpc = Wire(UInt(XLEN.W))
-  val pcsel = Wire(UInt(1.W))
-  val InstFetcher = Module(new DPIC_IFU)
-  val pcnext = Mux(pcsel === 1.B, dnpc, Mux(IDReg.valid, IDReg.pc + 4.U, 0.U))
-  InstFetcher.io.pc := pcnext
-  InstFetcher.io.valid := Mux(reset.asBool, 0.U, 1.U)
+  val ifu_dnpc = Wire(UInt(XLEN.W))
+  val pcsel = Wire(Bool())
+  val InstFetcher = Module(new IFU)
+  InstFetcher.io.in.valid := 1.B
+  val PC = RegInit(RESET_VECTOR.U(XLEN.W))
+  InstFetcher.io.in.bits.pc := PC
+  InstFetcher.io.out.ready := IDRegen
   
+  when (pcsel) {
+    PC := ifu_dnpc
+  } .otherwise {
+    // 如果没有指令，那么就不应该更新 PC
+    PC := Mux(InstFetcher.io.in.ready, InstFetcher.io.in.bits.pc + 4.U, PC)
+  }
+
   when (IDRegen) {
-    IDReg.inst := InstFetcher.io.inst
-    IDReg.pc := InstFetcher.io.pc
-    IDReg.valid := 1.B
+    IDReg.inst := Mux(InstFetcher.io.out.valid, InstFetcher.io.out.bits.inst, 0.U)
+    IDReg.pc := Mux(InstFetcher.io.out.valid, InstFetcher.io.out.bits.pc, 0.U)
+    IDReg.valid := InstFetcher.io.out.valid & (pcsel =/= 1.B) & (RegNext(pcsel, 0.B) =/= 1.B)
   } .otherwise {
     IDReg.inst := IDReg.inst
     IDReg.pc := IDReg.pc
     IDReg.valid := IDReg.valid
   }
-  
+
   val R = Mem(32, UInt(XLEN.W))
-  // val scoreboard = Mem(32, Bool())
+  
   
   val dataHazard = WireInit(Bool(), 0.B)
   
@@ -170,6 +178,7 @@ class Top extends Module {
   
   when(EXRegen) {
     EXReg.inst := Mux(IDReg.valid, IDReg.inst, 0.U)
+    EXReg.pc := Mux(IDReg.valid, IDReg.pc, 0.U)
     EXReg.rs1v := rs1v
     EXReg.rs1 := Decoder.io.rs1
     EXReg.rs2 := Decoder.io.rs2
@@ -190,8 +199,6 @@ class Top extends Module {
     EXReg.rden := Decoder.io.rd_en
     EXReg.rd := Decoder.io.rd
 
-    EXReg.inst := IDReg.inst
-    EXReg.pc := IDReg.pc
   } .otherwise {
     EXReg.inst := EXReg.inst
     EXReg.pc := EXReg.pc
@@ -391,11 +398,11 @@ class Top extends Module {
   when (stall) {
     IDRegen := 0.B
     EXReg.valid := 0.B
-    dnpc := IDReg.pc
+    ifu_dnpc := IDReg.pc
   } .otherwise { 
     IDRegen := 1.B
     EXReg.valid := 1.B
-    dnpc := MuxCase(0.U, Array(
+    ifu_dnpc := MuxCase(0.U, Array(
     (Decoder.io.inst === JALR)  -> (rs1v + Decoder.io.imm),
     (Decoder.io.inst === JAL)   -> (pc_plus_imm),
     (Decoder.io.inst === BEQ)   -> Mux(rs1v === rs2v, pc_plus_imm, snpc),
