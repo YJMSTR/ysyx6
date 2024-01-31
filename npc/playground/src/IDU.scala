@@ -5,42 +5,29 @@ import chisel3.util._
 
 // import chisel3.util.experimental.loadMemoryFromFileInline
 
-class IDU() extends Module {
-  val io = IO(new Bundle {
-    // RV32 和 64 的指令都是 32 位长，除非是 C 扩展
-    val inst = Input(UInt(32.W))
-    val pc = Input(UInt(XLEN.W))
-    val rs1 = Output(UInt(RIDXLEN.W))
-    val rs2 = Output(UInt(RIDXLEN.W))
-    val rd  = Output(UInt(RIDXLEN.W))
-    val rd_en = Output(Bool())
-    val imm = Output(UInt(XLEN.W))
-    val alu_op = Output(UInt(ALUCtrlWidth.W))
-    val alu_sel_a = Output(UInt(ALU_DATASEL_WIDTH.W))
-    val alu_sel_b = Output(UInt(ALU_DATASEL_WIDTH.W))
-    // pc 由其它模块传给 alu
-    
-    val isdnpc = Output(Bool())
-    //val dnpc = Output(UInt(XLEN.W))
-    val isEbreak = Output(Bool())
 
-    val memvalid = Output(Bool())
-    val memwen = Output(Bool())
-    val memwmask = Output(UInt(WMASKLEN.W))
-    val memsext = Output(UInt(MEM_SEXT_SEL_WIDTH.W))
-    
-    val isword = Output(Bool())
-    // 是否读取了 rs1 rs2
+
+class IDU(regFileIO: RegFileIO) extends Module {
+  val io = IO(new Bundle {
+    // IFU 传来的输入
+    val in = Flipped(Decoupled(new IFU_out))
+    // IDU 传给 EXU 的输出
+    val out = Decoupled(new IDU_out)
+    // 不直接传给 EXU 的信号
+    // 在译码阶段预先计算出当前指令是否为跳转指令，以及指令的跳转地址 dnpc
+    // 并将 dnpc 传回 IFU，使得当前正在译码的指令的下一条指令变为 dnpc 对应的指令 
+    // 寄存器堆要单独作为一个模块放外面，计算 dnpc 要读取寄存器，也放外面
+    val isdnpc = Output(Bool())
     val rrs1 = Output(Bool())
     val rrs2 = Output(Bool())
   })
   
-  io.rs1 := io.inst(19, 15)
-  io.rs2 := io.inst(24, 20)
-  io.rd  := io.inst(11, 7) 
+  io.out.bits.rs1 := io.inst(19, 15)
+  io.out.bits.rs2 := io.inst(24, 20)
+  io.out.bits.rd  := io.inst(11, 7) 
   // isword (RV64Only)：判断是否为字运算指令（例如addiw),如果是则为1
   val List(alu_op, alu_sel_a, alu_sel_b, isdnpc, immsel, rden, memvalid, memwen, memwmask, memsext, isword, rrs1, rrs2) = ListLookup(
-    io.inst,
+    io.in.inst,
     List(ALU_NONE, ALU_DATA_NONE, ALU_DATA_NONE, 0.U(1.W), IMM_NONE, 0.U(1.W), 0.U(1.W), 0.U(1.W), 0.U(WMASKLEN.W), MEM_SEXT_NONE, 0.U(1.W), 0.B, 0.B),
     //List(ALU_OP, ALU_A, ALU_B, isdnpc, IMMSEL, RDWEN, memvalid, memwen, memwmask, memsext&bits, isword, rrs1, rrs2)
     // NONE 就直接全0
@@ -126,17 +113,17 @@ class IDU() extends Module {
   )
 
   // immGen 
-  val immi = Cat(Fill(XLEN-12, io.inst(31)), io.inst(31, 20))
-  val immj_tmp = Cat(io.inst(31), io.inst(19, 12), io.inst(20), io.inst(30,21), 0.U(1.W))
+  val immi = Cat(Fill(XLEN-12, io.in.bits.inst(31)), io.in.bits.inst(31, 20))
+  val immj_tmp = Cat(io.in.bits.inst(31), io.in.bits.inst(19, 12), io.in.bits.inst(20), io.in.bits.inst(30,21), 0.U(1.W))
   val immj = Cat(Fill(XLEN-21, immj_tmp(20)), immj_tmp)
   //printf("immj = %x\n", immj)
-  val immu = Cat(Fill(XLEN-32, io.inst(31)), io.inst(31, 12), 0.U(12.W))
-  val imms_tmp = Cat(io.inst(31, 25), io.inst(11, 7))
+  val immu = Cat(Fill(XLEN-32, io.in.bits.inst(31)), io.in.bits.inst(31, 12), 0.U(12.W))
+  val imms_tmp = Cat(io.in.bits.inst(31, 25), io.in.bits.inst(11, 7))
   val imms = Cat(Fill(XLEN-12, imms_tmp(11)), imms_tmp)
-  val immb_tmp = Cat(io.inst(31), io.inst(7), io.inst(30, 25), io.inst(11, 8), 0.U(1.W))
+  val immb_tmp = Cat(io.in.bits.inst(31), io.in.bits.inst(7), io.in.bits.inst(30, 25), io.in.bits.inst(11, 8), 0.U(1.W))
   val immb = Cat(Fill(XLEN-13, immb_tmp(12)), immb_tmp)
   
-  io.imm := MuxLookup(immsel, 0.U)(Seq(
+  io.out.imm := MuxLookup(immsel, 0.U)(Seq(
     IMM_I->immi, 
     IMM_J->immj, 
     IMM_U->immu,
@@ -144,22 +131,25 @@ class IDU() extends Module {
     IMM_B->immb
   ))
 
-  io.alu_op := alu_op 
-  io.alu_sel_a := alu_sel_a
-  io.alu_sel_b := alu_sel_b
   io.isdnpc := isdnpc
-  io.rd_en := rden
-  io.memvalid := memvalid
-  io.memwen := memwen
-  io.memwmask := memwmask 
-  io.memsext := memsext
-  io.isword := isword
+
+  io.out.bits.alu_op := alu_op 
+  io.out.bits.alu_sel_a := alu_sel_a
+  io.out.bits.alu_sel_b := alu_sel_b
+  io.out.bits.rd_en := rden
+  io.out.bits.memvalid := memvalid
+  io.out.bits.memwen := memwen
+  io.out.bits.memwmask := memwmask 
+  io.out.bits.memsext := memsext
+  io.out.bits.isword := isword
+  
   io.rrs1 := rrs1
   io.rrs2 := rrs2
-  when(io.inst === EBREAK) {
-    io.isEbreak := 1.U(1.W)
+
+  when(io.in.bits.inst === EBREAK) {
+    io.out.bits.isEbreak := 1.U(1.W)
   }.otherwise {
-    io.isEbreak := 0.U(1.W)
+    io.out.bits.isEbreak := 0.U(1.W)
   }
   
 }

@@ -5,59 +5,67 @@ import Instr._
 import chisel3.util.experimental.loadMemoryFromFileInline
 import chisel3.experimental.BundleLiterals._
 
-class IDRegBundle extends Bundle {
-  val valid = Bool()
-  val inst  = UInt(32.W)
-  val pc    = UInt(XLEN.W)
+object StageConnect {
+  def apply[T <: Data](left: DecoupledIO[T], right: DecoupledIO[T], arch: String): Unit = {
+    if      (arch == "single")   { right.bits := left.bits }
+    else if (arch == "multi")    { right <> left }
+    else if (arch == "pipeline") { right <> RegEnable(left, left.fire) }
+    else if (arch == "ooo")      { right <> Queue(left, 16) }
+  }
 }
 
-class EXRegBundle extends Bundle {
-  val valid = Bool()
-  val inst  = UInt(32.W)
-  val pc    = UInt(XLEN.W)
-  val rs1v  = UInt(XLEN.W)
-  val rs2v  = UInt(XLEN.W)
-  val rs1   = UInt(RIDXLEN.W)
-  val rs2   = UInt(RIDXLEN.W)
-  val imm   = UInt(XLEN.W)
-  val dataAsel  = UInt(ALU_DATASEL_WIDTH.W)
-  val dataBsel  = UInt(ALU_DATASEL_WIDTH.W)
-  val aluop     = UInt(ALUCtrlWidth.W)
-  val memvalid  = Bool()
-  val memwen    = Bool()
-  val memwmask  = UInt(WMASKLEN.W)
-  val memsext   = UInt(MEM_SEXT_SEL_WIDTH.W)
-  val isdnpc    = Bool()
-  val isEbreak  = Bool()
-  val isword    = Bool()
-  val rden      = Bool()
-  val rd        = UInt(RIDXLEN.W)
+class IFUIn extends Bundle {
+  val pc = Output(UInt(XLEN.W))
 }
 
-class LSRegBundle extends Bundle {
-  val valid = Bool()
-  val inst = UInt(32.W)
-  val pc = UInt(XLEN.W)
-  val alures = UInt(XLEN.W)
-  val rs2v = UInt(XLEN.W)
-  val memvalid = Bool()
-  val memwen = Bool()
-  val memwmask = UInt(WMASKLEN.W)
-  val memsext = UInt(MEM_SEXT_SEL_WIDTH.W)
-  val rden = Bool()
-  val rd = UInt(RIDXLEN.W)
+class IFUOut extends Bundle {
+  val pc = Output(UInt(XLEN.W))
+  val inst = Output(UInt(32.W))
+}
+// IDU_in 直接用 Flipped(Decouple(ifu_out))，其它同理
+// 没有直接和下一阶段相连的信号就单独拉出来，不放在 in/out 里
+class IDUOut extends Bundle {
+  val inst = Output(UInt(32.W))
+  val pc = Output(UInt(XLEN.W))
+  val rs1 = Output(UInt(RIDXLEN.W))
+  val rs2 = Output(UInt(RIDXLEN.W))
+  val rs1v = Output(UInt(XLEN.W))
+  val rs2v = Output(UInt(XLEN.W))
+  val rd = Output(UInt(RIDXLEN.W))
+  val rd_en = Output(Bool())
+  val imm = Output(UInt(XLEN.W))
+  
+  val alu_sel_a = Output(UInt(ALU_DATASEL_WIDTH.W))
+  val alu_sel_b = Output(UInt(ALU_DATASEL_WIDTH.W))
+  val alu_op = Output(UInt(ALUCtrlWidth.W))
+
+  val isEbreak = Output(Bool())
+  val memvalid = Output(Bool())
+  val memwen = Output(Bool())
+  val memwmask = Output(UInt(WMASKLEN.W))
+  val memsext = Output(UInt(MEM_SEXT_SEL_WIDTH.W))
+  val isword = Output(Bool())
 }
 
-class WBRegBundle extends Bundle {
-  val valid = Bool()
-  val inst = UInt(32.W)
-  val pc = UInt(XLEN.W)
-  val alures = UInt(XLEN.W)
-  val sextrdata = UInt(XLEN.W)
-  val rden = Bool()
-  val rd = UInt(RIDXLEN.W)
-  val memvalid = Bool()
+class EXUOut extends Bundle {
+  val alu_res = Output(UInt(XLEN.W))
+  val rs2v = Output(UInt(XLEN.W))
+  val memvalid = Output(Bool())
+  val memwen = Output(Bool())
+  val memwmask = Output(UInt(WMASKLEN.W))
+  val memsext = Output(UInt(MEM_SEXT_SEL_WIDTH.W))
+  val isword = Output(Bool())
 }
+
+class LSUOut extends Bundle {
+  // 经过符号位扩展的 rdata
+  val sextrdata = Output(UInt(XLEN.W))
+
+  // 此外还有一些控制信号，调试用的数据等要传给 wbu
+
+}
+
+
 
 class Top extends Module {
   val io = IO(new Bundle {
@@ -65,350 +73,73 @@ class Top extends Module {
     val pc = Output(UInt(XLEN.W))
   })
   
-  val IDReg = RegInit(
-    (new IDRegBundle).Lit(
-      _.valid -> 1.B,
-      _.inst -> 0.U,
-      _.pc   -> "x7ffffffc".U
-    )
-  )
-  val EXReg = RegInit(
-    (new EXRegBundle).Lit(
-      _.valid     -> 1.B,
-      _.inst      -> 0.U,
-      _.pc        -> 0.U,
-      _.rs1       -> 0.U,
-      _.rs2       -> 0.U,
-      _.rs1v      -> 0.U,
-      _.rs2v      -> 0.U,
-      _.imm       -> 0.U,
-      _.dataAsel  -> ALU_DATA_NONE,
-      _.dataBsel  -> ALU_DATA_NONE,
-      _.aluop     -> ALU_NONE,
-      _.memvalid  -> 0.B,
-      _.memwen    -> 0.B,
-      _.memwmask  -> 0.U,
-      _.memsext   -> MEM_SEXT_NONE,
-      _.isdnpc    -> 0.B,
-      _.isEbreak  -> 0.B,
-      _.isword    -> 0.B,
-      _.rden      -> 0.B,
-      _.rd        -> 0.U
-    )
-  )
-  val LSReg = RegInit(
-    (new LSRegBundle).Lit(
-      _.valid     -> 1.B,
-      _.inst      -> 0.U,
-      _.pc        -> 0.U,
-      _.alures    -> 0.U,
-      _.rs2v      -> 0.U,
-      _.memvalid  -> 0.B,
-      _.memwen    -> 0.B,
-      _.memwmask  -> 0.U,
-      _.memsext   -> MEM_SEXT_NONE,
-      _.rden      -> 0.B,
-      _.rd        -> 0.U
-    )
-  )
-  val WBReg = RegInit(
-    (new WBRegBundle).Lit(
-      _.valid     -> 1.B,
-      _.inst      -> 0.U,
-      _.pc        -> 0.U,
-      _.memvalid  -> 0.B,
-      _.alures    -> 0.U,
-      _.sextrdata -> 0.U,
-      _.rden      -> 0.B,
-      _.rd        -> 0.U
-    )
-  )
+  // 寄存器堆
+  // 其它模块可以通过 chisel 的参数化模块机制来跨模块访问寄存器堆的 IO 接口
+  val R = Module(new REG)
 
-  val IDRegen = WireInit(Bool(), 1.B)
-  val EXRegen = WireInit(Bool(), 1.B)
-  val LSRegen = WireInit(Bool(), 1.B)
-  val WBRegen = WireInit(Bool(), 1.B)
-  val dnpc = Wire(UInt(XLEN.W))
-  val pcsel = Wire(UInt(1.W))
-  val InstFetcher = Module(new DPIC_IFU)
-  val pcnext = Mux(pcsel === 1.B, dnpc, Mux(IDReg.valid, IDReg.pc + 4.U, 0.U))
-  InstFetcher.io.pc := pcnext
-  InstFetcher.io.valid := Mux(reset.asBool, 0.U, 1.U)
-  
-  when (IDRegen) {
-    IDReg.inst := InstFetcher.io.inst
-    IDReg.pc := InstFetcher.io.pc
-    IDReg.valid := 1.B
-  } .otherwise {
-    IDReg.inst := IDReg.inst
-    IDReg.pc := IDReg.pc
-    IDReg.valid := IDReg.valid
-  }
-  
-  val R = Mem(32, UInt(XLEN.W))
-  // val scoreboard = Mem(32, Bool())
-  
-  val dataHazard = WireInit(Bool(), 0.B)
-  
-  val stall = WireInit(Bool(), 0.B)
-  stall := dataHazard
-  def Rread(idx: UInt) = Mux(idx === 0.U, 0.U(XLEN.W), R(idx))
-  
-  R(0) := 0.U
-  val Decoder = Module(new IDU)
-  // when(Decoder.io.rd =/= 0.U && scoreboard(Decoder.io.rd) =/= 1.B && Decoder.io.rd_en) {
-  //   scoreboard(Decoder.io.rd) := 1.B
-  // } .otherwise {
-  //   scoreboard(Decoder.io.rd) := scoreboard(Decoder.io.rd)
-  // }
-  val pc_plus_imm = Decoder.io.pc + Decoder.io.imm
-  //printf("decoder pc = %x, imm = %x, pc_plus_imm = %x\n", Decoder.io.pc, Decoder.io.imm, pc_plus_imm)
-  val rs2v = Rread(Decoder.io.rs2)
-  val rs1v = Rread(Decoder.io.rs1)
-  
-  val snpc = Decoder.io.pc + 4.U
-  
-  when(EXRegen) {
-    EXReg.inst := Mux(IDReg.valid, IDReg.inst, 0.U)
-    EXReg.rs1v := rs1v
-    EXReg.rs1 := Decoder.io.rs1
-    EXReg.rs2 := Decoder.io.rs2
-    EXReg.rs2v := rs2v
-    EXReg.imm  := Decoder.io.imm
-    
-    EXReg.aluop := Decoder.io.alu_op
-    EXReg.dataAsel := Decoder.io.alu_sel_a
-    EXReg.dataBsel := Decoder.io.alu_sel_b
+  val ifu = Module(new IFU(R.io))
+  val idu = Module(new IDU(R.io))
+  val exu = Module(new EXU(R.io))
+  val lsu = Module(new LSU(R.io))
+  val wbu = Module(new WBU(R.io))
 
-    EXReg.memvalid := Decoder.io.memvalid
-    EXReg.memwen   := Decoder.io.memwen
-    EXReg.memwmask := Decoder.io.memwmask 
-    EXReg.memsext  := Decoder.io.memsext
+  StageConnect(ifu.io.out, idu.io.in)
+  StageConnect(idu.io.out, exu.io.in)
+  StageConnect(exu.io.out, lsu.io.in)
+  StageConnect(lsu.io.out, wbu.io.in)
 
-    EXReg.isEbreak := Decoder.io.isEbreak
-    EXReg.isword := Decoder.io.isword
-    EXReg.rden := Decoder.io.rd_en
-    EXReg.rd := Decoder.io.rd
 
-    EXReg.inst := IDReg.inst
-    EXReg.pc := IDReg.pc
-  } .otherwise {
-    EXReg.inst := EXReg.inst
-    EXReg.pc := EXReg.pc
-    EXReg.rs1v := EXReg.rs1v
-    EXReg.rs2v := EXReg.rs2v
-    EXReg.rs1 := EXReg.rs1 
-    EXReg.rs2 := EXReg.rs2
-    EXReg.imm := EXReg.imm
-    EXReg.aluop := EXReg.aluop
-    EXReg.dataAsel := EXReg.dataAsel
-    EXReg.dataBsel := EXReg.dataBsel
-    EXReg.memvalid := EXReg.memvalid
-    EXReg.memwen := EXReg.memwen
-    EXReg.memwmask := EXReg.memwmask
-    EXReg.memsext := EXReg.memsext
-    EXReg.isEbreak := EXReg.isEbreak
-    EXReg.isword := EXReg.isword
-    EXReg.rden := EXReg.rden
-    EXReg.rd := EXReg.rd  
-  }
-
-  when (IDReg.valid) {
-    Decoder.io.inst := IDReg.inst
-    Decoder.io.pc := IDReg.pc
-  } .otherwise {
-    // 否则按照空指令进行输入
-    Decoder.io.inst := 0.U
-    Decoder.io.pc := 0.U
-  }
-  pcsel := Decoder.io.isdnpc
+  val isdnpc = WireInit(0.B)
+  val dnpc = WireInit(0.U(XLEN.W))
+  val snpc = ifu.io.out.bits.pc + 4.U
+  ifu.io.in.valid := reset.asBool =/= 1.B
+  // 其实 SRAM 也有流水线，如果取回指令要 x 个周期，其实这 x 个周期内会读入新的 pc？
+  // 目前实现的 SRAM IFU 是多周期非流水的，如果取回指令要一个周期，就阻塞一个周期再读入新 pc
+  // 怎么阻塞？把取回的 inst 和对应的 pc 一起输出，并判断当前 pc 是否等于这个 pc,如果不是接着阻塞直到是为止
+  // 通过把 out.valid 和 in.ready 拉低作为阻塞
+  // 把 ifu.io.out.bits.pc + 4.U 作为 snpc
+  // 目前 dnpc 的实现可能不太正确，先不管
+  ifu.io.in.bits.pc := Mux(isdnpc, dnpc, snpc)
+  // 先不考虑跳转指令，仅连接好流水线
 
   
+  val R = Module(new REG)
+  // 这里通过给 rs1 和 rs2 赋值来取得 rs1v 和 rs2v 的话，其它模块怎么办呢？
+  // 五级流水仅 idu 读取寄存器值，其它模块通过 idu 传给流水段间寄存器的值来获取 rs1v 和 rs2v
+  R.io.raddr1 := idu.io.out.rs1
+  R.io.raddr2 := idu.io.out.rs2
+  val rs1v = R.io.rdata1
+  val rs2v = R.io.rdata2
 
-  val ALU = Module(new EXU)
-  when(EXReg.valid) {
-    
-    ALU.io.inst := EXReg.inst
-    ALU.io.pc := EXReg.pc
-    ALU.io.alu_op := EXReg.aluop
-    ALU.io.asel := EXReg.dataAsel
-    ALU.io.bsel := EXReg.dataBsel
-    ALU.io.imm := EXReg.imm
-    ALU.io.rs1v := EXReg.rs1v
-    ALU.io.rs2v := EXReg.rs2v
-    ALU.io.isword := EXReg.isword
-    when (LSRegen) {
-      LSReg.valid := EXReg.valid
-      LSReg.inst := EXReg.inst
-      LSReg.pc := EXReg.pc
-      LSReg.rs2v := EXReg.rs2v
-      LSReg.memvalid := EXReg.memvalid
-      LSReg.memwen := EXReg.memwen
-      LSReg.memwmask := EXReg.memwmask
-      LSReg.memsext := EXReg.memsext 
-      LSReg.rden := EXReg.rden
-      LSReg.rd := EXReg.rd
-    }.otherwise {
-      LSReg.valid := LSReg.valid
-      LSReg.inst := LSReg.inst
-      LSReg.pc := LSReg.pc
-      LSReg.rs2v := LSReg.rs2v
-      LSReg.memvalid := LSReg.memvalid
-      LSReg.memwen := LSReg.memwen
-      LSReg.memwmask := LSReg.memwmask
-      LSReg.memsext := LSReg.memsext 
-      LSReg.rden := LSReg.rden
-      LSReg.rd := LSReg.rd
-    }
-  } .otherwise {
-    ALU.io.inst := 0.U 
-    ALU.io.pc := 0.U 
-    ALU.io.alu_op := ALU_NONE
-    ALU.io.asel := ALU_DATA_NONE
-    ALU.io.bsel := ALU_DATA_NONE
-    ALU.io.imm := 0.U
-    ALU.io.rs1v := 0.U
-    ALU.io.rs2v := 0.U
-    ALU.io.isword := 0.B
-    LSReg.inst := 0.U
-    LSReg.pc := 0.U
-    LSReg.rs2v := 0.U
-    LSReg.memvalid := 0.B
-    LSReg.memwen := 0.B
-    LSReg.memwmask := 0.U
-    LSReg.memsext := MEM_SEXT_NONE
-    LSReg.rden := 0.B
-    LSReg.rd := 0.U
-  }
-  when (LSRegen) {
-    LSReg.alures := ALU.io.res
-  } .otherwise {
-    LSReg.alures := LSReg.alures
-  }
-  
-  val NPC_Mem = Module(new DPIC_MEM)
-  NPC_Mem.io.clk := clock
-  val rdata7 = NPC_Mem.io.rdata(7)
-  val rdata15 = NPC_Mem.io.rdata(15)
-  val rdata31 = NPC_Mem.io.rdata(31)
-  when (LSReg.valid) {
-    NPC_Mem.io.valid := LSReg.memvalid
-    NPC_Mem.io.wen := LSReg.memwen
-    NPC_Mem.io.raddr := LSReg.alures
-    NPC_Mem.io.waddr := LSReg.alures
-    NPC_Mem.io.wdata := LSReg.rs2v
-    NPC_Mem.io.wmask := LSReg.memwmask
-    when (WBRegen) {
-      WBReg.inst := LSReg.inst
-      WBReg.pc := LSReg.pc
-      WBReg.memvalid := LSReg.memvalid
-      WBReg.valid := LSReg.valid
-      WBReg.alures := LSReg.alures
-      WBReg.sextrdata := MuxLookup(LSReg.memsext, NPC_Mem.io.rdata)(Seq(
-        MEM_NSEXT_8 ->  Cat(Fill(XLEN-8, 0.U), NPC_Mem.io.rdata(7, 0)),
-        MEM_NSEXT_16->  Cat(Fill(XLEN-16, 0.U), NPC_Mem.io.rdata(15, 0)),
-        MEM_NSEXT_32->  Cat(Fill(XLEN-32, 0.U), NPC_Mem.io.rdata(31, 0)),
-        MEM_SEXT_8  ->  Cat(Fill(XLEN-8, rdata7), NPC_Mem.io.rdata(7, 0)),
-        MEM_SEXT_16 ->  Cat(Fill(XLEN-16, rdata15), NPC_Mem.io.rdata(15, 0)),
-        MEM_SEXT_32 ->  Cat(Fill(XLEN-32, rdata31), NPC_Mem.io.rdata(31, 0)),
-      ))
-      WBReg.rden := LSReg.rden
-      WBReg.rd := LSReg.rd
-    } .otherwise {
-      WBReg.valid := WBReg.valid
-      WBReg.inst := WBReg.inst
-      WBReg.pc := WBReg.pc
-      WBReg.memvalid := WBReg.memvalid
-      WBReg.alures := WBReg.alures
-      WBReg.sextrdata := WBReg.sextrdata
-      WBReg.rden := WBReg.rden
-      WBReg.rd := WBReg.rd
-    }
-  } .otherwise {
-    NPC_Mem.io.valid := 0.U
-    NPC_Mem.io.wen := 0.U
-    NPC_Mem.io.raddr := 0.U
-    NPC_Mem.io.waddr := 0.U
-    NPC_Mem.io.wdata := 0.U
-    NPC_Mem.io.wmask := 0.U
-    WBReg.inst := 0.U 
-    WBReg.valid := 0.B
-    WBReg.pc := 0.U
-    WBReg.memvalid := 0.B
-    WBReg.alures := 0.U
-    WBReg.sextrdata := 0.U
-    WBReg.rden := 0.B
-    WBReg.rd := 0.U
-  }
+  val pc_plus_imm = idu.io.out.pc + idu.io.out.imm
 
-  val rdv = Wire(UInt(XLEN.W))
-  val wbrd = Wire(UInt(RIDXLEN.W))
-  val wbrden = Wire(Bool())
-  val wbrdmemvalid = Wire(Bool())
-  val wbrdsextrdata = Wire(UInt(XLEN.W))
-  val wbrdalures = Wire(UInt(XLEN.W))
-
-  when (WBReg.valid) {
-    wbrd := WBReg.rd
-    wbrden := WBReg.rden
-    wbrdmemvalid := WBReg.memvalid
-    wbrdsextrdata := WBReg.sextrdata
-    wbrdalures := WBReg.alures
-    io.inst := WBReg.inst
-    io.pc := WBReg.pc
-  } .otherwise {
-    wbrd := 0.U
-    wbrden := 0.B
-    wbrdmemvalid := 0.B
-    wbrdsextrdata := 0.U
-    wbrdalures := 0.U
-    io.inst := 0.U
-    io.pc := 0.U
-  }
-
-  rdv := Mux(wbrdmemvalid === 1.B, wbrdsextrdata, wbrdalures)
-  //printf("wbrdmemvalid: %d, wbrdsextrdata: %x, wbrdalures: %x, wbrden: %d, rdv: %x\n", wbrdmemvalid, wbrdsextrdata, wbrdalures, wbrden, rdv)
-  
-  //scoreboard(wbrd) := 0.B
-  when(wbrd =/= 0.U) {
-    R(wbrd) := Mux(wbrden === 0.B, R(wbrd), rdv)
-  } .otherwise {
-    R(wbrd) := 0.U
-  }
-  val rs1ren = Decoder.io.rrs1 && Decoder.io.rs1 =/= 0.U && IDReg.valid
-  val rs2ren = Decoder.io.rrs2 && Decoder.io.rs2 =/= 0.U && IDReg.valid
-  val EX_RS1_Hazard = Decoder.io.rs1 === Mux(EXReg.valid, EXReg.rd, 0.U) && EXReg.rden
-  val EX_RS2_Hazard = Decoder.io.rs2 === Mux(EXReg.valid, EXReg.rd, 0.U) && EXReg.rden
-  val WB_RS1_Hazard = Decoder.io.rs1 === Mux(WBReg.valid, WBReg.rd, 0.U) && WBReg.rden
-  val WB_RS2_Hazard = Decoder.io.rs2 === Mux(WBReg.valid, WBReg.rd, 0.U) && WBReg.rden
-  val LS_RS1_Hazard = Decoder.io.rs1 === Mux(LSReg.valid, LSReg.rd, 0.U) && LSReg.rden
-  val LS_RS2_Hazard = Decoder.io.rs2 === Mux(LSReg.valid, LSReg.rd, 0.U) && LSReg.rden
-  dataHazard := MuxCase(0.U, Array (
-    (rs1ren && (EX_RS1_Hazard | LS_RS1_Hazard | WB_RS1_Hazard)) -> 1.B,
-    (rs2ren && (EX_RS2_Hazard | LS_RS2_Hazard | WB_RS2_Hazard)) -> 1.B,
+  // 与译码模块相关的数据线
+  isdnpc := idu.io.isdnpc
+  // dnpc 预执行，这里用到的 snpc 是用 ifu 输出的 pc + 4 算的，并不是当前跳转指令所对应的 pc，所以这里的 dnpc 也不对
+  // 但是目前不考虑跳转指令，所以先不管
+   dnpc := MuxCase(0.U, Array(
+    (idu.io.out.bits.inst === JALR)  -> (rs1v + idu.io.out.bits.imm),
+    (idu.io.out.bits.inst === JAL)   -> (pc_plus_imm),
+    (idu.io.out.bits.inst === BEQ)   -> Mux(rs1v === rs2v, pc_plus_imm, snpc),
+    (idu.io.out.bits.inst === BNE)   -> Mux(rs1v === rs2v, snpc, pc_plus_imm),
+    (idu.io.out.bits.inst === BGE)   -> Mux(rs1v.asSInt >= rs2v.asSInt, pc_plus_imm, snpc),
+    (idu.io.out.bits.inst === BGEU)  -> Mux(rs1v >= rs2v, pc_plus_imm, snpc),
+    (idu.io.out.bits.inst === BLT)   -> Mux(rs1v.asSInt < rs2v.asSInt, pc_plus_imm, snpc),
+    (idu.io.out.bits.inst === BLTU)  -> Mux(rs1v < rs2v, pc_plus_imm, snpc)
   ))
-  //printf("IDUpc=%x rs1ren: %d, rs2ren: %d, EX_RS1_Hazard: %d, EX_RS2_Hazard: %d, WB_RS1_Hazard: %d, WB_RS2_Hazard: %d, LS_RS1_Hazard: %d, LS_RS2_Hazard: %d\n", IDReg.pc, rs1ren, rs2ren, EX_RS1_Hazard, EX_RS2_Hazard, WB_RS1_Hazard, WB_RS2_Hazard, LS_RS1_Hazard, LS_RS2_Hazard)
-  when (stall) {
-    IDRegen := 0.B
-    EXReg.valid := 0.B
-    dnpc := IDReg.pc
-  } .otherwise { 
-    IDRegen := 1.B
-    EXReg.valid := 1.B
-    dnpc := MuxCase(0.U, Array(
-    (Decoder.io.inst === JALR)  -> (rs1v + Decoder.io.imm),
-    (Decoder.io.inst === JAL)   -> (pc_plus_imm),
-    (Decoder.io.inst === BEQ)   -> Mux(rs1v === rs2v, pc_plus_imm, snpc),
-    (Decoder.io.inst === BNE)   -> Mux(rs1v === rs2v, snpc, pc_plus_imm),
-    (Decoder.io.inst === BGE)   -> Mux(rs1v.asSInt >= rs2v.asSInt, pc_plus_imm, snpc),
-    (Decoder.io.inst === BGEU)  -> Mux(rs1v >= rs2v, pc_plus_imm, snpc),
-    (Decoder.io.inst === BLT)   -> Mux(rs1v.asSInt < rs2v.asSInt, pc_plus_imm, snpc),
-    (Decoder.io.inst === BLTU)  -> Mux(rs1v < rs2v, pc_plus_imm, snpc)
-  ))
-  }
-  
+  // 此外 译码阶段还要判断是否有数据冒险
+  // 当前指令是否要读取 rs1
+  val rs1ren = idu.rrs1 && idu.io.out.bits.rs1 =/= 0.U && idu.io.in.valid
+  // 当前指令是否要读取 rs2
+  val rs2ren = idu.rrs2 && idu.io.out.bits.rs2 =/= 0.U && idu.io.in.valid
+  val EX_RS1_Hazard = idu.io.out.rs1 === Mux(idu.io.out.valid, idu.io.out.bits.rd, 0.U) && idu.io.out.ready
+  val EX_RS2_Hazard = idu.io.out.rs2 === Mux(idu.io.out.valid, idu.io.out.bits.rd, 0.U) && idu.io.out.ready
+  val WB_RS1_Hazard = idu.io.out.rs1 === Mux(lsu.io.out.valid, lsu.io.out.bits.rd, 0.U) && lsu.io.in.ready
+  val WB_RS2_Hazard = idu.io.out.rs2 === Mux(lsu.io.out.valid, lsu.io.out.bits.rd, 0.U) && lsu.io.in.ready
+  val LS_RS1_Hazard = idu.io.out.rs1 === Mux(exu.io.out.valid, exu.io.out.bits.rd, 0.U) && exu.io.in.ready
+
   val Ebreak = Module(new DPIC_EBREAK)
-  Ebreak.io.isEbreak := EXReg.isEbreak
+  Ebreak.io.isEbreak := exu.io.in.isEbreak
   Ebreak.io.clk := clock
 }
 
