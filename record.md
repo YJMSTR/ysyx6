@@ -1961,7 +1961,7 @@ bug：译码阶段计算 JALR 等跳转指令的地址的时候要访问 rs1、r
 
 先不改整体连线了，就直接把 IFU 改成延迟 1 周期。不应该一次重构太多代码，应该改一点测一点。
 
-#### IFU重构
+#### IFU 重构
 
 加入 DecoupledIO，然后手动让输出比输入慢一个周期即可。这样从取指模块输入 dnpc 到 IDReg 输出对应的 pc 和 inst 需要两个周期，在此期间流水线中要出现一个气泡？
 
@@ -1969,11 +1969,44 @@ bug：译码阶段计算 JALR 等跳转指令的地址的时候要访问 rs1、r
 
 如果阻塞了，需要把 PC，IFU，IDReg 的全部锁住，即 stall 期间让它们保持当前的状态。
 
+这么改完以后可以运行 bad apple
 
+#### LSU 重构
 
+给 Mem 加上一周期延迟后，如果当前指令要访问 Mem，需要等待 mem 取回数据之后再进入下一个阶段，此时需要阻塞访存级（？），即把 LSU 的 valid 信号置为 0，ready 信号也置为 0，
 
+如果某个模块没有和下游模块握手，该模块中现有的数据会怎么样呢？由于处理器是一个状态机，当 valid 无效时，我们可以将后续模块的写使能置 0，使后续模块保持当前状态。但目前我的处理器在 valid 为 0 时会往后输出无效数据 nop。valid & !ready 时，master 要暂存消息避免丢失
 
+目前我实现的五级流水是由一个全局的 stall 信号来检测是否阻塞的，它会和各个模块之间的分布式控制有冲突吗？
 
+```scala
+  when (stall) {
+    IDRegen := 0.B
+    EXReg.valid := 0.B
+    ifu_dnpc := "x114514".U
+  } .otherwise { 
+    IDRegen := 1.B
+    EXReg.valid := 1.B
+    ifu_dnpc := MuxCase(0.U, Array(
+    (Decoder.io.inst === JALR)  -> (rs1v + Decoder.io.imm),
+    (Decoder.io.inst === JAL)   -> (pc_plus_imm),
+    (Decoder.io.inst === BEQ)   -> Mux(rs1v === rs2v, pc_plus_imm, snpc),
+    (Decoder.io.inst === BNE)   -> Mux(rs1v === rs2v, snpc, pc_plus_imm),
+    (Decoder.io.inst === BGE)   -> Mux(rs1v.asSInt >= rs2v.asSInt, pc_plus_imm, snpc),
+    (Decoder.io.inst === BGEU)  -> Mux(rs1v >= rs2v, pc_plus_imm, snpc),
+    (Decoder.io.inst === BLT)   -> Mux(rs1v.asSInt < rs2v.asSInt, pc_plus_imm, snpc),
+    (Decoder.io.inst === BLTU)  -> Mux(rs1v < rs2v, pc_plus_imm, snpc)
+  ))
+ }
+```
+
+IDRegen 和 EXReg.valid 的结果是根据 stall 来修改的，此外 PC 和 InstFetcher 也受 stall 的影响。 
+
+todo：
+
+1. 检查当 valid 为 0 时，后续模块的时序元件是不是保持了当前的状态，但后续模块的组合元件怎么处理？
+2. valid & !ready 时，master 要暂存消息，避免丢失。master 在暂存信号时，master 输入端的 ready 信号又该是什么呢？
+3. 
 
 
 

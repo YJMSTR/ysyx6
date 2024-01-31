@@ -148,9 +148,9 @@ class Top extends Module {
   }
 
   when (IDRegen) {
-    IDReg.inst := Mux(InstFetcher.io.out.valid, InstFetcher.io.out.bits.inst, 0.U)
-    IDReg.pc := Mux(InstFetcher.io.out.valid, InstFetcher.io.out.bits.pc, 0.U)
-    IDReg.valid := InstFetcher.io.out.valid & (pcsel =/= 1.B) & (RegNext(pcsel, 0.B) =/= 1.B)
+    IDReg.inst := Mux(InstFetcher.io.out.valid, InstFetcher.io.out.bits.inst, IDReg.inst)
+    IDReg.pc := Mux(InstFetcher.io.out.valid, InstFetcher.io.out.bits.pc, IDReg.pc)
+    IDReg.valid := Mux(InstFetcher.io.out.valid, (pcsel =/= 1.B) & (RegNext(pcsel, 0.B) =/= 1.B), IDReg.valid)
   } .otherwise {
     IDReg.inst := IDReg.inst
     IDReg.pc := IDReg.pc
@@ -229,11 +229,8 @@ class Top extends Module {
   }
   pcsel := Decoder.io.isdnpc
 
-  
-
   val ALU = Module(new EXU)
   when(EXReg.valid) {
-    
     ALU.io.inst := EXReg.inst
     ALU.io.pc := EXReg.pc
     ALU.io.alu_op := EXReg.aluop
@@ -292,31 +289,31 @@ class Top extends Module {
     LSReg.alures := LSReg.alures
   }
   
-  val NPC_Mem = Module(new DPIC_MEM)
-  NPC_Mem.io.clk := clock
-  val rdata7 = NPC_Mem.io.rdata(7)
-  val rdata15 = NPC_Mem.io.rdata(15)
-  val rdata31 = NPC_Mem.io.rdata(31)
+  val NPC_Mem = Module(new LSU)
+  NPC_Mem.io.out.ready := WBRegen
+  val rdata7 = NPC_Mem.io.out.bits.rdata(7)
+  val rdata15 = NPC_Mem.io.out.bits.rdata(15)
+  val rdata31 = NPC_Mem.io.out.bits.rdata(31)
   when (LSReg.valid) {
-    NPC_Mem.io.valid := LSReg.memvalid
-    NPC_Mem.io.wen := LSReg.memwen
-    NPC_Mem.io.raddr := LSReg.alures
-    NPC_Mem.io.waddr := LSReg.alures
-    NPC_Mem.io.wdata := LSReg.rs2v
-    NPC_Mem.io.wmask := LSReg.memwmask
+    NPC_Mem.io.in.valid := LSReg.memvalid
+    NPC_Mem.io.in.bits.wen := LSReg.memwen
+    NPC_Mem.io.in.bits.raddr := LSReg.alures
+    NPC_Mem.io.in.bits.waddr := LSReg.alures
+    NPC_Mem.io.in.bits.wdata := LSReg.rs2v
+    NPC_Mem.io.in.bits.wmask := LSReg.memwmask
     when (WBRegen) {
       WBReg.inst := LSReg.inst
       WBReg.pc := LSReg.pc
       WBReg.memvalid := LSReg.memvalid
       WBReg.valid := LSReg.valid
       WBReg.alures := LSReg.alures
-      WBReg.sextrdata := MuxLookup(LSReg.memsext, NPC_Mem.io.rdata)(Seq(
-        MEM_NSEXT_8 ->  Cat(Fill(XLEN-8, 0.U), NPC_Mem.io.rdata(7, 0)),
-        MEM_NSEXT_16->  Cat(Fill(XLEN-16, 0.U), NPC_Mem.io.rdata(15, 0)),
-        MEM_NSEXT_32->  Cat(Fill(XLEN-32, 0.U), NPC_Mem.io.rdata(31, 0)),
-        MEM_SEXT_8  ->  Cat(Fill(XLEN-8, rdata7), NPC_Mem.io.rdata(7, 0)),
-        MEM_SEXT_16 ->  Cat(Fill(XLEN-16, rdata15), NPC_Mem.io.rdata(15, 0)),
-        MEM_SEXT_32 ->  Cat(Fill(XLEN-32, rdata31), NPC_Mem.io.rdata(31, 0)),
+      WBReg.sextrdata := MuxLookup(LSReg.memsext, NPC_Mem.io.out.bits.rdata)(Seq(
+        MEM_NSEXT_8 ->  Cat(Fill(XLEN-8, 0.U), NPC_Mem.io.out.bits.rdata(7, 0)),
+        MEM_NSEXT_16->  Cat(Fill(XLEN-16, 0.U), NPC_Mem.io.out.bits.rdata(15, 0)),
+        MEM_NSEXT_32->  Cat(Fill(XLEN-32, 0.U), NPC_Mem.io.out.bits.rdata(31, 0)),
+        MEM_SEXT_8  ->  Cat(Fill(XLEN-8, rdata7), NPC_Mem.io.out.bits.rdata(7, 0)),
+        MEM_SEXT_16 ->  Cat(Fill(XLEN-16, rdata15), NPC_Mem.io.out.bits.rdata(15, 0)),
+        MEM_SEXT_32 ->  Cat(Fill(XLEN-32, rdata31), NPC_Mem.io.out.bits.rdata(31, 0)),
       ))
       WBReg.rden := LSReg.rden
       WBReg.rd := LSReg.rd
@@ -331,12 +328,12 @@ class Top extends Module {
       WBReg.rd := WBReg.rd
     }
   } .otherwise {
-    NPC_Mem.io.valid := 0.U
-    NPC_Mem.io.wen := 0.U
-    NPC_Mem.io.raddr := 0.U
-    NPC_Mem.io.waddr := 0.U
-    NPC_Mem.io.wdata := 0.U
-    NPC_Mem.io.wmask := 0.U
+    NPC_Mem.io.in.valid := 0.B
+    NPC_Mem.io.in.bits.wen := 0.B
+    NPC_Mem.io.in.bits.raddr := 0.U
+    NPC_Mem.io.in.bits.waddr := 0.U
+    NPC_Mem.io.in.bits.wdata := 0.U
+    NPC_Mem.io.in.bits.wmask := 0.U
     WBReg.inst := 0.U 
     WBReg.valid := 0.B
     WBReg.pc := 0.U
