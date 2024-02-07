@@ -213,8 +213,8 @@ static void trace_and_difftest(vaddr_t pc, vaddr_t dnpc) {
     difftest_step(pc, dnpc);
 }
 
-extern "C" void npc_pmem_read(long long raddr, long long *rdata) {
-  uint64_t addr = raddr;
+extern "C" void npc_pmem_read(int raddr, long long *rdata) {
+  uint32_t addr = raddr;
   //addr = addr & ~0x3u;
   if (addr == RTC_ADDR + 4) {
     //Log("DTRACE RTC_ADDR + 4");
@@ -246,9 +246,9 @@ extern "C" void npc_pmem_read(long long raddr, long long *rdata) {
   //printf("pmem_read: *rdata = 0x%08x\n", *rdata);
 }
 
-extern "C" void npc_pmem_write(long long waddr, long long wdata, char wmask) {
+extern "C" void npc_pmem_write(int waddr, long long wdata, char wmask) {
   //int addr = waddr & ~0x3u;
-  int addr = waddr;
+  uint32_t addr = waddr;
   //printf("pmem_write: waddr = 0x%08llx wdata = 0x%08llx wmask = 0x%x\n", waddr, wdata, 0xff & wmask);
   if (addr == SERIAL_PORT) {
     difftest_skip_ref();

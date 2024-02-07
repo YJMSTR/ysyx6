@@ -136,7 +136,7 @@ class Top extends Module {
   val dataHazard = WireInit(Bool(), 0.B)
   val stall = WireInit(Bool(), 0.B)
   InstFetcher.io.in.valid := PC =/= 0.U
-  InstFetcher.io.in.bits.pc := Mux(stall, InstFetcher.io.out.bits.pc, PC)
+  InstFetcher.io.in.bits.pc := Mux(stall, InstFetcher.io.out.bits.pc(31, 0), PC(31, 0))
   InstFetcher.io.out.ready := IDRegen
   when (stall) {
     PC := PC
@@ -294,11 +294,13 @@ class Top extends Module {
   val rdata7 = NPC_Mem.io.out.bits.rdata(7)
   val rdata15 = NPC_Mem.io.out.bits.rdata(15)
   val rdata31 = NPC_Mem.io.out.bits.rdata(31)
+  val alureslow = Wire(UInt(32.W))
+  alureslow := LSReg.alures(31, 0)
   when (LSReg.valid) {
     NPC_Mem.io.in.valid := LSReg.memvalid
     NPC_Mem.io.in.bits.wen := LSReg.memwen
-    NPC_Mem.io.in.bits.raddr := LSReg.alures
-    NPC_Mem.io.in.bits.waddr := LSReg.alures
+    NPC_Mem.io.in.bits.raddr := alureslow
+    NPC_Mem.io.in.bits.waddr := alureslow
     NPC_Mem.io.in.bits.wdata := LSReg.rs2v
     NPC_Mem.io.in.bits.wmask := LSReg.memwmask
     when (WBRegen) {

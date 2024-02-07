@@ -1,10 +1,10 @@
 module DPIC_IFU(valid, pc, inst);
   input valid;
-  input [63:0] pc;
+  input [31:0] pc;
   output reg [31:0] inst;
   //input clk;
   import "DPI-C" function void npc_pmem_read(
-    input longint raddr, output longint rdata);
+    input int raddr, output longint rdata);
 
   reg [63:0] fulldata;
   always @(*) begin

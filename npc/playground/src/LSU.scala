@@ -5,8 +5,8 @@ import Configs._
 
 class LSUIn extends Bundle {
   val wen = Bool()
-  val raddr = UInt(XLEN.W)
-  val waddr = UInt(XLEN.W)
+  val raddr = UInt(32.W)
+  val waddr = UInt(32.W)
   val wdata = UInt(XLEN.W)
   val wmask = UInt(XLEN.W)
 }
