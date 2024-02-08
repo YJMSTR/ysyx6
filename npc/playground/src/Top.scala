@@ -53,7 +53,7 @@ class WBRegBundle extends Bundle {
   val inst = UInt(32.W)
   val pc = UInt(XLEN.W)
   val alures = UInt(XLEN.W)
-  val sextrdata = UInt(XLEN.W)
+  //val sextrdata = UInt(XLEN.W)
   val rden = Bool()
   val rd = UInt(RIDXLEN.W)
   val memvalid = Bool()
@@ -118,7 +118,7 @@ class Top extends Module {
       _.pc        -> 0.U,
       _.memvalid  -> 0.B,
       _.alures    -> 0.U,
-      _.sextrdata -> 0.U,
+      //_.sextrdata -> 0.U,
       _.rden      -> 0.B,
       _.rd        -> 0.U
     )
@@ -295,6 +295,8 @@ class Top extends Module {
   val rdata15 = NPC_Mem.io.out.bits.rdata(15)
   val rdata31 = NPC_Mem.io.out.bits.rdata(31)
   val alureslow = Wire(UInt(32.W))
+  val sextrdata = WireInit(0.U(XLEN.W))
+  val memsextreg = RegNext(LSReg.memsext)
   alureslow := LSReg.alures(31, 0)
   when (LSReg.valid) {
     NPC_Mem.io.in.valid := LSReg.memvalid
@@ -303,20 +305,22 @@ class Top extends Module {
     NPC_Mem.io.in.bits.waddr := alureslow
     NPC_Mem.io.in.bits.wdata := LSReg.rs2v
     NPC_Mem.io.in.bits.wmask := LSReg.memwmask
+    
+    sextrdata := MuxLookup(memsextreg, NPC_Mem.io.out.bits.rdata)(Seq(
+      MEM_NSEXT_8 ->  Cat(Fill(XLEN-8, 0.U), NPC_Mem.io.out.bits.rdata(7, 0)),
+      MEM_NSEXT_16->  Cat(Fill(XLEN-16, 0.U), NPC_Mem.io.out.bits.rdata(15, 0)),
+      MEM_NSEXT_32->  Cat(Fill(XLEN-32, 0.U), NPC_Mem.io.out.bits.rdata(31, 0)),
+      MEM_SEXT_8  ->  Cat(Fill(XLEN-8, rdata7), NPC_Mem.io.out.bits.rdata(7, 0)),
+      MEM_SEXT_16 ->  Cat(Fill(XLEN-16, rdata15), NPC_Mem.io.out.bits.rdata(15, 0)),
+      MEM_SEXT_32 ->  Cat(Fill(XLEN-32, rdata31), NPC_Mem.io.out.bits.rdata(31, 0)),
+    ))
     when (WBRegen) {
       WBReg.inst := LSReg.inst
       WBReg.pc := LSReg.pc
       WBReg.memvalid := LSReg.memvalid
       WBReg.valid := LSReg.valid
       WBReg.alures := LSReg.alures
-      WBReg.sextrdata := MuxLookup(LSReg.memsext, NPC_Mem.io.out.bits.rdata)(Seq(
-        MEM_NSEXT_8 ->  Cat(Fill(XLEN-8, 0.U), NPC_Mem.io.out.bits.rdata(7, 0)),
-        MEM_NSEXT_16->  Cat(Fill(XLEN-16, 0.U), NPC_Mem.io.out.bits.rdata(15, 0)),
-        MEM_NSEXT_32->  Cat(Fill(XLEN-32, 0.U), NPC_Mem.io.out.bits.rdata(31, 0)),
-        MEM_SEXT_8  ->  Cat(Fill(XLEN-8, rdata7), NPC_Mem.io.out.bits.rdata(7, 0)),
-        MEM_SEXT_16 ->  Cat(Fill(XLEN-16, rdata15), NPC_Mem.io.out.bits.rdata(15, 0)),
-        MEM_SEXT_32 ->  Cat(Fill(XLEN-32, rdata31), NPC_Mem.io.out.bits.rdata(31, 0)),
-      ))
+      
       WBReg.rden := LSReg.rden
       WBReg.rd := LSReg.rd
     } .otherwise {
@@ -325,7 +329,7 @@ class Top extends Module {
       WBReg.pc := WBReg.pc
       WBReg.memvalid := WBReg.memvalid
       WBReg.alures := WBReg.alures
-      WBReg.sextrdata := WBReg.sextrdata
+      //WBReg.sextrdata := WBReg.sextrdata
       WBReg.rden := WBReg.rden
       WBReg.rd := WBReg.rd
     }
@@ -341,7 +345,7 @@ class Top extends Module {
     WBReg.pc := 0.U
     WBReg.memvalid := 0.B
     WBReg.alures := 0.U
-    WBReg.sextrdata := 0.U
+    //WBReg.sextrdata := 0.U
     WBReg.rden := 0.B
     WBReg.rd := 0.U
   }
@@ -353,11 +357,14 @@ class Top extends Module {
   val wbrdsextrdata = Wire(UInt(XLEN.W))
   val wbrdalures = Wire(UInt(XLEN.W))
 
+  
+  
   when (WBReg.valid) {
     wbrd := WBReg.rd
     wbrden := WBReg.rden
     wbrdmemvalid := WBReg.memvalid
-    wbrdsextrdata := WBReg.sextrdata
+    // sextrdata 直通
+    wbrdsextrdata := sextrdata
     wbrdalures := WBReg.alures
     io.inst := WBReg.inst
     io.pc := WBReg.pc

@@ -29,9 +29,9 @@ class LSU extends Module {
   dpic_mem.io.wdata := io.in.bits.wdata
   dpic_mem.io.wmask := io.in.bits.wmask
   dpic_mem.io.clk := clock
-  io.out.valid := 1.B
-  // 手动模拟 1 周期的 SRAM 延迟
-  // io.out.bits.rdata := RegNext(dpic_mem.rdata)
-  io.out.bits.rdata := dpic_mem.io.rdata
+  io.out.valid := RegNext(io.in.valid, 0.B)
+  // 手动模拟 1 周期的 SRAM 延迟，仅读取有延迟
+  io.out.bits.rdata := RegNext(dpic_mem.io.rdata, 0.U)
+  //io.out.bits.rdata := dpic_mem.io.rdata
 }
 

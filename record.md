@@ -411,7 +411,7 @@ NEMU 中的程序开始：RESET_VECTOR 处的第一条指令
 
 #### 优美地退出
 
-> 为了测试大家是否已经理解框架代码, 我们给大家设置一个练习: 如果在运行NEMU之后直接键入`q`退出, 你会发现终端输出了一些错误信息. 请分析这个错误信息是什么原因造成的, 然后尝试在NEMU中修复它.
+> 为了测试大家是否已经理解框架代码, 我们给大家设置一个练习: 如果在运行NEMU之后直接键入 `q`退出, 你会发现终端输出了一些错误信息. 请分析这个错误信息是什么原因造成的, 然后尝试在NEMU中修复它.
 
 错误信息如下：
 
@@ -441,8 +441,6 @@ make: *** [/home/yjmstr/ysyx-workbench/nemu/scripts/native.mk:38: run] Error 1
 
 free_wp  的参数改成 int，只删除指定编号的监视点，没有释放空间。
 
-
-
 #### 温故而知新
 
 static 的作用是
@@ -471,8 +469,6 @@ https://nju-projectn.github.io/i386-manual/s02_05.htm
 4:jmp 2
 ```
 
-
-
 (0,x,x)->(1,0,x)->(2,0,0)->(3,0,0)->(4,0,1)->(5,1,1)->(6,1,2)->(7,3,2)->...(201, 4950, 99)->(202, 4950, 100)->(203, 5050, 100)->(203, 5050, 101)
 
 ##### 理解基础设施
@@ -496,7 +492,7 @@ count:
 	@find . -name "*.h" -or -name "*.c" |xargs wc -l
 ```
 
-pa0 23775 
+pa0 23775
 
 pa1 24197
 
@@ -521,7 +517,6 @@ pa1 24197
 1. YEMU 上执行的加法程序的状态机
 
    (0, x, x)->(1, x, M[y])->(2, M[y], M[y])->(3, M[y], M[x])->(4, M[y]+M[x], M[x])
-
 2. 通过 RTFSC 理解 YEMU 如何执行一条指令
 
    通过 exec_once 函数，先从 M[pc] 处取出指令，然后进行译码，根据译码结果执行对应的操作，然后更新 pc。
@@ -553,11 +548,11 @@ include $(AM_HOME)/Makefile
 
 ```
 
-第一行`NAME	:= am` 用`:=`运算符避免了多次展开，但也因此必须提前声明。
+第一行 `NAME	:= am` 用 `:=`运算符避免了多次展开，但也因此必须提前声明。
 
-第二行声明一个 SRCS 变量， 值为`src/$(AM_SRCS)` 
+第二行声明一个 SRCS 变量， 值为 `src/$(AM_SRCS)`
 
-第三行通过`+=`运算符给 INC_PATH变量追加一个值，为am/src的绝对路径。
+第三行通过 `+=`运算符给 INC_PATH变量追加一个值，为am/src的绝对路径。
 
 最后一行导入上一级目录的Makefile，这个Makefile比较有含金量，可以通过make html获得一个html版本以便阅读，各个步骤在html里都有说明
 
@@ -589,7 +584,7 @@ mtrace 略
 
 https://blog.csdn.net/helowken2/article/details/113782851
 
->  elf 的符号包括一个 Symbol Table，其中包含一组 Symbol。这些 Symbol 在程序中要么表示定义，要么表示引用，它们的作用是在编译和链接的过程中进行定位和重定位。
+> elf 的符号包括一个 Symbol Table，其中包含一组 Symbol。这些 Symbol 在程序中要么表示定义，要么表示引用，它们的作用是在编译和链接的过程中进行定位和重定位。
 
 https://blog.csdn.net/helowken2/article/details/113792555
 
@@ -604,7 +599,7 @@ https://blog.csdn.net/helowken2/article/details/113792555
 > Local Symbol 并不是指局部变量
 >
 > 1. .symtab 不会包含任何局部变量。
-> 2. 局部变量是运行期间在 Stack 上进行分配 
+> 2. 局部变量是运行期间在 Stack 上进行分配
 > 3. static 变量不会在 Stack 上进行分配，而是在编译期间，由编译器在 ".data" 或 ".bss"  Section 上分配空间，然后在 ".symtab" 段中创建 Symbol，这些 Symbol 名字都是唯一的。
 
 NR_DATA 宏会在预处理阶段被展开
@@ -677,7 +672,7 @@ hd 的输出中 helloworld 位置如下
 00002000  01 00 02 00 68 65 6c 6c  6f 20 77 6f 72 6c 64 00  |....hello world.|
 ```
 
-2000 对应的是 rodata，而不是字符串表 
+2000 对应的是 rodata，而不是字符串表
 
 #### 实现 ftrace
 
@@ -967,18 +962,16 @@ https://www.gnu.org/software/make/manual/html_node/Running.html
 > - `0`
 >
 >   The exit status is zero if `make` is successful.
->
 > - `2`
 >
 >   The exit status is two if `make` encounters any errors. It will print messages describing the particular errors.
->
 > - `1`
 >
 >   The exit status is one if you use the ‘-q’ flag and `make` determines that some target is not already up to date. See [Instead of Executing Recipes](https://www.gnu.org/software/make/manual/html_node/Instead-of-Execution.html).
 
 #### 这是如何实现的
 
-> 框架代码编译到`native`的时候默认链接到glibc, 我们需要把这些库函数的调用链接到我们编写的klib来进行测试. 我们可以通过在`abstract-machine/klib/include/klib.h` 中通过定义宏`__NATIVE_USE_KLIB__`来把库函数链接到klib. 如果不定义这个宏, 库函数将会链接到glibc, 可以作为正确的参考实现来进行对比.
+> 框架代码编译到 `native`的时候默认链接到glibc, 我们需要把这些库函数的调用链接到我们编写的klib来进行测试. 我们可以通过在 `abstract-machine/klib/include/klib.h` 中通过定义宏 `__NATIVE_USE_KLIB__`来把库函数链接到klib. 如果不定义这个宏, 库函数将会链接到glibc, 可以作为正确的参考实现来进行对比.
 
 klib 文件的代码中会判断是否定义了这个宏，并用 `#if` 把 klib 的实现代码包起来。
 
@@ -1002,13 +995,13 @@ klib 的 build 目录下包含生成的静态库文件 `xxx.a`，
 
 待填坑
 
-> RISC-V作为一个RISC架构, 通常是不支持不对齐访存的, 在Spike中执行一条地址不对齐的访存指令将会抛出异常, 让PC跳转到`0`. 但NEMU为了简化, 没有实现这样的功能, 因此如果让NEMU和Spike同时执行这样的指令, DiffTest将会报错. 不过这很可能是你的软件实现(例如klib)有问题, 请检查并修改相关代码.
+> RISC-V作为一个RISC架构, 通常是不支持不对齐访存的, 在Spike中执行一条地址不对齐的访存指令将会抛出异常, 让PC跳转到 `0`. 但NEMU为了简化, 没有实现这样的功能, 因此如果让NEMU和Spike同时执行这样的指令, DiffTest将会报错. 不过这很可能是你的软件实现(例如klib)有问题, 请检查并修改相关代码.
 
 2024.01.10：
 
 感觉这段话有语病阿，看不懂“不过”这个词的上下文到底有没有关系
 
-开启 difftest spike，为 NEMU 增加对齐访存之后跑 unalign 的测例会在`80000078:	00544783          	lbu	a5,5(s0)` 处 abort，并且此时 s0 为 `s0: 80000134`
+开启 difftest spike，为 NEMU 增加对齐访存之后跑 unalign 的测例会在 `80000078:	00544783          	lbu	a5,5(s0)` 处 abort，并且此时 s0 为 `s0: 80000134`
 
 #### 一键回归测试
 
@@ -1016,15 +1009,15 @@ klib 的 build 目录下包含生成的静态库文件 `xxx.a`，
 
 ### 输入输出
 
-####  运行Hello World
+#### 运行Hello World
 
 关了trace，直接运行就可以看见Hello, AbstractMachine!
 
 需要注意：
 
->  设备和DiffTest
+> 设备和DiffTest
 >
-> 在状态机视角下, 执行一条输入指令会让状态机的状态转移变得不唯一, 新状态取决于设备的状态. 由于NEMU中设备的行为是我们自定义的, 与REF中的标准设备的行为不完全一样 (例如NEMU中的串口总是就绪的, 但QEMU中的串口也许并不是这样), 这导致**在NEMU中执行输入指令的结果会和REF有所不同**. 为了使得DiffTest可以正常工作, 框架代码在访问设备的过程中调用了`difftest_skip_ref()`函数 (见`nemu/include/device/map.h`中定义的`find_mapid_by_addr()`函数)来跳过与REF的检查.
+> 在状态机视角下, 执行一条输入指令会让状态机的状态转移变得不唯一, 新状态取决于设备的状态. 由于NEMU中设备的行为是我们自定义的, 与REF中的标准设备的行为不完全一样 (例如NEMU中的串口总是就绪的, 但QEMU中的串口也许并不是这样), 这导致**在NEMU中执行输入指令的结果会和REF有所不同**. 为了使得DiffTest可以正常工作, 框架代码在访问设备的过程中调用了 `difftest_skip_ref()`函数 (见 `nemu/include/device/map.h`中定义的 `find_mapid_by_addr()`函数)来跳过与REF的检查.
 
 #### 实现 printf
 
@@ -1051,7 +1044,7 @@ buf 开的 1024，
 
 此外，讲义中提到不要在 native 链接到 klib 的时候运行 IOE 相关的测试，因此我们还需要将 native 链接到 glibc
 
-> 我们可以通过在`abstract-machine/klib/include/klib.h` 中通过定义宏`__NATIVE_USE_KLIB__`来把库函数链接到klib. 如果不定义这个宏, 库函数将会链接到glibc
+> 我们可以通过在 `abstract-machine/klib/include/klib.h` 中通过定义宏 `__NATIVE_USE_KLIB__`来把库函数链接到klib. 如果不定义这个宏, 库函数将会链接到glibc
 
 #### 实现 IOE
 
@@ -1088,7 +1081,7 @@ uptime->us = (uint64_t)inl(RTC_ADDR) + (((uint64_t)inl(RTC_ADDR+4)) << 32ull);
 coremark 得分：
 
 > CoreMark PASS       416 Marks
->                 vs. 100000 Marks (i7-7700K @ 4.20GHz)
+> vs. 100000 Marks (i7-7700K @ 4.20GHz)
 
 #### RTFSC 了解一切细节
 
@@ -1119,7 +1112,7 @@ static inline uint32_t inl(uintptr_t addr) { return *(volatile uint32_t *)addr; 
 
 开启 ftrace，先读低32位在读高32位运行dhrystone 能够正常运行且没有报错？？？
 
-ftrace 显示的调用过程是 
+ftrace 显示的调用过程是
 
 ```c
 #6: call: ioe_read at 80000cc8
@@ -1154,7 +1147,7 @@ Dhrystone PASS         16 Marks
                    vs. 100000 Marks (i7-7700K @ 4.20GHz)
 ```
 
-第四期时 dhrystone 能跑到 130 分. 
+第四期时 dhrystone 能跑到 130 分.
 
 换成 native 跑的得分是正常的 125842 分，复用第四期代码跑仍然只有25分。
 
@@ -1192,7 +1185,7 @@ nemu/src/device/vga.c 在 NEMU 层面定义了显示器的大小。vgactl 的高
 
 还有一个用于同步的 sync，对应 SYNC_ADDR=VGACTL_ADDR+4 处的 MMIO，即 vgactl_port_base[1]
 
-####  实现IOE(4)
+#### 实现IOE(4)
 
 修改 fbdraw，把 pixels 中的东西画到 framebuffer 上，在 (x,y) 处画一个 wxh 的矩形
 
@@ -1221,7 +1214,7 @@ main 函数中有一个主循环不断检测按下的键，调用 io_read 读取
 
 编译与链接：
 
-> 在`nemu/include/cpu/ifetch.h`中, 你会看到由`static inline`开头定义的`inst_fetch()`函数. 分别尝试去掉`static`, 去掉`inline`或去掉两者, 然后重新进行编译, 你可能会看到发生错误. 请分别解释为什么这些错误会发生/不发生? 你有办法证明你的想法吗?
+> 在 `nemu/include/cpu/ifetch.h`中, 你会看到由 `static inline`开头定义的 `inst_fetch()`函数. 分别尝试去掉 `static`, 去掉 `inline`或去掉两者, 然后重新进行编译, 你可能会看到发生错误. 请分别解释为什么这些错误会发生/不发生? 你有办法证明你的想法吗?
 
 去掉 static 没有报错，去掉 inline 也没有报错，去掉二者则会报错：
 
@@ -1235,15 +1228,15 @@ static 关键字可以使函数变为静态函数，仅声明该函数的文件�
 
 去掉 static 不会报错，可能是因为编译器将其内联了。去掉 inline 不报错是因为引用该头文件的 c 文件都创建了该函数的 static 副本，static 允许不同文件中的同名函数。
 
-> 在`nemu/include/common.h`中添加一行`volatile static int dummy;` 然后重新编译NEMU. 请问重新编译后的NEMU含有多少个`dummy`变量的实体? 你是如何得到这个结果的?
+> 在 `nemu/include/common.h`中添加一行 `volatile static int dummy;` 然后重新编译NEMU. 请问重新编译后的NEMU含有多少个 `dummy`变量的实体? 你是如何得到这个结果的?
 
 `nm build/riscv32-nemu-interpreter | grep dummy` ，34 个。nm 可以从对象文件中读取符号
 
-> 添加上题中的代码后, 再在`nemu/include/debug.h`中添加一行`volatile static int dummy;` 然后重新编译NEMU. 请问此时的NEMU含有多少个`dummy`变量的实体? 与上题中`dummy`变量实体数目进行比较, 并解释本题的结果.
+> 添加上题中的代码后, 再在 `nemu/include/debug.h`中添加一行 `volatile static int dummy;` 然后重新编译NEMU. 请问此时的NEMU含有多少个 `dummy`变量的实体? 与上题中 `dummy`变量实体数目进行比较, 并解释本题的结果.
 
 还是 34 个。去掉 debug.h 中添加的代码并把 common.h 中的 volatile 去掉，则会报错 定义了未使用的变量。y
 
-> 修改添加的代码, 为两处`dummy`变量进行初始化:`volatile static int dummy = 0;` 然后重新编译NEMU. 你发现了什么问题? 为什么之前没有出现这样的问题? (回答完本题后可以删除添加的代码.)
+> 修改添加的代码, 为两处 `dummy`变量进行初始化:`volatile static int dummy = 0;` 然后重新编译NEMU. 你发现了什么问题? 为什么之前没有出现这样的问题? (回答完本题后可以删除添加的代码.)
 
 此时会报错 `error: redefinition of ‘dummy’` 。STFW，C 语言的 static 变量在编译时初始化，C++ 的 static 变量在运行时初始化，如果在头文件中定义 static 变量，其会在所有包括该头文件的源文件中都进行一次初始化。如果仅在 common.h 中进行初始化则不会报错。这涉及到 C 语言的链接决议规则：
 
@@ -1257,11 +1250,11 @@ static 关键字可以使函数变为静态函数，仅声明该函数的文件�
 
 > **了解Makefile**
 >
-> 请描述你在`am-kernels/kernels/hello/`目录下敲入`make ARCH=$ISA-nemu` 后, `make`程序如何组织.c和.h文件, 最终生成可执行文件`am-kernels/kernels/hello/build/hello-$ISA-nemu.elf`. (这个问题包括两个方面:`Makefile`的工作方式和编译链接的过程.) 关于`Makefile`工作方式的提示:
+> 请描述你在 `am-kernels/kernels/hello/`目录下敲入 `make ARCH=$ISA-nemu` 后, `make`程序如何组织.c和.h文件, 最终生成可执行文件 `am-kernels/kernels/hello/build/hello-$ISA-nemu.elf`. (这个问题包括两个方面:`Makefile`的工作方式和编译链接的过程.) 关于 `Makefile`工作方式的提示:
 >
 > - `Makefile`中使用了变量, 包含文件等特性
 > - `Makefile`运用并重写了一些implicit rules
-> - 在`man make`中搜索`-n`选项, 也许会对你有帮助
+> - 在 `man make`中搜索 `-n`选项, 也许会对你有帮助
 > - RTFM
 
 hello 文件夹中的 makefile 包含了 AM_HOME 目录下的 makefile，后者定义了 `INC_PATH += $(WORK_DIR)/include $(addsuffix /include/, $(addprefix $(AM_HOME)/, $(LIBS)))`，编译器在编译时将会在 INC_PATH 下寻找头文件，包括 am 和 klib 的头文件（由 LIBS 指定）。
@@ -1272,9 +1265,9 @@ hello 文件夹中的 makefile 包含了 AM_HOME 目录下的 makefile，后者�
 
 第三点，在 man 中可以通过 `/` 进行查找，`/` 后面可以跟正则表达式。查找到 -n 选项为：
 
->  -n, --just-print, --dry-run, --recon
->             Print the commands that would be executed, but do not execute them
->             (except in certain circumstances).
+> -n, --just-print, --dry-run, --recon
+> Print the commands that would be executed, but do not execute them
+> (except in certain circumstances).
 
 可以用来看变量展开以后的命令
 
@@ -1301,7 +1294,6 @@ riscv64-linux-gnu-objcopy -S --set-section-flags .bss=alloc,contents -O binary /
 am 和 klib 作为静态库被链接进最终的文件
 
 编译出的 elf 文件通过 objdump -d 去掉符号表之类的得到 bin 文件，并输出到 txt 中
-
 
 ## 最简单的处理器
 
@@ -1386,7 +1378,7 @@ dummy 会在 addr = 0x8000002c 处无限循环，这是因为 npc 的 halt 函�
 
 先看看 nemu 是怎么实现的，nemu/src/cpu/cpu-exec.c 中会在 NEMU_END 和 NEMU_ABORT 时检查 halt_ret 是否为 0，若不为 0 即 HIT BAD TRAP
 
-nemu 的 trm.c 中通过 NEMU_TRAP 
+nemu 的 trm.c 中通过 NEMU_TRAP
 
 ```c
 asm volatile("mv a0, %0; ebreak" : :"r"(code))
@@ -1431,7 +1423,7 @@ asm volatile("mv a0, %0; ebreak" : :"r"(code))
 > void difftest_init();
 > ```
 >
-> 其中寄存器状态`dut`要求寄存器的成员按照某种顺序排列, 若未按要求顺序排列, `difftest_regcpy()`的行为是未定义的(这样就把锅甩给你们了^_^). REF需要实现这些API, DUT会使用这些API来进行DiffTest. 在这里, DUT和REF分别是NEMU和其它模拟器.
+> 其中寄存器状态 `dut`要求寄存器的成员按照某种顺序排列, 若未按要求顺序排列, `difftest_regcpy()`的行为是未定义的(这样就把锅甩给你们了^_^). REF需要实现这些API, DUT会使用这些API来进行DiffTest. 在这里, DUT和REF分别是NEMU和其它模拟器.
 
 在实现了相关 API 之后修改 NEMU 的 menuconfig，重新编译时报错：` src/cpu/cpu-exec.c:33:13: error: ‘CONFIG_ITRACE_RINGBUFFER_SIZE’ undeclared here (not in a function)`，此时注意到 menuconfig 中相关的配置选项都消失了。涉及到的代码是iringbuffer 的结构体定义，在定义的两头加上 ifdef CONFIG_ITRACE 即可。
 
@@ -1555,7 +1547,7 @@ FILE = example.txt
 FILE_WITHOUT_SUFFIX = $(patsubst %.txt,%,$(FILE))
 ```
 
-那么修改之后的语句是 
+那么修改之后的语句是
 
 ```makefile
 BINNAME = $(patsubst %-$(ARCH), %, $(IMAGE_NAME))
@@ -1611,11 +1603,9 @@ make[1]: *** [/home/yjmstr/ysyx-workbench/abstract-machine/scripts/platform/npc.
 ==64032== 
 ```
 
-
-
 #### 用 yosys-sta 综合
 
-样例包含一个 sdc 文件和 verilog 文件，STFW 得知 SDC 文件为设计约束文件，我的 npc 目前没有 sdc 文件， 
+样例包含一个 sdc 文件和 verilog 文件，STFW 得知 SDC 文件为设计约束文件，我的 npc 目前没有 sdc 文件，
 
 ### 设备和输入输出
 
@@ -1663,7 +1653,7 @@ sp: 8009cfe8
 
 修复以后 crc32、hello-str、unalign 等测例爆了 bad trap，但把 NEMU 和 NPC 都改成支持非对齐访存以后就可以通过测试了。并且 am-test 中的 hello test 也正常了。但 rtc-test 不太正常，时间非常快。检查以后发现是没有计算 boot_time，加入之后就正常了。
 
-运行字符版超级玛丽：一堆字符，fps 为 0, 完全不能玩，跑的时候还有申必报错`ROM 'mario' not found, using default ROM 'mario'`，启动以后 129 s 才能出现依稀可辨的界面。
+运行字符版超级玛丽：一堆字符，fps 为 0, 完全不能玩，跑的时候还有申必报错 `ROM 'mario' not found, using default ROM 'mario'`，启动以后 129 s 才能出现依稀可辨的界面。
 
 #### 修改 NEMU ，使其支持设备 difftest
 
@@ -1843,7 +1833,7 @@ val fe_reg = RegInit(
 
 RV 中的访存指令地址总是在 rs2v，addr 总是在指令中（可以直接走 ALU->res 这个数据通路）
 
-每一级级间寄存器都加 inst 和 pc，方便 debug，目前不考虑冒险，所有的 en 信号都初始化为 1 且保持为 1 
+每一级级间寄存器都加 inst 和 pc，方便 debug，目前不考虑冒险，所有的 en 信号都初始化为 1 且保持为 1
 
 目前不考虑跳转和分支指令，因此 isdnpc 时钟为 0, pc 直接取 snpc 作为 nextpc
 
@@ -1890,7 +1880,7 @@ static uint8_t mem[MEM_SIZE] = {
 
 在流水线中，若上一级级间寄存器的 valid 信号为 0，则本级按照空指令对各个信号进行处理，并将下一级的 valid 信号也置为 0。
 
-假如要阻塞执行级，即将 IDReg，EXReg 的写使能 en 设为 0，LSReg 和 WBReg 的写使能设为 1。并将 LSReg 的 valid 置为 0，其它的 valid 设为上一级的输入。这样的话，译码阶段的输入和执行阶段的输入就会停住，而访存阶段和写回阶段仍会有新数据写入（当前位于访存阶段的指令及其之后的指令还会继续，而执行阶段及其之前的阶段就会停住） 
+假如要阻塞执行级，即将 IDReg，EXReg 的写使能 en 设为 0，LSReg 和 WBReg 的写使能设为 1。并将 LSReg 的 valid 置为 0，其它的 valid 设为上一级的输入。这样的话，译码阶段的输入和执行阶段的输入就会停住，而访存阶段和写回阶段仍会有新数据写入（当前位于访存阶段的指令及其之后的指令还会继续，而执行阶段及其之前的阶段就会停住）
 
 当执行级停止阻塞（对于顺序五级流水来说，即 WB 阶段完成了 RD 寄存器的写入），此时 IDReg，EXReg 的 en 重新设为 1，LSReg 的 valid 重新置为 1
 
@@ -2000,23 +1990,11 @@ bug：译码阶段计算 JALR 等跳转指令的地址的时候要访问 rs1、r
  }
 ```
 
-IDRegen 和 EXReg.valid 的结果是根据 stall 来修改的，此外 PC 和 InstFetcher 也受 stall 的影响。 
+IDRegen 和 EXReg.valid 的结果是根据 stall 来修改的，此外 PC 和 InstFetcher 也受 stall 的影响。
 
 todo：
 
 1. 检查当 valid 为 0 时，后续模块的时序元件是不是保持了当前的状态，但后续模块的组合元件怎么处理？
 2. valid & !ready 时，master 要暂存消息，避免丢失。master 在暂存信号时，master 输入端的 ready 信号又该是什么呢？
-3. 改位宽，现在我的地址位宽和数据位宽都是 64 位，但按照第五期讲义的话，地址位宽应该是 32，数据位宽是 64 才对。
-
-
-
-
-
-
-
-
-
-
-
-
-
+3. 改位宽，现在我的地址位宽和数据位宽都是 64 位，但按照第五期讲义的话，地址位宽应该是 32，数据位宽是 64 才对。(已经改成 32)
+4. 为访存部分加入 1 周期的读取延迟后，原先读取结果放入 LS/WBReg 改为直接放到一个 Wire 中，直通到 WB 阶段，这样一个周期之后的 WB 阶段正好能够得到上一个周期访存时对应的结果。
