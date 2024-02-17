@@ -17,13 +17,14 @@ class IFU extends Module {
     val out = Decoupled(new IFUOut)
   })
 
-  val dpic_ifu = Module(new DPIC_IFU)
-  dpic_ifu.io.valid := io.in.valid & Mux(io.in.bits.pc === 0.U, 0.B, 1.B)
-  dpic_ifu.io.pc := io.in.bits.pc
+  val fake_sram = Module(new FAKE_SRAM)
+  val axi4lite = Module(new AXI4LiteInterface)
+  axi4lite <> fake_sram.io.axi4lite
 
-  io.in.ready := reset.asBool =/= 1.B
-  io.out.bits.inst := RegNext(dpic_ifu.io.inst, 0.U)
-  io.out.valid := RegNext(io.in.valid, 0.B)
-  io.out.bits.pc := RegNext(dpic_ifu.io.pc, RESET_VECTOR.U)
+  val mem_state = RegInit(s_idle)
+  val mem_idle :: mem_
+
+  
+
 }
 
