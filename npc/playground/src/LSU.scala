@@ -32,6 +32,6 @@ class LSU extends Module {
   io.out.valid := RegNext(io.in.valid, 0.B)
   // 手动模拟 1 周期的 SRAM 延迟，仅读取有延迟
   io.out.bits.rdata := RegNext(dpic_mem.io.rdata, 0.U)
-  //io.out.bits.rdata := dpic_mem.io.rdata
+  // io.out.bits.rdata := 0.U
 }
 
