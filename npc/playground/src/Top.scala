@@ -136,21 +136,27 @@ class Top extends Module {
   val dataHazard = WireInit(Bool(), 0.B)
   val stall = WireInit(Bool(), 0.B)
   InstFetcher.io.in.valid := PC =/= 0.U
-  InstFetcher.io.in.bits.pc := Mux(stall, InstFetcher.io.out.bits.pc(31, 0), PC(31, 0))
   InstFetcher.io.out.ready := IDRegen
+  InstFetcher.io.in.bits.isdnpc := pcsel
   when (stall) {
     PC := PC
+    InstFetcher.io.in.bits.pc := InstFetcher.io.out.bits.pc(31, 0)
   }.elsewhen (pcsel) {
+    //todo:此处应该等待 IFU 的 ready 为真再赋值 dnpc
     PC := ifu_dnpc
+    InstFetcher.io.in.bits.pc := PC
   } .otherwise {
     // 如果没有指令，那么就不应该更新 PC
     PC := Mux(InstFetcher.io.in.ready, InstFetcher.io.in.bits.pc + 4.U, PC)
+    InstFetcher.io.in.bits.pc := PC
   }
-
+  // 如果上一条指令（即当前处于译码阶段的指令）是跳转指令，那么就不应该更新 IDReg，
+  // 而应该冲刷掉 IFU 里正在取指的指令
+  // ifu 应该加一个 isdnpc 信号，如果该信号为真，直接转移到返回指令的状态
   when (IDRegen) {
-    IDReg.inst := Mux(InstFetcher.io.out.valid, InstFetcher.io.out.bits.inst, IDReg.inst)
-    IDReg.pc := Mux(InstFetcher.io.out.valid, InstFetcher.io.out.bits.pc, IDReg.pc)
-    IDReg.valid := Mux(InstFetcher.io.out.valid, (pcsel =/= 1.B) & (RegNext(pcsel, 0.B) =/= 1.B), IDReg.valid)
+    IDReg.inst := Mux(InstFetcher.io.out.valid, InstFetcher.io.out.bits.inst, 0.U)
+    IDReg.pc := Mux(InstFetcher.io.out.valid, InstFetcher.io.out.bits.pc, 0.U) 
+    IDReg.valid := InstFetcher.io.out.valid
   } .otherwise {
     IDReg.inst := IDReg.inst
     IDReg.pc := IDReg.pc

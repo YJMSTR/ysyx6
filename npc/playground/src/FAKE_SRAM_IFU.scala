@@ -7,6 +7,7 @@ import Configs._
 class FAKE_SRAM_IFU(delay: UInt) extends Module {
   val io = IO(new Bundle{
     val axi4lite = new AXI4LiteInterface
+    val isdnpc = Input(Bool())
   })
 
   val ar_idle :: ar_read :: Nil = Enum(2)
@@ -46,6 +47,7 @@ class FAKE_SRAM_IFU(delay: UInt) extends Module {
   switch(ar_state) {
     is(ar_idle) {
       // idle 状态下 arready 为 1,等待读地址的 valid 信号
+      readData := 0.U
       when(io.axi4lite.arvalid) {
         //如果 ar channel 握手成功，就切换到 ar_read
         //并且从机将 araddr 存一下
@@ -67,10 +69,17 @@ class FAKE_SRAM_IFU(delay: UInt) extends Module {
         rvalidReg := true.B  //即将 rvalid = 1
         ar_state := ar_idle
         // 此时将 dpic_mem.io.valid = 1, 进行读取，并立刻读出数据
-        readData := dpic_ifu.io.inst // 在 ready 为 1 之前，valid 为真要求发送方保持数据直到 ready 为 1
+        readData := Mux(io.isdnpc, 0.U, dpic_ifu.io.inst) // 在 ready 为 1 之前，valid 为真要求发送方保持数据直到 ready 为 1
       }.otherwise{
         //还没取回数据，给延迟计数器加1
-        delayCounter := delayCounter + 1.U
+        when(io.isdnpc) {
+          rvalidReg := false.B
+          ar_state := ar_idle
+          readData := 0.U
+        }.otherwise {
+          delayCounter := delayCounter + 1.U
+          readData := 0.U
+        }
       }
     }
   }

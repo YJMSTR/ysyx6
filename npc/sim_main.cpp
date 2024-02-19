@@ -49,12 +49,14 @@ VTop* topp = new VTop{contextp};
 enum NPC_STATES npc_state;
 word_t npc_halt_pc;
 int npc_ret;
-bool difftest_is_enable = 0;
-bool is_batch_mode = 0;
+bool difftest_is_enable = 1;
+bool is_batch_mode = 1;
 bool is_itrace = 1;
 char logbuf[128];
 static uint64_t boot_time = 0;
 static uint64_t rtc_us = 0;
+static uint64_t nz_pc = 0;
+static uint64_t nz_npc = 0;
 
 // void nvboard_bind_all_pins(VTop *top);
 const char *regs[] = {
@@ -209,7 +211,8 @@ void difftest_step(vaddr_t pc, vaddr_t npc) {
 static void trace_and_difftest(vaddr_t pc, vaddr_t dnpc) {
   log_write("%s\n", logbuf);
   //printf("difftest pc == 0x%08x, dnpc == 0x%08x\n", pc, dnpc);
-  if (difftest_is_enable)
+  // 由于现在 npc 变成了多周期，应该将上一次非 0 的 pc 和 dnpc 值存起来用于比较
+  if (difftest_is_enable && pc != dnpc)
     difftest_step(pc, dnpc);
 }
 
@@ -291,6 +294,7 @@ static void single_cycle() {
   if (npc_state != NPC_RUN) return;
   char *p = logbuf;
   word_t pc = topp->io_pc;
+  if (pc != 0) nz_pc = pc;
 	contextp->timeInc(1);
   topp->clock = 0;
   topp->eval();
@@ -302,6 +306,7 @@ static void single_cycle() {
   topp->clock = 1;
   topp->eval();
   word_t npc = topp->io_pc;
+  if (npc != 0) nz_npc = npc;
   //printf("pc == 0x%08x, npc == 0x%08x\n", pc, npc);
 #ifdef VCD
   tfp->dump(contextp->time());
@@ -328,7 +333,7 @@ static void single_cycle() {
     for (int i = 0; i < 32; i++) {
       cpu.gpr[i] = Rread(i);
     }
-    trace_and_difftest(pc, npc);
+    trace_and_difftest(nz_pc, nz_npc);
   }
   //sleep(1);
 }
