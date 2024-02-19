@@ -52,11 +52,6 @@ class WBRegBundle extends Bundle {
   val valid = Bool()
   val inst = UInt(32.W)
   val pc = UInt(XLEN.W)
-  val alures = UInt(XLEN.W)
-  //val sextrdata = UInt(XLEN.W)
-  val rden = Bool()
-  val rd = UInt(RIDXLEN.W)
-  val memvalid = Bool()
 }
 
 class Top extends Module {
@@ -116,11 +111,6 @@ class Top extends Module {
       _.valid     -> 1.B,
       _.inst      -> 0.U,
       _.pc        -> 0.U,
-      _.memvalid  -> 0.B,
-      _.alures    -> 0.U,
-      //_.sextrdata -> 0.U,
-      _.rden      -> 0.B,
-      _.rd        -> 0.U
     )
   )
 
@@ -302,6 +292,7 @@ class Top extends Module {
   val rdata31 = NPC_Mem.io.out.bits.rdata(31)
   val alureslow = Wire(UInt(32.W))
   val sextrdata = WireInit(0.U(XLEN.W))
+  val lsalures = WireInit(0.U(XLEN.W))
   val memsextreg = RegNext(LSReg.memsext)
   alureslow := LSReg.alures(31, 0)
   when (LSReg.valid) {
@@ -320,24 +311,20 @@ class Top extends Module {
       MEM_SEXT_16 ->  Cat(Fill(XLEN-16, rdata15), NPC_Mem.io.out.bits.rdata(15, 0)),
       MEM_SEXT_32 ->  Cat(Fill(XLEN-32, rdata31), NPC_Mem.io.out.bits.rdata(31, 0)),
     ))
+    lsalures := LSReg.alures
+
+    when (LSReg.rden && LSReg.rd =/= 0.U) {
+      R(LSReg.rd) := Mux(LSReg.memvalid === 1.B, sextrdata, lsalures)
+    }    
+
     when (WBRegen) {
       WBReg.inst := LSReg.inst
       WBReg.pc := LSReg.pc
-      WBReg.memvalid := LSReg.memvalid
       WBReg.valid := LSReg.valid
-      WBReg.alures := LSReg.alures
-      
-      WBReg.rden := LSReg.rden
-      WBReg.rd := LSReg.rd
     } .otherwise {
       WBReg.valid := WBReg.valid
       WBReg.inst := WBReg.inst
       WBReg.pc := WBReg.pc
-      WBReg.memvalid := WBReg.memvalid
-      WBReg.alures := WBReg.alures
-      //WBReg.sextrdata := WBReg.sextrdata
-      WBReg.rden := WBReg.rden
-      WBReg.rd := WBReg.rd
     }
   } .otherwise {
     NPC_Mem.io.in.valid := 0.B
@@ -349,61 +336,27 @@ class Top extends Module {
     WBReg.inst := 0.U 
     WBReg.valid := 0.B
     WBReg.pc := 0.U
-    WBReg.memvalid := 0.B
-    WBReg.alures := 0.U
-    //WBReg.sextrdata := 0.U
-    WBReg.rden := 0.B
-    WBReg.rd := 0.U
   }
-
-  val rdv = Wire(UInt(XLEN.W))
-  val wbrd = Wire(UInt(RIDXLEN.W))
-  val wbrden = Wire(Bool())
-  val wbrdmemvalid = Wire(Bool())
-  val wbrdsextrdata = Wire(UInt(XLEN.W))
-  val wbrdalures = Wire(UInt(XLEN.W))
-
-  
   
   when (WBReg.valid) {
-    wbrd := WBReg.rd
-    wbrden := WBReg.rden
-    wbrdmemvalid := WBReg.memvalid
-    // sextrdata 直通
-    wbrdsextrdata := sextrdata
-    wbrdalures := WBReg.alures
     io.inst := WBReg.inst
     io.pc := WBReg.pc
   } .otherwise {
-    wbrd := 0.U
-    wbrden := 0.B
-    wbrdmemvalid := 0.B
-    wbrdsextrdata := 0.U
-    wbrdalures := 0.U
     io.inst := 0.U
     io.pc := 0.U
   }
 
-  rdv := Mux(wbrdmemvalid === 1.B, wbrdsextrdata, wbrdalures)
-  //printf("wbrdmemvalid: %d, wbrdsextrdata: %x, wbrdalures: %x, wbrden: %d, rdv: %x\n", wbrdmemvalid, wbrdsextrdata, wbrdalures, wbrden, rdv)
-  
-  //scoreboard(wbrd) := 0.B
-  when(wbrd =/= 0.U) {
-    R(wbrd) := Mux(wbrden === 0.B, R(wbrd), rdv)
-  } .otherwise {
-    R(wbrd) := 0.U
-  }
   val rs1ren = Decoder.io.rrs1 && Decoder.io.rs1 =/= 0.U && IDReg.valid
   val rs2ren = Decoder.io.rrs2 && Decoder.io.rs2 =/= 0.U && IDReg.valid
   val EX_RS1_Hazard = Decoder.io.rs1 === Mux(EXReg.valid, EXReg.rd, 0.U) && EXReg.rden
   val EX_RS2_Hazard = Decoder.io.rs2 === Mux(EXReg.valid, EXReg.rd, 0.U) && EXReg.rden
-  val WB_RS1_Hazard = Decoder.io.rs1 === Mux(WBReg.valid, WBReg.rd, 0.U) && WBReg.rden
-  val WB_RS2_Hazard = Decoder.io.rs2 === Mux(WBReg.valid, WBReg.rd, 0.U) && WBReg.rden
+  // val WB_RS1_Hazard = Decoder.io.rs1 === Mux(WBReg.valid, WBReg.rd, 0.U) && WBReg.rden
+  // val WB_RS2_Hazard = Decoder.io.rs2 === Mux(WBReg.valid, WBReg.rd, 0.U) && WBReg.rden
   val LS_RS1_Hazard = Decoder.io.rs1 === Mux(LSReg.valid, LSReg.rd, 0.U) && LSReg.rden
   val LS_RS2_Hazard = Decoder.io.rs2 === Mux(LSReg.valid, LSReg.rd, 0.U) && LSReg.rden
   dataHazard := MuxCase(0.U, Array (
-    (rs1ren && (EX_RS1_Hazard | LS_RS1_Hazard | WB_RS1_Hazard)) -> 1.B,
-    (rs2ren && (EX_RS2_Hazard | LS_RS2_Hazard | WB_RS2_Hazard)) -> 1.B,
+    (rs1ren && (EX_RS1_Hazard | LS_RS1_Hazard )) -> 1.B,
+    (rs2ren && (EX_RS2_Hazard | LS_RS2_Hazard )) -> 1.B,
   ))
   //printf("IDUpc=%x rs1ren: %d, rs2ren: %d, EX_RS1_Hazard: %d, EX_RS2_Hazard: %d, WB_RS1_Hazard: %d, WB_RS2_Hazard: %d, LS_RS1_Hazard: %d, LS_RS2_Hazard: %d\n", IDReg.pc, rs1ren, rs2ren, EX_RS1_Hazard, EX_RS2_Hazard, WB_RS1_Hazard, WB_RS2_Hazard, LS_RS1_Hazard, LS_RS2_Hazard)
   when (stall) {

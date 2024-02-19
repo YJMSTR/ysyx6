@@ -209,11 +209,14 @@ void difftest_step(vaddr_t pc, vaddr_t npc) {
 }
 
 static void trace_and_difftest(vaddr_t pc, vaddr_t dnpc) {
+  static vaddr_t last_pc = 0x00000000;
   log_write("%s\n", logbuf);
-  //printf("difftest pc == 0x%08x, dnpc == 0x%08x\n", pc, dnpc);
+  printf("difftest pc == 0x%08x, dnpc == 0x%08x\n", pc, dnpc);
   // 由于现在 npc 变成了多周期，应该将上一次非 0 的 pc 和 dnpc 值存起来用于比较
-  if (difftest_is_enable && pc != dnpc)
+  if (difftest_is_enable && pc != last_pc) {
     difftest_step(pc, dnpc);
+    last_pc = pc;
+  }
 }
 
 extern "C" void npc_pmem_read(int raddr, long long *rdata) {
@@ -307,7 +310,7 @@ static void single_cycle() {
   topp->eval();
   word_t npc = topp->io_pc;
   if (npc != 0) nz_npc = npc;
-  //printf("pc == 0x%08x, npc == 0x%08x\n", pc, npc);
+  printf("pc == 0x%08x, npc == 0x%08x\n", pc, npc);
 #ifdef VCD
   tfp->dump(contextp->time());
 #endif
