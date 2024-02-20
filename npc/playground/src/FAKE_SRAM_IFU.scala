@@ -7,10 +7,9 @@ import Configs._
 class FAKE_SRAM_IFU(delay: UInt) extends Module {
   val io = IO(new Bundle{
     val axi4lite = new AXI4LiteInterface
-    val isdnpc = Input(Bool())
   })
 
-  val ar_idle :: ar_read :: Nil = Enum(2)
+  val ar_idle :: ar_read :: ar_wait_ready :: Nil = Enum(3)
   val ar_state = RegInit(ar_idle)
 
   val delayCounter = RegInit(0.U(5.W))
@@ -41,8 +40,6 @@ class FAKE_SRAM_IFU(delay: UInt) extends Module {
   //从机 ar channel 的状态机
   //idle 等待主机发来 araddr
   //read 进行读取
-  //发回上游即将 rdata := readData
-  //但向readData寄存器赋值是有一个周期延迟的，是不是应该提前赋值？
   //同一个周期内对 reg 进行读写时，会先写再读
   switch(ar_state) {
     is(ar_idle) {
@@ -56,30 +53,24 @@ class FAKE_SRAM_IFU(delay: UInt) extends Module {
         readAddr := io.axi4lite.araddr
         delayCounter := 0.U
       }
-      when(io.axi4lite.rready) {
-        // 数据传输完成，将 rvalid 置为 false
-        rvalidReg := false.B
-      }
-      // arvalid 不为 1 就继续等，直到握手
     }
     is(ar_read) {
       // read 状态即存储器进行读取，直到取回数据
       // 进入这一状态说明已经接收到了 araddr
       when(delayDone) { // 模拟经过若干周期后取回了数据
         rvalidReg := true.B  //即将 rvalid = 1
-        ar_state := ar_idle
-        // 此时将 dpic_mem.io.valid = 1, 进行读取，并立刻读出数据
-        readData := Mux(io.isdnpc, 0.U, dpic_ifu.io.inst) // 在 ready 为 1 之前，valid 为真要求发送方保持数据直到 ready 为 1
+        ar_state := ar_wait_ready
+        // 此时将 dpic_ifu.io.valid = 1, 进行读取，并立刻读出数据
+        readData := dpic_ifu.io.inst // 在 ready 为 1 之前，valid 为真要求发送方保持数据直到 ready 为 1
       }.otherwise{
-        //还没取回数据，给延迟计数器加1
-        when(io.isdnpc) {
-          rvalidReg := false.B
-          ar_state := ar_idle
-          readData := 0.U
-        }.otherwise {
-          delayCounter := delayCounter + 1.U
-          readData := 0.U
-        }
+        delayCounter := delayCounter + 1.U
+        readData := 0.U
+      }
+    }
+    is(ar_wait_ready) {
+      when(io.axi4lite.rready) {
+        ar_state := ar_idle
+        rvalidReg := false.B  //传输完成，重新将 rvalid 置为低
       }
     }
   }

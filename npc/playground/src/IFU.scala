@@ -21,7 +21,7 @@ class IFU extends Module {
   val fake_sram = Module(new FAKE_SRAM_IFU(1.U))
   val readAddr = RegInit(0.U(32.W))
 
-  fake_sram.io.isdnpc := io.in.bits.isdnpc
+  // fake_sram.io.isdnpc := io.in.bits.isdnpc
 
   //ar
   fake_sram.io.axi4lite.arvalid := io.in.valid
