@@ -45,8 +45,8 @@ class FAKE_SRAM_IFU(delay: UInt) extends Module {
     is(ar_idle) {
       // idle 状态下 arready 为 1,等待读地址的 valid 信号
       readData := 0.U
-      when(io.axi4lite.arvalid) {
-        //如果 ar channel 握手成功，就切换到 ar_read
+      when(io.axi4lite.arvalid & io.axi4lite.arready) {
+        //从设备在使能RVALID前必须等待ARVALID和ARREADY信号都使能。
         //并且从机将 araddr 存一下
         //模拟任意周期延迟的存储器，这里用延迟计数器来实现，此处清零
         ar_state := ar_read

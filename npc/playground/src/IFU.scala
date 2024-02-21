@@ -3,7 +3,7 @@ import chisel3.util._
 import Configs._
 
 class IFUIn extends Bundle {
-  val pc = UInt(XLEN.W)
+  //val pc = UInt(XLEN.W)
   val isdnpc = Bool()
   val dnpc = UInt(XLEN.W)
 }
@@ -19,61 +19,79 @@ class IFU extends Module {
     val out = Decoupled(new IFUOut)
   })
 
+  val PC = RegInit(RESET_VECTOR.U(XLEN.W))
   val fake_sram = Module(new FAKE_SRAM_IFU(1.U))
   val readAddr = RegInit(0.U(32.W))
+  val outAddr = RegInit(0.U(32.W))
+  val readData = RegInit(0.U(32.W))
 
   // fake_sram.io.isdnpc := io.in.bits.isdnpc
 
-  val s_idle :: s_wait_dnpc :: Nil = Enum(2)
+  val s_idle :: s_wait_arready :: s_wait_rvalid :: Nil = Enum(3)
   val state = RegInit(s_idle)
-  val dnpc_reg = RegInit(0.U(XLEN.W))
-  val valid_reg = RegInit(1.B)
 
-  //借助状态机模型处理有跳转指令时的 io.out.valid，此时需要将 out.valid 置为 0 来等待 IFU 取回 dnpc。
-  switch(state){
-    is(s_idle){
-      when(io.in.valid){
-        when(io.in.bits.isdnpc){
-          state := s_wait_dnpc
-          dnpc_reg := io.in.bits.dnpc
-          valid_reg := 0.B
-        }
-      }
-    }
-    is(s_wait_dnpc){
-      when(fake_sram.io.axi4lite.rvalid){
-        when(fake_sram.io.axi4lite.araddr === dnpc_reg) {
-          valid_reg := 1.B  // 取回了跳转指令，此时 valid 才能为 1
-          state := s_idle
-        }.otherwise{
-          valid_reg := 0.B
-        }
-      }
-    }
-  }
+  fake_sram.io.axi4lite.arvalid := state === s_wait_arready
+  fake_sram.io.axi4lite.rready := state === s_wait_rvalid & io.out.ready
+  fake_sram.io.axi4lite.araddr := readAddr
 
-  //ar
-  fake_sram.io.axi4lite.arvalid := io.in.valid
-  fake_sram.io.axi4lite.araddr := io.in.bits.pc
-  io.in.ready := fake_sram.io.axi4lite.arready
-  //r
-  fake_sram.io.axi4lite.rready := io.out.ready
-  io.out.valid := fake_sram.io.axi4lite.rvalid & valid_reg
-  io.out.bits.pc := readAddr
-  io.out.bits.inst := fake_sram.io.axi4lite.rdata
-  //aw
-  fake_sram.io.axi4lite.awvalid := 0.B
   fake_sram.io.axi4lite.awaddr := 0.U
-  //w
-  fake_sram.io.axi4lite.wvalid := 0.B
+  fake_sram.io.axi4lite.awvalid := 0.B
   fake_sram.io.axi4lite.wdata := 0.U
   fake_sram.io.axi4lite.wstrb := 0.U
-  //b
-  fake_sram.io.axi4lite.bready := 0.B
-  when(fake_sram.io.axi4lite.arvalid && fake_sram.io.axi4lite.arready) {
-    readAddr := fake_sram.io.axi4lite.araddr
-    // 如果 ar channel 握手成功，存一下地址等到输出的时候用
+  fake_sram.io.axi4lite.wvalid := 0.U
+  fake_sram.io.axi4lite.bready := 0.U
+  
+  val dnpc_idle :: dnpc_wait :: Nil = Enum(2)
+  val dnpc_state = RegInit(dnpc_idle)
+  val dnpc_reg = RegInit(0.U(XLEN.W))
+  val dnpc_valid_reg = RegInit(1.B)
+
+  //注意：当 arvalid 为 1 后， araddr 就不能变了，直到握手成功，因此需要用寄存器存一下
+  switch(state){
+    is(s_idle){
+      // arvalid := state === s_wait_arready
+      readAddr := PC
+      state := s_wait_arready
+    }
+    is(s_wait_arready){ // 此时 arvalid 为 true
+      when(fake_sram.io.axi4lite.arready){
+        // 读地址通道握手成功，等待 rvalid.
+        PC := Mux(dnpc_valid_reg, PC + 4.U, dnpc_reg)
+        // 切换到 wait_rvalid 状态，即将 rready 置为 1 
+        state := s_wait_rvalid
+      }
+    }
+    is(s_wait_rvalid){  // 保持数据，等待输出
+      when(fake_sram.io.axi4lite.rvalid){
+        state := s_idle
+        readData := fake_sram.io.axi4lite.rdata
+        outAddr := readAddr
+      }
+    }
   }
 
-}
 
+
+  switch(dnpc_state) {
+    is(dnpc_idle){
+      when(io.in.fire) {
+        when(io.in.bits.isdnpc) {
+          dnpc_state := dnpc_wait
+          dnpc_reg := io.in.bits.dnpc
+          dnpc_valid_reg := 0.B
+        }
+      }
+    }
+    is(dnpc_wait){  // 如果当前取出的指令对应的 pc 等于 dnpc reg，那么切换回 dnpc_idle 
+      when(outAddr === dnpc_reg) {
+        dnpc_state := dnpc_idle
+        dnpc_valid_reg := 1.B
+      }
+    }
+  }
+
+  io.out.valid := state === s_idle & dnpc_valid_reg
+  io.out.bits.pc := readAddr
+  io.out.bits.inst := readData
+  io.in.ready := fake_sram.io.axi4lite.arready
+}

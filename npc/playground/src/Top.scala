@@ -125,22 +125,26 @@ class Top extends Module {
   val R = Mem(32, UInt(XLEN.W))
   val dataHazard = WireInit(Bool(), 0.B)
   val stall = WireInit(Bool(), 0.B)
-  InstFetcher.io.in.valid := PC =/= 0.U
+
+  //in 现在仅包含 isdnpc 和 dnpc，其 valid 的逻辑也要修改
+  InstFetcher.io.in.valid := IDReg.valid
   InstFetcher.io.out.ready := IDRegen
   InstFetcher.io.in.bits.isdnpc := pcsel
   InstFetcher.io.in.bits.dnpc := Mux(pcsel, ifu_dnpc, 0.U)
-  when (stall) {
-    PC := PC
-    InstFetcher.io.in.bits.pc := InstFetcher.io.out.bits.pc(31, 0)
-  }.elsewhen (pcsel) {
-    //todo:此处应该等待 IFU 的 ready 为真再赋值 dnpc
-    PC := ifu_dnpc
-    InstFetcher.io.in.bits.pc := PC
-  } .otherwise {
-    // 如果没有指令，那么就不应该更新 PC
-    PC := Mux(InstFetcher.io.in.ready, InstFetcher.io.in.bits.pc + 4.U, PC)
-    InstFetcher.io.in.bits.pc := PC
-  }
+  // InstFetcher.io.in.bits.pc := PC
+  // when (stall) {
+  //   PC := PC
+  //   InstFetcher.io.in.bits.pc := InstFetcher.io.out.bits.pc(31, 0)
+  // }.elsewhen (pcsel) {
+  //   //todo:此处应该等待 IFU 的 ready 为真再赋值 dnpc
+  //   PC := ifu_dnpc
+  //   InstFetcher.io.in.bits.pc := PC
+  // } .otherwise {
+  //   // 如果没有指令，那么就不应该更新 PC
+  //   PC := Mux(InstFetcher.io.out.fire, InstFetcher.io.out.bits.pc + 4.U, PC)
+  //   InstFetcher.io.in.bits.pc := PC
+  // }
+
   // 如果上一条指令（即当前处于译码阶段的指令）是跳转指令，那么就不应该更新 IDReg，
   // 而应该冲刷掉 IFU 里正在取指的指令
   // 
@@ -294,7 +298,11 @@ class Top extends Module {
   val alureslow = Wire(UInt(32.W))
   val sextrdata = WireInit(0.U(XLEN.W))
   val lsalures = WireInit(0.U(XLEN.W))
-  val memsextreg = RegNext(LSReg.memsext)
+  // reg for debug
+  val sextrdatareg = RegInit(0.U(XLEN.W))
+  sextrdatareg := sextrdata
+  printf("sextrdata = %x, sextrdatareg = %x\n", sextrdata, sextrdatareg)
+
   alureslow := LSReg.alures(31, 0)
   when (LSReg.valid) {
     NPC_Mem.io.in.valid := LSReg.memvalid
@@ -304,7 +312,7 @@ class Top extends Module {
     NPC_Mem.io.in.bits.wdata := LSReg.rs2v
     NPC_Mem.io.in.bits.wmask := LSReg.memwmask
     
-    sextrdata := MuxLookup(memsextreg, NPC_Mem.io.out.bits.rdata)(Seq(
+    sextrdata := MuxLookup(LSReg.memsext, NPC_Mem.io.out.bits.rdata)(Seq(
       MEM_NSEXT_8 ->  Cat(Fill(XLEN-8, 0.U), NPC_Mem.io.out.bits.rdata(7, 0)),
       MEM_NSEXT_16->  Cat(Fill(XLEN-16, 0.U), NPC_Mem.io.out.bits.rdata(15, 0)),
       MEM_NSEXT_32->  Cat(Fill(XLEN-32, 0.U), NPC_Mem.io.out.bits.rdata(31, 0)),
