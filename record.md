@@ -1962,6 +1962,13 @@ bug：译码阶段计算 JALR 等跳转指令的地址的时候要访问 rs1、r
 
 这么改完以后可以运行 bad apple
 
+2024.2.22: 在使用状态机模型改写 IFU 后，sim_main.cpp 中获取 PC 的逻辑也需要修改：
+
+- IFU 上升沿时取出下一个 pc，在 clk = 0 时是当前指令对应的 pc，clk = 1 时已经取出了下一条指令对应的 pc。
+- 当 single_cycle 函数中第二次执行 eval() 时，clk 进入高电位，此时 pc 已经变为了 dnpc，并且寄存器的状态已经发生了变化。因此，difftest 应该在此之前比较 ref 和 dut 的状态
+- sim_main 中需要 pc 和 nextpc，而 nextpc 被读出时其对应的指令不应该执行完毕，即应该在写回之前读出 nextpc。因此可以添加一个 npc ，从 LSReg 读出。此外 PC 从 WBReg 读出
+- 改完之后发现，IFU 会在不该跳转的时候（例如 add 测例第一次执行 80000018 处的 beqz 指令）跳转，导致 difftest 报错并 hit bad trap。注意到 Decoder 的 isdnpc 信号仅仅用于标识当前指令是否为跳转指令，并不一定真的会跳转，至于是否跳转是需要再额外判断的。原先的逻辑是：如果不跳转，就把跳转地址设置为 snpc。但 snpc 的计算随着每次重构都要重写一遍，不如把 isdnpc 信号改一下，改成真要跳转时才为真
+
 #### LSU 重构
 
 给 Mem 加上一周期延迟后，如果当前指令要访问 Mem，需要等待 mem 取回数据之后再进入下一个阶段，此时需要阻塞访存级（？），即把 LSU 的 valid 信号置为 0，ready 信号也置为 0，

@@ -4,6 +4,8 @@ import Configs._
 
 class IFUIn extends Bundle {
   //val pc = UInt(XLEN.W)
+  // 注意：Decoder 传出的 isdnpc 信号仅仅用于标识当前指令是否为跳转指令，并不一定真的会跳转。 
+  // 改一下 IFU 传入的 isdnpc，改成真的要跳转时才能为真
   val isdnpc = Bool()
   val dnpc = UInt(XLEN.W)
 }

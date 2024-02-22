@@ -58,6 +58,7 @@ class Top extends Module {
   val io = IO(new Bundle {
     val inst = Output(UInt(32.W))
     val pc = Output(UInt(XLEN.W))
+    val npc = Output(UInt(XLEN.W))
   })
   
   val IDReg = RegInit(
@@ -119,14 +120,13 @@ class Top extends Module {
   val LSRegen = WireInit(Bool(), 1.B)
   val WBRegen = WireInit(Bool(), 1.B)
   val ifu_dnpc = Wire(UInt(XLEN.W))
-  val pcsel = Wire(Bool())
+  val pcsel = WireInit(Bool(), 0.B)
   val InstFetcher = Module(new IFU)
   val PC = RegInit(UInt(XLEN.W), RESET_VECTOR.U)
   val R = Mem(32, UInt(XLEN.W))
   val dataHazard = WireInit(Bool(), 0.B)
   val stall = WireInit(Bool(), 0.B)
 
-  //in 现在仅包含 isdnpc 和 dnpc，其 valid 的逻辑也要修改
   InstFetcher.io.in.valid := IDReg.valid
   InstFetcher.io.out.ready := IDRegen
   InstFetcher.io.in.bits.isdnpc := pcsel
@@ -174,7 +174,7 @@ class Top extends Module {
   val rs2v = Rread(Decoder.io.rs2)
   val rs1v = Rread(Decoder.io.rs1)
   
-  val snpc = Decoder.io.pc + 4.U
+  // val snpc = Decoder.io.pc + 4.U
   
   when(EXRegen) {
     EXReg.inst := Mux(IDReg.valid, IDReg.inst, 0.U)
@@ -228,7 +228,7 @@ class Top extends Module {
     Decoder.io.inst := 0.U
     Decoder.io.pc := 0.U
   }
-  pcsel := Decoder.io.isdnpc
+  // pcsel := Decoder.io.isdnpc
 
   val ALU = Module(new EXU)
   when(EXReg.valid) {
@@ -301,7 +301,7 @@ class Top extends Module {
   // reg for debug
   val sextrdatareg = RegInit(0.U(XLEN.W))
   sextrdatareg := sextrdata
-  printf("sextrdata = %x, sextrdatareg = %x\n", sextrdata, sextrdatareg)
+  //printf("sextrdata = %x, sextrdatareg = %x\n", sextrdata, sextrdatareg)
 
   alureslow := LSReg.alures(31, 0)
   when (LSReg.valid) {
@@ -347,10 +347,19 @@ class Top extends Module {
     WBReg.pc := 0.U
   }
   
+  when(LSReg.valid) {
+    io.npc := LSReg.pc
+  } .otherwise {
+    io.npc := 0.U
+  }
   when (WBReg.valid) {
     io.inst := WBReg.inst
     io.pc := WBReg.pc
   } .otherwise {
+  // when (LSReg.valid) {
+  //   io.inst := LSReg.inst
+  //   io.pc := LSReg.pc
+  // }.otherwise {
     io.inst := 0.U
     io.pc := 0.U
   }
@@ -376,15 +385,25 @@ class Top extends Module {
     IDRegen := 1.B
     EXReg.valid := 1.B
     ifu_dnpc := MuxCase(0.U, Array(
-    (Decoder.io.inst === JALR)  -> (rs1v + Decoder.io.imm),
-    (Decoder.io.inst === JAL)   -> (pc_plus_imm),
-    (Decoder.io.inst === BEQ)   -> Mux(rs1v === rs2v, pc_plus_imm, snpc),
-    (Decoder.io.inst === BNE)   -> Mux(rs1v === rs2v, snpc, pc_plus_imm),
-    (Decoder.io.inst === BGE)   -> Mux(rs1v.asSInt >= rs2v.asSInt, pc_plus_imm, snpc),
-    (Decoder.io.inst === BGEU)  -> Mux(rs1v >= rs2v, pc_plus_imm, snpc),
-    (Decoder.io.inst === BLT)   -> Mux(rs1v.asSInt < rs2v.asSInt, pc_plus_imm, snpc),
-    (Decoder.io.inst === BLTU)  -> Mux(rs1v < rs2v, pc_plus_imm, snpc)
-  ))
+      (Decoder.io.inst === JALR)  -> (rs1v + Decoder.io.imm),
+      (Decoder.io.inst === JAL)   -> (pc_plus_imm),
+      (Decoder.io.inst === BEQ)   -> pc_plus_imm,
+      (Decoder.io.inst === BNE)   -> pc_plus_imm,
+      (Decoder.io.inst === BGE)   -> pc_plus_imm,
+      (Decoder.io.inst === BGEU)  -> pc_plus_imm,
+      (Decoder.io.inst === BLT)   -> pc_plus_imm,
+      (Decoder.io.inst === BLTU)  -> pc_plus_imm,
+    ))
+    pcsel := MuxCase(0.U, Array(
+      (Decoder.io.inst === JALR)  -> 1.B,
+      (Decoder.io.inst === JAL)   -> 1.B,
+      (Decoder.io.inst === BEQ)   -> (rs1v === rs2v),
+      (Decoder.io.inst === BNE)   -> (rs1v =/= rs2v),
+      (Decoder.io.inst === BGE)   -> (rs1v.asSInt >= rs2v.asSInt),
+      (Decoder.io.inst === BGEU)  -> (rs1v >= rs2v),
+      (Decoder.io.inst === BLT)   -> (rs1v.asSInt < rs2v.asSInt),
+      (Decoder.io.inst === BLTU)  -> (rs1v < rs2v),
+    ))
   }
   
   val Ebreak = Module(new DPIC_EBREAK)

@@ -49,7 +49,7 @@ VTop* topp = new VTop{contextp};
 enum NPC_STATES npc_state;
 word_t npc_halt_pc;
 int npc_ret;
-bool difftest_is_enable = 0;
+bool difftest_is_enable = 1;
 bool is_batch_mode = 0;
 bool is_itrace = 1;
 char logbuf[128];
@@ -98,6 +98,7 @@ static uint8_t mem[MEM_SIZE] = {
   0x13, 0x06, 0x10, 0x3a, //li a2, 929
   0x93, 0x05, 0x10, 0x3a, //li a1, 929
   0x73, 0x00, 0x10, 0x00  //ebreak
+  // 如果改了这里，记得把默认的 img_size 也改了
 }; 
 
 void (*ref_difftest_memcpy)(paddr_t addr, void *buf, size_t n, bool direction) = NULL;
@@ -168,6 +169,11 @@ bool isa_difftest_checkregs(CPU_state *ref_r, vaddr_t pc) {
       ret = false;
     }
   }
+  if (!ret) {
+    for (int i = 0; i < 32; i++) {
+      printf("%s: ref = %lx cur = %lx\n", regs[i], ref_r->gpr[i], cpu.gpr[i]);
+   }
+  }
   return ret;
 }
 
@@ -203,17 +209,25 @@ void difftest_step(vaddr_t pc, vaddr_t npc) {
   }
   if (pc >= 0x80000000) {
     ref_difftest_exec(1);
+    printf("ref pc = %08x done\n", pc);
     ref_difftest_regcpy(&ref_r, DIFFTEST_TO_DUT);
     checkregs(&ref_r, pc);
   }
 }
 
 static void trace_and_difftest(vaddr_t pc, vaddr_t dnpc) {
-  static vaddr_t last_pc = 0x00000000;
   log_write("%s\n", logbuf);
-  printf("difftest pc == 0x%08x, dnpc == 0x%08x\n", pc, dnpc);
-  // 由于现在 npc 变成了多周期，应该将上一次非 0 的 pc 和 dnpc 值存起来用于比较
-  if (difftest_is_enable && pc != last_pc) {
+  static vaddr_t last_pc = 0;
+  //printf("difftest pc == 0x%08x, dnpc == 0x%08x\n", pc, dnpc);
+  /**
+   * 如何判断 dut 的一条指令已经执行完成了，并让 ref 也执行该指令？
+   * 可以比较 WBReg 中读出的 非 0 pc 值进行判断
+   * 如果 WBReg 中读出的非 0 pc 值不同于上一次读出的非 0 pc 值
+   * 说明又有一条新指令完成了写回操作
+   * 此时应该让 ref 执行相应的操作
+   */
+  if (difftest_is_enable && pc != last_pc) {  // 传入参数时已经保证非 0
+    printf("difftest_step pc = %x dnpc = %x lastpc= %x\n", pc, dnpc, last_pc);
     difftest_step(pc, dnpc);
     last_pc = pc;
   }
@@ -293,24 +307,27 @@ word_t npc_vaddr_read(word_t addr, int len) {
 
 
 extern "C" void disassemble(char *str, int size, uint64_t pc, uint8_t *code, int nbyte);
+
 static void single_cycle() {
   if (npc_state != NPC_RUN) return;
   char *p = logbuf;
-  word_t pc = topp->io_pc;
-  if (pc != 0) nz_pc = pc;
+  
 	contextp->timeInc(1);
   topp->clock = 0;
   topp->eval();
-  word_t instval = topp->io_inst;
 #ifdef VCD
   tfp->dump(contextp->time());
 #endif
   contextp->timeInc(1);
   topp->clock = 1;
   topp->eval();
-  word_t npc = topp->io_pc;
+  word_t instval = topp->io_inst;
+  word_t pc = topp->io_pc;
+  word_t npc = topp->io_npc;
+  //static word_t nz_pc = 0, nz_npc = 0;
+  if (pc != 0) nz_pc = pc;
   if (npc != 0) nz_npc = npc;
-  printf("pc == 0x%08x, npc == 0x%08x\n", pc, npc);
+
 #ifdef VCD
   tfp->dump(contextp->time());
 #endif
@@ -372,7 +389,8 @@ static char *img_file = NULL;
 long load_img() {
   if (img_file == NULL) {
     Log("no image found, use default img");
-    return 0;
+    //记得改了 默认 img 之后，默认的 img size 也要改
+    return 32;
   }
   memset(mem, 0, sizeof(mem));
 	printf("img == %s\n", img_file);
