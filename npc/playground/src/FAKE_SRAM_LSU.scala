@@ -9,6 +9,9 @@ class FAKE_SRAM_LSU(delay: UInt) extends Module {
     val axi4lite = new AXI4LiteInterface
   })
 
+  val r_idle :: r_read :: r_wait_ready :: Nil = Enum(3)
+  val r_state = RegInit(r_idle)
+
   val delayCounter = RegInit(0.U(5.W))
   val delayDone = delayCounter === delay 
 
@@ -18,9 +21,6 @@ class FAKE_SRAM_LSU(delay: UInt) extends Module {
   val readAddr = RegInit(0.U(32.W))
   val rvalidReg = RegInit(false.B)
 
-  val r_idle :: r_read :: r_wait_ready :: Nil = Enum(3)
-  val r_state = RegInit(r_idle)
-
   io.axi4lite.rvalid := rvalidReg
   io.axi4lite.rdata := readData
   io.axi4lite.rresp := 0.U
@@ -28,13 +28,9 @@ class FAKE_SRAM_LSU(delay: UInt) extends Module {
   io.axi4lite.arready := r_state === r_idle
 
   dpic_mem.io.raddr := readAddr
-  dpic_mem.io.valid := delayDone & r_state === r_read
-
-  // 把写地址，写数据和写回复的握手信号置为 0，因为目前还没有实现写操作
-  io.axi4lite.awready := false.B
-  io.axi4lite.wready := false.B
-  io.axi4lite.bvalid := false.B
-  io.axi4lite.bresp := 0.U
+ 
+  
+  dpic_mem.io.clk := clock
 
   switch(r_state) {
     is(r_idle) {
@@ -63,7 +59,50 @@ class FAKE_SRAM_LSU(delay: UInt) extends Module {
     }
   }
   
+  val w_idle :: w_wait_wvalid :: w_write :: w_wait_bready :: Nil = Enum(4)
+  // 写也有延迟
+  val w_state = RegInit(w_idle)
 
+  val writeAddr = RegInit(0.U(32.W))
+  val writeData = RegInit(0.U(XLEN.W))
+  val writeStrb = RegInit(0.U((XLEN/8).W))
+  val bresp = RegInit(0.U(2.W)) //default 0b00 === OKAY
+
+  io.axi4lite.awready := w_state === w_idle
+  io.axi4lite.wready := w_state === w_wait_wvalid
+  io.axi4lite.bvalid := w_state === w_wait_bready
+  io.axi4lite.bresp := bresp
+
+  dpic_mem.io.wen := w_state === w_write
+  dpic_mem.io.waddr := writeAddr
+  dpic_mem.io.wdata := writeData
+  dpic_mem.io.wmask := writeStrb
+
+  switch(w_state) {
+    is(w_idle) {  // awready = 1
+      when(io.axi4lite.awvalid) {
+        w_state := w_wait_wvalid
+        writeAddr := io.axi4lite.awaddr
+      }
+    }
+    is(w_wait_wvalid) { // w_ready = 1
+      when(io.axi4lite.wvalid) {
+        writeData := io.axi4lite.wdata
+        writeStrb := io.axi4lite.wstrb
+        w_state := w_write
+      }
+    }
+    is(w_write) {
+      w_state := w_wait_bready
+    }
+    is(w_wait_bready) { // b_valid = 1
+      when(io.axi4lite.bready) {
+        w_state := w_idle
+      }
+    }
+  }
+
+   dpic_mem.io.valid := (delayDone & r_state === r_read) || (w_state === w_write)
 
 }
 

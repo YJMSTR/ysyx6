@@ -17,7 +17,6 @@ class FAKE_SRAM_IFU(delay: UInt) extends Module {
 
   val dpic_ifu = Module(new DPIC_IFU)
 
-
   val readData = RegInit(0.U(XLEN.W))
   val readAddr = RegInit(0.U(32.W))
   val rvalidReg = RegInit(false.B)

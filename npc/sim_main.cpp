@@ -169,11 +169,11 @@ bool isa_difftest_checkregs(CPU_state *ref_r, vaddr_t pc) {
       ret = false;
     }
   }
-  if (!ret) {
-    for (int i = 0; i < 32; i++) {
-      printf("%s: ref = %lx cur = %lx\n", regs[i], ref_r->gpr[i], cpu.gpr[i]);
-   }
-  }
+  // if (!ret) {
+  //   for (int i = 0; i < 32; i++) {
+  //     printf("%s: ref = %lx cur = %lx\n", regs[i], ref_r->gpr[i], cpu.gpr[i]);
+  //  }
+  // }
   return ret;
 }
 

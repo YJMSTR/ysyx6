@@ -78,7 +78,7 @@ class IFU extends Module {
     is(dnpc_idle){
       when(io.in.fire) {
         when(io.in.bits.isdnpc) {
-          dnpc_state := dnpc_wait
+          dnpc_state := dnpc_wait                
           dnpc_reg := io.in.bits.dnpc
           dnpc_valid_reg := 0.B
         }
