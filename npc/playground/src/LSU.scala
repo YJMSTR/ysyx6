@@ -73,7 +73,7 @@ class LSU extends Module {
 
   switch(r_state){
     is(r_idle){
-      when(io.in.bits.memvalid && !io.in.bits.wen){
+      when(io.in.valid && io.in.bits.memvalid && !io.in.bits.wen){
         readAddr := io.in.bits.raddr
         r_state := r_wait_arready
       }
@@ -110,7 +110,7 @@ class LSU extends Module {
   switch(w_state) {
     is(w_idle) {
       // 由于目前没有同时进行读写，当 valid = 1 且 wen = 1 为写
-      when(io.in.bits.memvalid && io.in.bits.wen) {
+      when(io.in.valid && io.in.bits.memvalid && io.in.bits.wen) {
         writeAddr := io.in.bits.waddr
         writeData := io.in.bits.wdata 
         writeStrb := io.in.bits.wmask
@@ -139,7 +139,7 @@ class LSU extends Module {
   
   //printf("io.out.valid = %d\n", io.out.valid)
   io.out.bits.rdata := readData
-  io.in.ready := fake_sram.io.axi4lite.arready & fake_sram.io.axi4lite.awready
+  io.in.ready := r_state === r_idle && w_state === w_idle
   
   val instreg = RegInit(0.U(32.W))
   val pcreg = RegInit(0.U(XLEN.W))
@@ -168,7 +168,7 @@ class LSU extends Module {
   //   memsextreg := io.in.bits.wsext
   // }
 
-  when (r_state === r_idle && w_state === w_idle) {
+  when (io.in.valid && r_state === r_idle && w_state === w_idle) {
     instreg := io.in.bits.inst 
     pcreg := io.in.bits.pc
     memvalidreg := io.in.bits.memvalid

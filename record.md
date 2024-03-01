@@ -2109,4 +2109,12 @@ IFU 的 in.valid 应该是什么？直接改成全 1
 val MEM_RS1_Hazard = Decoder.io.rs1 === Mux(NPC_Mem.io.out.valid, NPC_Mem.io.out.bits.rd, 0.U) && NPC_Mem.io.out.bits.rden
 ```
 
-此时 Decoder.io.rs1 和 NPC_Mem.rd 相等，但 NPC_Mem.io.out.valid 为 0，导致没有标出发生了冒险。应该修改 NPC_Mem 相关冒险的检测方式，当一条指令进入 MEM 一直到离开 MEM 的期间都需要对其进行检测
+此时 Decoder.io.rs1 和 NPC_Mem.rd 相等，但 NPC_Mem.io.out.valid 为 0，导致没有标出发生了冒险。应该修改 NPC_Mem 相关冒险的检测方式，当一条指令进入 MEM 一直到离开 MEM 的期间都需要对其进行检测。RTFSC 后发现不需要判断 io.out.valid，
+
+现在能过这个测例了，但是 movsx 报错，addi 指令似乎读不到寄存器的原值。检查发现 80000060 执行完成之后漏掉了中间的 80000064 auipc 指令，直接跳到了 80000068，导致这个错。发现是 LSU 的 io.in.ready 变成 0 了，并且在 io.in.ready 为 0 时发送方没有保存数据导致的。当 valid = 1，ready = 0 时，发送方应该保持 valid = 1 并保持要发送的数据不变，直到 ready = 1。但是代码里 `LSRegen := NPC_Mem.io.in.ready | !LSReg.valid`，当 NPC_Mem.io.in.ready 为 0 时 LSReg.valid 并不为 0，此时 LSRegen 为 0 正在保持数据才对，但是 LSReg.pc 还是发生了变化。发现是给 LSReg 在 EXReg.valid = 0 时赋值时漏判了 LSRegen
+
+修正以后再次运行 movsx 会在 80000070 处指令访存时越界，`80000070:	1af72423          	sw	a5,424(a4) # 80000214 <b>` 在 log 里报的是访问了 000001a8 的地址，（0x1a8 就是 424），由于这条指令还没进入提交阶段，它和它的上一条指令都还没有 difftest. 看 cpu-tests 的反汇编结果发现上一条指令是 `auipc a4, 0`，和这一条访存指令存在数据冒险，从结果来看上一条指令还没写回，当前这条指令就进行访存了，导致了这个错误。 
+
+查看波形发现并不是因为数据冒险了没有停顿，而是 8000006c 处的指令根本没有执行，直接被跳过了。原因：当 IDRegen 为 false 时，IFU 没有保持数据。修改后此处运行正确了，但随后 80000080 处的指令也被跳过了，查看波形发现是访存部分丢指令了。检查后发现 LSReg 没有在 valid = 1 且下游 ready = 0 时保存数据，即使 LSRegen = 0 传进去的 pc 还是变成 0 了，发现是 MEM 的 in.ready  设置有问题，改成 io.in.ready := r_state === r_idle && w_state === w_idle 后又把 8000008c 丢了
+
+此处 commit

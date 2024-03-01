@@ -275,6 +275,7 @@ class Top extends Module {
       LSReg.memsext := EXReg.memsext 
       LSReg.rden := EXReg.rden
       LSReg.rd := EXReg.rd
+      LSReg.alures := ALU.io.res
     }
   } .otherwise {
     ALU.io.inst := 0.U 
@@ -286,35 +287,25 @@ class Top extends Module {
     ALU.io.rs1v := 0.U
     ALU.io.rs2v := 0.U
     ALU.io.isword := 0.B
-    LSReg.inst := 0.U
-    LSReg.pc := 0.U
-    LSReg.rs2v := 0.U
-    LSReg.memvalid := 0.B
-    LSReg.memwen := 0.B
-    LSReg.memwmask := 0.U
-    LSReg.memsext := MEM_SEXT_NONE
-    LSReg.rden := 0.B
-    LSReg.rd := 0.U
+    when (LSRegen) {
+      LSReg.inst := 0.U
+      LSReg.pc := 0.U
+      LSReg.rs2v := 0.U
+      LSReg.memvalid := 0.B
+      LSReg.memwen := 0.B
+      LSReg.memwmask := 0.U
+      LSReg.memsext := MEM_SEXT_NONE
+      LSReg.rden := 0.B
+      LSReg.rd := 0.U
+    }
   }
-  when (LSRegen) {
-    LSReg.alures := ALU.io.res
-  } .otherwise {
-    LSReg.alures := LSReg.alures
-  }
+
   
   val NPC_Mem = Module(new LSU)
   NPC_Mem.io.out.ready := WBRegen
 
-  // 当 NPC_Mem.io.in.ready 为 false，并且上游模块的 valid 为 true 时，
-  // 需要保持这些数据直到 NPC_Mem.io.in.ready 为 true
-  // 靠上游模块保持数据，还是靠级间寄存器保持数据？
-  // 如果不保持：当 Mem.io.in.ready 为 false，
-  // 即 mem 的 arready 为 false，
-  // 传入的读地址可能不会被接收（丢失了）
-  // 因为传入 LSReg 的读取指令只会持续一个周期
-  // IFU 没有上游模块，因此没有这个问题
+  // printf("LSRegen=%d LSReg.pc = %x\n", LSRegen, LSReg.pc)
   LSRegen := NPC_Mem.io.in.ready | !LSReg.valid
-  // 先不考虑丢失的问题，跑一下看看波形
 
   val rdata = WBReg.rdata
   val rdata7 = rdata(7)

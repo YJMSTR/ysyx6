@@ -52,8 +52,11 @@ class IFU extends Module {
   switch(state){
     is(s_idle){ // io.in.valid 恒为 1，因此此处不进行判断
       // arvalid := state === s_wait_arready
-      readAddr := PC
-      state := s_wait_arready
+      when (io.out.ready) {
+        // 如果成功输出了，再转移状态 + 接收输入。
+        readAddr := PC
+        state := s_wait_arready
+      }
     }
     is(s_wait_arready){ // 此时 arvalid 为 true
       when(fake_sram.io.axi4lite.arready){
