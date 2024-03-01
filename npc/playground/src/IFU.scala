@@ -74,7 +74,7 @@ class IFU extends Module {
   
 
   when(dnpc_valid) {
-    when (io.in.bits.isdnpc) {
+    when (io.in.bits.isdnpc & io.in.valid) {
       dnpc_valid := 0.B // 这个修改要延迟一个周期才会生效，但此时可能已经有指令被取出准备输出了
       // 可以给 io.out.valid 加一个条件，如果当前 in.isdnpc = 1,那么这个周期要把 valid 置为 0
       // 这样就解决了寄存器要延迟一个周期写入的问题

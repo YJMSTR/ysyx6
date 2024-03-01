@@ -2097,6 +2097,16 @@ IFU 的 in.valid 应该是什么？直接改成全 1
 
 2024.3.1
 
-将 rready 的条件改为 state === s_wait_rvalid 后，即去掉对 io.out.ready 的依赖后，解决了死锁问题，但是运行到 800002a8 处 difftest 报错。检查 log 和寄存器发现是 800002a4 处的 blt 指令本该跳转但是没有正确跳转导致的。检查后发现当 dnpc 输入到 IFU 后，IFU 要经过 1 个周期的延迟才能反应过来。
+将 rready 的条件改为 state === s_wait_rvalid 后，即去掉对 io.out.ready 的依赖后，解决了死锁问题，但是运行到 800002a8 处 difftest 报错。检查 log 和寄存器发现是 800002a4 处的 blt 指令本该跳转但是没有正确跳转导致的。检查后发现当 dnpc 输入到 IFU 后，IFU 要经过 1 个周期的延迟才能反应过来。解决方法是：isdnpc 也只持续一个周期，可以把 isdnpc 加入 out.valid 的判断条件中，若 isdnpc = 1 则无效。
 
-把 io.out.ready 加到 io.in.ready 的判断条件中，即现在 io.in.ready = io.out.ready & arready
+把 io.out.ready 加到 io.in.ready 的判断条件中，即现在 io.in.ready = io.out.ready & arready（但好像根本没用上 io.in.ready）
+
+能过 quicksort 等测例了，但是跑 hello-str 时发现不该跳转的指令也跳转了，检查发现当遇到数据冒险需要全局阻塞之前，dnpc 会被读入 ifu 并且判断 isdnpc 时用的是导致冒险的寄存器写回之前的旧值，从而导致了错误的跳转。解决方案是在 stall 时将 IFU 的 in.valid 拉低[没用]
+
+把每个流水线寄存器的波形拉出来看，发现当 NPC_Mem 里的 rd 等于 IDU 的 rs1 时本应 stall 但实际上没有 stall，
+
+```scala
+val MEM_RS1_Hazard = Decoder.io.rs1 === Mux(NPC_Mem.io.out.valid, NPC_Mem.io.out.bits.rd, 0.U) && NPC_Mem.io.out.bits.rden
+```
+
+此时 Decoder.io.rs1 和 NPC_Mem.rd 相等，但 NPC_Mem.io.out.valid 为 0，导致没有标出发生了冒险。应该修改 NPC_Mem 相关冒险的检测方式，当一条指令进入 MEM 一直到离开 MEM 的期间都需要对其进行检测

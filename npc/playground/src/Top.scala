@@ -154,7 +154,7 @@ class Top extends Module {
   val dataHazard = WireInit(Bool(), 0.B)
   val stall = WireInit(Bool(), 0.B)
 
-  InstFetcher.io.in.valid := 1.B  // ！
+ 
   InstFetcher.io.out.ready := IDRegen
   InstFetcher.io.in.bits.isdnpc := pcsel
   InstFetcher.io.in.bits.dnpc := Mux(pcsel, ifu_dnpc, 0.U)
@@ -431,8 +431,8 @@ class Top extends Module {
   val EX_RS2_Hazard = Decoder.io.rs2 === Mux(EXReg.valid, EXReg.rd, 0.U) && EXReg.rden
   val LS_RS1_Hazard = Decoder.io.rs1 === Mux(LSReg.valid, LSReg.rd, 0.U) && LSReg.rden
   val LS_RS2_Hazard = Decoder.io.rs2 === Mux(LSReg.valid, LSReg.rd, 0.U) && LSReg.rden
-  val MEM_RS1_Hazard = Decoder.io.rs1 === Mux(NPC_Mem.io.out.valid, NPC_Mem.io.out.bits.rd, 0.U) && NPC_Mem.io.out.bits.rden
-  val MEM_RS2_Hazard = Decoder.io.rs2 === Mux(NPC_Mem.io.out.valid, NPC_Mem.io.out.bits.rd, 0.U) && NPC_Mem.io.out.bits.rden
+  val MEM_RS1_Hazard = Decoder.io.rs1 === NPC_Mem.io.out.bits.rd && NPC_Mem.io.out.bits.rden
+  val MEM_RS2_Hazard = Decoder.io.rs2 === NPC_Mem.io.out.bits.rd && NPC_Mem.io.out.bits.rden
   val WB_RS1_Hazard = Decoder.io.rs1 === Mux(WBReg.valid, WBReg.rd, 0.U) && WBReg.rden
   val WB_RS2_Hazard = Decoder.io.rs2 === Mux(WBReg.valid, WBReg.rd, 0.U) && WBReg.rden
   dataHazard := MuxCase(0.U, Array (
@@ -441,10 +441,12 @@ class Top extends Module {
   ))
   //printf("IDUpc=%x rs1ren: %d, rs2ren: %d, EX_RS1_Hazard: %d, EX_RS2_Hazard: %d, WB_RS1_Hazard: %d, WB_RS2_Hazard: %d, LS_RS1_Hazard: %d, LS_RS2_Hazard: %d\n", IDReg.pc, rs1ren, rs2ren, EX_RS1_Hazard, EX_RS2_Hazard, WB_RS1_Hazard, WB_RS2_Hazard, LS_RS1_Hazard, LS_RS2_Hazard)
   when (stall) {
+    InstFetcher.io.in.valid := 0.B
     IDRegen := 0.B
     EXReg.valid := 0.B
     ifu_dnpc := "x114514".U
   } .otherwise { 
+    InstFetcher.io.in.valid := 1.B
     IDRegen := EXRegen | !IDReg.valid
     EXReg.valid := 1.B
     ifu_dnpc := MuxCase(0.U, Array(
