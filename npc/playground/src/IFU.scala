@@ -25,7 +25,7 @@ class IFU extends Module {
   val fake_sram = Module(new FAKE_SRAM_IFU(1.U))
   val readAddr = RegInit(0.U(32.W))
   val outAddr = RegInit(0.U(32.W))
-  val readData = RegInit(0.U(32.W))
+  val outData = RegInit(0.U(32.W))
 
   // fake_sram.io.isdnpc := io.in.bits.isdnpc
 
@@ -33,7 +33,7 @@ class IFU extends Module {
   val state = RegInit(s_idle)
 
   fake_sram.io.axi4lite.arvalid := state === s_wait_arready
-  fake_sram.io.axi4lite.rready := state === s_wait_rvalid & io.out.ready
+  fake_sram.io.axi4lite.rready := state === s_wait_rvalid
   fake_sram.io.axi4lite.araddr := readAddr
 
   fake_sram.io.axi4lite.awaddr := 0.U
@@ -43,14 +43,14 @@ class IFU extends Module {
   fake_sram.io.axi4lite.wvalid := 0.U
   fake_sram.io.axi4lite.bready := 0.U
   
-  val dnpc_idle :: dnpc_wait :: Nil = Enum(2)
+  val dnpc_idle :: dnpc_wait_ready :: dnpc_wait :: Nil = Enum(3)
   val dnpc_state = RegInit(dnpc_idle)
   val dnpc_reg = RegInit(0.U(XLEN.W))
-  val dnpc_valid_reg = RegInit(1.B)
+  val dnpc_valid = RegInit(1.B)
 
   //注意：当 arvalid 为 1 后， araddr 就不能变了，直到握手成功，因此需要用寄存器存一下
   switch(state){
-    is(s_idle){
+    is(s_idle){ // io.in.valid 恒为 1，因此此处不进行判断
       // arvalid := state === s_wait_arready
       readAddr := PC
       state := s_wait_arready
@@ -58,7 +58,7 @@ class IFU extends Module {
     is(s_wait_arready){ // 此时 arvalid 为 true
       when(fake_sram.io.axi4lite.arready){
         // 读地址通道握手成功，等待 rvalid.
-        PC := Mux(dnpc_valid_reg, PC + 4.U, dnpc_reg)
+        PC := Mux(dnpc_valid, PC + 4.U, dnpc_reg)
         // 切换到 wait_rvalid 状态，即将 rready 置为 1 
         state := s_wait_rvalid
       }
@@ -66,34 +66,26 @@ class IFU extends Module {
     is(s_wait_rvalid){  // 保持数据，等待输出
       when(fake_sram.io.axi4lite.rvalid){
         state := s_idle
-        readData := fake_sram.io.axi4lite.rdata
+        outData := fake_sram.io.axi4lite.rdata
         outAddr := readAddr
       }
     }
   }
+  
 
-
-
-  switch(dnpc_state) {
-    is(dnpc_idle){
-      when(io.in.fire) {
-        when(io.in.bits.isdnpc) {
-          dnpc_state := dnpc_wait                
-          dnpc_reg := io.in.bits.dnpc
-          dnpc_valid_reg := 0.B
-        }
-      }
+  when(dnpc_valid) {
+    when (io.in.bits.isdnpc) {
+      dnpc_valid := 0.B // 这个修改要延迟一个周期才会生效，但此时可能已经有指令被取出准备输出了
+      // 可以给 io.out.valid 加一个条件，如果当前 in.isdnpc = 1,那么这个周期要把 valid 置为 0
+      // 这样就解决了寄存器要延迟一个周期写入的问题
+      dnpc_reg := io.in.bits.dnpc
     }
-    is(dnpc_wait){  // 如果当前取出的指令对应的 pc 等于 dnpc reg，那么切换回 dnpc_idle 
-      when(outAddr === dnpc_reg) {
-        dnpc_state := dnpc_idle
-        dnpc_valid_reg := 1.B
-      }
-    }
+  } .otherwise {
+    dnpc_valid := dnpc_reg === outAddr
   }
 
-  io.out.valid := state === s_idle & dnpc_valid_reg
+  io.out.valid := state === s_idle && dnpc_valid && !io.in.bits.isdnpc
   io.out.bits.pc := readAddr
-  io.out.bits.inst := readData
-  io.in.ready := fake_sram.io.axi4lite.arready
+  io.out.bits.inst := outData
+  io.in.ready := fake_sram.io.axi4lite.arready & io.out.ready
 }

@@ -21,11 +21,12 @@ class FAKE_SRAM_IFU(delay: UInt) extends Module {
   val readAddr = RegInit(0.U(32.W))
   val rvalidReg = RegInit(false.B)
 
-  io.axi4lite.rvalid := rvalidReg
+  io.axi4lite.rvalid := ar_state === ar_wait_ready
   io.axi4lite.rdata := readData
   io.axi4lite.rresp := 0.U
 
-  io.axi4lite.arready := ar_state === ar_idle
+  io.axi4lite.arready := ar_state === ar_idle 
+  // 规范推荐 arready 默认为高电平 
 
   dpic_ifu.io.pc := readAddr
   dpic_ifu.io.valid := delayDone
@@ -57,7 +58,6 @@ class FAKE_SRAM_IFU(delay: UInt) extends Module {
       // read 状态即存储器进行读取，直到取回数据
       // 进入这一状态说明已经接收到了 araddr
       when(delayDone) { // 模拟经过若干周期后取回了数据
-        rvalidReg := true.B  //即将 rvalid = 1
         ar_state := ar_wait_ready
         // 此时将 dpic_ifu.io.valid = 1, 进行读取，并立刻读出数据
         readData := dpic_ifu.io.inst // 在 ready 为 1 之前，valid 为真要求发送方保持数据直到 ready 为 1
@@ -69,7 +69,6 @@ class FAKE_SRAM_IFU(delay: UInt) extends Module {
     is(ar_wait_ready) {
       when(io.axi4lite.rready) {
         ar_state := ar_idle
-        rvalidReg := false.B  //传输完成，重新将 rvalid 置为低
       }
     }
   }

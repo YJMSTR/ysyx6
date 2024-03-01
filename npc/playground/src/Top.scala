@@ -154,7 +154,7 @@ class Top extends Module {
   val dataHazard = WireInit(Bool(), 0.B)
   val stall = WireInit(Bool(), 0.B)
 
-  InstFetcher.io.in.valid := IDReg.valid
+  InstFetcher.io.in.valid := 1.B  // ！
   InstFetcher.io.out.ready := IDRegen
   InstFetcher.io.in.bits.isdnpc := pcsel
   InstFetcher.io.in.bits.dnpc := Mux(pcsel, ifu_dnpc, 0.U)
@@ -179,11 +179,7 @@ class Top extends Module {
     IDReg.inst := Mux(InstFetcher.io.out.valid, InstFetcher.io.out.bits.inst, 0.U)
     IDReg.pc := Mux(InstFetcher.io.out.valid, InstFetcher.io.out.bits.pc, 0.U) 
     IDReg.valid := InstFetcher.io.out.valid
-  } .otherwise {
-    IDReg.inst := IDReg.inst
-    IDReg.pc := IDReg.pc
-    IDReg.valid := IDReg.valid
-  }
+  } 
 
  
   stall := dataHazard

@@ -2043,7 +2043,7 @@ AXI 总线支持 Outstanding，即 AXI 允许数据返回之前又发起一次�
 
 AMBA 手册里有 AXI4 各握手信号的依赖关系图，可以按照那个进行。需要注意图中单箭头和双箭头含义不同
 
-### 流水线
+### 流水线（接 AXI-4 lite 总线）
 
 2024.2.23
 
@@ -2079,7 +2079,24 @@ LSU 里传入 PC 和 INST 时要分情况讨论，如果当前不是访存指令
 
 目前的实现是用一个寄存器标识当前是否正在执行访存指令。需要注意将 LSReg 和 LSU 连接后，由于 LSU 不是纯组合逻辑了，需要提取其中的 rd 信息判断是否存在数据冒险
 
-现在处理器按照时间走，一条指令执行经过这些时序逻辑部件：IF->IDReg->EXReg->LSReg->LSU->WBReg->ISReg。
+现在处理器按照时间走，一条指令执行经过这些时序逻辑部件：IF->IDReg->EXReg->LSReg->LSU->WBReg->ISReg。（其实 LSReg 可以删了）
 
-发现写指令（例如 sd） 全都没有生效，检查后发现是调用 DPIC_MEM 使能其 valid 信号时只根据读取相关的信号进行使能了，没有根据写相关的信号进行使能。
+发现写指令（例如 sd） 全都没有生效，检查后发现是调用 DPIC_MEM 使能其 valid 信号时只根据读取相关的信号进行使能了，没有根据写相关的信号进行使能。改完以后运行 add 可以 hit good trap
 
+运行 quicksort 如果不开 difftest 会直接卡死，经检查发现本该执行跳转的 bge 指令没有成功跳转。bge 0 0 两边相等，本该跳转。
+
+检查后发现当跳转地址正准备输入 IFU 时流水线发生了全局 stall，stall 时会把 IDRegen 和 EXReg.valid 置为 0,
+
+IFU 的 in.valid 应该是什么？直接改成全 1
+
+然后执行到 80000298 处，开始无限爆 nop。看波形发现是 FAKE_SRAM 的 ar_state 卡在 ar_wait_ready，一直在等待 rready，而 IFU rready 的条件是 state === s_wait_rvalid & io.out.ready，IFU 的读状态机一直卡在 wait_arready 的状态，导致死锁
+
+看波形发现 state 从 10(wait_rvalid) 变成 00(idle) 的一瞬间 io.out.ready 变为 1 了， 需要 state 迟一个周期发生变化，或者 ready 早一个周期发生变化才能避免死锁。但 io.out.ready 实际上是 IDRegen，它随着 stall 的变化而变化，要动只能动 state 或者动 rready 的判断条件了。IFU 什么时候能接收 MEM 发来的 rdata，即什么时候可以把 rready 置为 1？当 IFU 的下游可以接收数据时（out.ready，即 IDRegen），即可接收 rdata，或是 IFU 当前的 output.valid 无效（说明存放 rdata 的寄存器中的数据无效）
+
+现在 master 和 slave 都是拉高自己的 valid/ready 信号然后去判断对方的对应信号是否为 1。
+
+2024.3.1
+
+将 rready 的条件改为 state === s_wait_rvalid 后，即去掉对 io.out.ready 的依赖后，解决了死锁问题，但是运行到 800002a8 处 difftest 报错。检查 log 和寄存器发现是 800002a4 处的 blt 指令本该跳转但是没有正确跳转导致的。检查后发现当 dnpc 输入到 IFU 后，IFU 要经过 1 个周期的延迟才能反应过来。
+
+把 io.out.ready 加到 io.in.ready 的判断条件中，即现在 io.in.ready = io.out.ready & arready
