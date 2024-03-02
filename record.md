@@ -2127,4 +2127,7 @@ val MEM_RS1_Hazard = Decoder.io.rs1 === Mux(NPC_Mem.io.out.valid, NPC_Mem.io.out
 
 在 EXReg.pc === 8000008c 的期间，Mem 由于访存指令的原因阻塞了，而 IDReg 也因为 stall 的原因阻塞了。访存导致的阻塞先消失-》导致了 EXReg 发生更新，LSReg 此时理应更新但是没有更新
 
-*流水线阻塞会导致  EXReg.valid 被拉低，但其实拉低后 EXReg 中保存的仍然是有效数据，不应该冲刷掉*。原先 EXRegen = LSRegen | !EXReg.valid，就会导致 EXReg 被冲刷，其它流水线寄存器同理。修改各个流水线寄存器的 en 信号后通过了这一测例
+*流水线阻塞会导致  EXReg.valid 被拉低，但其实拉低后 EXReg 中保存的仍然是有效数据，不应该冲刷掉*。原先 EXRegen = LSRegen | !EXReg.valid，就会导致 EXReg 被冲刷，其它流水线寄存器同理。修改各个流水线寄存器的 en 信号后通过了这一测例。
+
+通过全部测例，能够运行 bad apple！
+
