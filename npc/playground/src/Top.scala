@@ -158,6 +158,7 @@ class Top extends Module {
   InstFetcher.io.out.ready := IDRegen
   InstFetcher.io.in.bits.isdnpc := pcsel
   InstFetcher.io.in.bits.dnpc := Mux(pcsel, ifu_dnpc, 0.U)
+  InstFetcher.io.in.bits.stall := stall
   // InstFetcher.io.in.bits.pc := PC
   // when (stall) {
   //   PC := PC
@@ -198,7 +199,8 @@ class Top extends Module {
   val rs1v = Rread(Decoder.io.rs1)
   
   // val snpc = Decoder.io.pc + 4.U
-  EXRegen := LSRegen | !EXReg.valid
+  EXRegen := LSRegen //| !EXReg.valid
+  // 流水线阻塞会导致  EXReg.valid 被拉低，但其实拉低后 EXReg 中保存的仍然是有效数据，不应该冲刷掉
   when(EXRegen) {
     EXReg.inst := Mux(IDReg.valid, IDReg.inst, 0.U)
     EXReg.pc := Mux(IDReg.valid, IDReg.pc, 0.U)
@@ -221,27 +223,26 @@ class Top extends Module {
     EXReg.isword := Decoder.io.isword
     EXReg.rden := Decoder.io.rd_en
     EXReg.rd := Decoder.io.rd
-
-  } .otherwise {
-    EXReg.inst := EXReg.inst
-    EXReg.pc := EXReg.pc
-    EXReg.rs1v := EXReg.rs1v
-    EXReg.rs2v := EXReg.rs2v
-    EXReg.rs1 := EXReg.rs1 
-    EXReg.rs2 := EXReg.rs2
-    EXReg.imm := EXReg.imm
-    EXReg.aluop := EXReg.aluop
-    EXReg.dataAsel := EXReg.dataAsel
-    EXReg.dataBsel := EXReg.dataBsel
-    EXReg.memvalid := EXReg.memvalid
-    EXReg.memwen := EXReg.memwen
-    EXReg.memwmask := EXReg.memwmask
-    EXReg.memsext := EXReg.memsext
-    EXReg.isEbreak := EXReg.isEbreak
-    EXReg.isword := EXReg.isword
-    EXReg.rden := EXReg.rden
-    EXReg.rd := EXReg.rd  
-  }
+  }// .otherwise {
+  //   EXReg.inst := EXReg.inst
+  //   EXReg.pc := EXReg.pc
+  //   EXReg.rs1v := EXReg.rs1v
+  //   EXReg.rs2v := EXReg.rs2v
+  //   EXReg.rs1 := EXReg.rs1 
+  //   EXReg.rs2 := EXReg.rs2
+  //   EXReg.imm := EXReg.imm
+  //   EXReg.aluop := EXReg.aluop
+  //   EXReg.dataAsel := EXReg.dataAsel
+  //   EXReg.dataBsel := EXReg.dataBsel
+  //   EXReg.memvalid := EXReg.memvalid
+  //   EXReg.memwen := EXReg.memwen
+  //   EXReg.memwmask := EXReg.memwmask
+  //   EXReg.memsext := EXReg.memsext
+  //   EXReg.isEbreak := EXReg.isEbreak
+  //   EXReg.isword := EXReg.isword
+  //   EXReg.rden := EXReg.rden
+  //   EXReg.rd := EXReg.rd  
+  // }
 
   when (IDReg.valid) {
     Decoder.io.inst := IDReg.inst
@@ -305,7 +306,7 @@ class Top extends Module {
   NPC_Mem.io.out.ready := WBRegen
 
   // printf("LSRegen=%d LSReg.pc = %x\n", LSRegen, LSReg.pc)
-  LSRegen := NPC_Mem.io.in.ready | !LSReg.valid
+  LSRegen := NPC_Mem.io.in.ready //| !LSReg.valid
 
   val rdata = WBReg.rdata
   val rdata7 = rdata(7)
@@ -313,12 +314,6 @@ class Top extends Module {
   val rdata31 = rdata(31)
   val alureslow = Wire(UInt(32.W))
   val wbsextrdata = WireInit(0.U(XLEN.W))
-  // val lsalures = WireInit(0.U(XLEN.W))
-  // val wbalures = WireInit(0.U(XLEN.W))
-  // reg for debug
-  // val wbsextrdatareg = RegInit(0.U(XLEN.W))
-  // wbsextrdatareg := wbsextrdata
-  //printf("wbsextrdata = %x, wbsextrdatareg = %x\n", wbsextrdata, wbsextrdatareg)
   alureslow := LSReg.alures(31, 0)
   NPC_Mem.io.in.valid := LSReg.valid
   when (LSReg.valid) {  
@@ -438,7 +433,7 @@ class Top extends Module {
     ifu_dnpc := "x114514".U
   } .otherwise { 
     InstFetcher.io.in.valid := 1.B
-    IDRegen := EXRegen | !IDReg.valid
+    IDRegen := EXRegen
     EXReg.valid := 1.B
     ifu_dnpc := MuxCase(0.U, Array(
       (Decoder.io.inst === JALR)  -> (rs1v + Decoder.io.imm),

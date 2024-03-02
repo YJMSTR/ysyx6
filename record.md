@@ -2117,4 +2117,14 @@ val MEM_RS1_Hazard = Decoder.io.rs1 === Mux(NPC_Mem.io.out.valid, NPC_Mem.io.out
 
 查看波形发现并不是因为数据冒险了没有停顿，而是 8000006c 处的指令根本没有执行，直接被跳过了。原因：当 IDRegen 为 false 时，IFU 没有保持数据。修改后此处运行正确了，但随后 80000080 处的指令也被跳过了，查看波形发现是访存部分丢指令了。检查后发现 LSReg 没有在 valid = 1 且下游 ready = 0 时保存数据，即使 LSRegen = 0 传进去的 pc 还是变成 0 了，发现是 MEM 的 in.ready  设置有问题，改成 io.in.ready := r_state === r_idle && w_state === w_idle 后又把 8000008c 丢了
 
-此处 commit
+----------------------------------------------------此处 commit---------------------------------
+
+看波形推了一下，由于 Chisel 用 Mem 实现的寄存器具有先写后读的特性，当 EXRegen 变为 1 的那一瞬间，新的 PC 值将会先写入 EXReg，随后 LSReg 才会从 EXReg 中读出新的 PC 值，这就导致旧 PC 值丢失了。
+
+8000008c 为什么被吞：当 EXReg.pc 变成 8000008c 的那一瞬间，LSU 正好在执行一条访存指令，此时 LSU 的 in.ready 即 LSReg 的写使能正好变成 0 了，于是 EXReg 会保持 8000008c 这个数据，直到 LSU 的 io.in.ready 变为 1。从 io.in.ready 变为 1 到 EXReg.pc 变成下一条指令之间还需要有一个周期
+
+2024.3.2
+
+在 EXReg.pc === 8000008c 的期间，Mem 由于访存指令的原因阻塞了，而 IDReg 也因为 stall 的原因阻塞了。访存导致的阻塞先消失-》导致了 EXReg 发生更新，LSReg 此时理应更新但是没有更新
+
+*流水线阻塞会导致  EXReg.valid 被拉低，但其实拉低后 EXReg 中保存的仍然是有效数据，不应该冲刷掉*。原先 EXRegen = LSRegen | !EXReg.valid，就会导致 EXReg 被冲刷，其它流水线寄存器同理。修改各个流水线寄存器的 en 信号后通过了这一测例

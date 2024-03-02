@@ -6,6 +6,7 @@ class IFUIn extends Bundle {
   //val pc = UInt(XLEN.W)
   // 注意：Decoder 传出的 isdnpc 信号仅仅用于标识当前指令是否为跳转指令，并不一定真的会跳转。 
   // 改一下 IFU 传入的 isdnpc，改成真的要跳转时才能为真
+  val stall = Bool()
   val isdnpc = Bool()
   val dnpc = UInt(XLEN.W)
 }
@@ -61,6 +62,7 @@ class IFU extends Module {
     is(s_wait_arready){ // 此时 arvalid 为 true
       when(fake_sram.io.axi4lite.arready){
         // 读地址通道握手成功，等待 rvalid.
+        //PC := Mux(io.in.bits.stall, PC, Mux(dnpc_valid, PC + 4.U, dnpc_reg))
         PC := Mux(dnpc_valid, PC + 4.U, dnpc_reg)
         // 切换到 wait_rvalid 状态，即将 rready 置为 1 
         state := s_wait_rvalid
