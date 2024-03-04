@@ -23,7 +23,7 @@ class IFU extends Module {
   })
 
   val PC = RegInit(RESET_VECTOR.U(XLEN.W))
-  val fake_sram = Module(new FAKE_SRAM_IFU(1.U))
+  val fake_sram = Module(new FAKE_SRAM_IFU)
   val readAddr = RegInit(0.U(32.W))
   val outAddr = RegInit(0.U(32.W))
   val outData = RegInit(0.U(32.W))
@@ -33,8 +33,8 @@ class IFU extends Module {
   val s_idle :: s_wait_arready :: s_wait_rvalid :: Nil = Enum(3)
   val state = RegInit(s_idle)
 
-  fake_sram.io.axi4lite.arvalid := state === s_wait_arready
-  fake_sram.io.axi4lite.rready := state === s_wait_rvalid
+  fake_sram.io.axi4lite.arvalid := state === s_wait_arready && reset.asBool === 0.B
+  fake_sram.io.axi4lite.rready := state === s_wait_rvalid && reset.asBool === 0.B
   fake_sram.io.axi4lite.araddr := readAddr
 
   fake_sram.io.axi4lite.awaddr := 0.U
@@ -51,12 +51,14 @@ class IFU extends Module {
 
   //注意：当 arvalid 为 1 后， araddr 就不能变了，直到握手成功，因此需要用寄存器存一下
   switch(state){
-    is(s_idle){ // io.in.valid 恒为 1，因此此处不进行判断
-      // arvalid := state === s_wait_arready
-      when (io.out.ready) {
-        // 如果成功输出了，再转移状态 + 接收输入。
-        readAddr := PC
-        state := s_wait_arready
+    is(s_idle){ 
+      when (io.in.valid && reset.asBool === 0.B) {
+        printf("reset == 0 PC == %d\n", PC)
+        when (io.out.ready) {
+          // 如果成功输出了，再转移状态 + 接收输入。
+          readAddr := PC
+          state := s_wait_arready
+        }
       }
     }
     is(s_wait_arready){ // 此时 arvalid 为 true

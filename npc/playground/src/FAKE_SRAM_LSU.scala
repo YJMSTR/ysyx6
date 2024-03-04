@@ -1,17 +1,19 @@
 import chisel3._
 import chisel3.util._
+import chisel3.util.random.LFSR
 import Configs._ 
 
 // 作为 AXI4-Lite 的 slave 
 
-class FAKE_SRAM_LSU(delay: UInt) extends Module {
+class FAKE_SRAM_LSU() extends Module {
   val io = IO(new Bundle{
     val axi4lite = new AXI4LiteInterface
   })
 
   val r_idle :: r_read :: r_wait_ready :: Nil = Enum(3)
   val r_state = RegInit(r_idle)
-
+  val delaygen = LFSR(4, 1.B, Some(1))
+  val delay = RegInit(1.U(4.W))
   val delayCounter = RegInit(0.U(5.W))
   val delayDone = delayCounter === delay 
 
@@ -39,6 +41,7 @@ class FAKE_SRAM_LSU(delay: UInt) extends Module {
         readAddr := io.axi4lite.araddr
         r_state := r_read
         delayCounter := 0.U
+        delay := delaygen
       }
     }
     is(r_read){
@@ -46,6 +49,7 @@ class FAKE_SRAM_LSU(delay: UInt) extends Module {
         rvalidReg := true.B
         readData := dpic_mem.io.rdata
         r_state := r_wait_ready
+        
       }.otherwise{
         delayCounter := delayCounter + 1.U
         readData := 0.U

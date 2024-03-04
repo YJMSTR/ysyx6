@@ -58,7 +58,7 @@ class LSU extends Module {
   })
 
 
-  val fake_sram = Module(new FAKE_SRAM_LSU(1.U))
+  val fake_sram = Module(new FAKE_SRAM_LSU())
 
   val readAddr = RegInit(0.U(32.W))
   val readData = RegInit(0.U(XLEN.W))

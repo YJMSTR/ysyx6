@@ -9,8 +9,8 @@ module DPIC_IFU(valid, pc, inst);
   reg [63:0] fulldata;
   always @(*) begin
     if (valid) begin
-      // $display("npc inst fetch pmem read."); 
-      // $display("pc value: %d", pc);
+      $display("npc inst fetch pmem read."); 
+      $display("pc value: %d", pc);
       npc_pmem_read(pc, fulldata);
       inst = fulldata[31:0];
       

@@ -2131,3 +2131,12 @@ val MEM_RS1_Hazard = Decoder.io.rs1 === Mux(NPC_Mem.io.out.valid, NPC_Mem.io.out
 
 通过全部测例，能够运行 bad apple！
 
+2024.3.4
+
+### 测试总线的实现
+
+把 IFU 的 SRAM 延迟调成 5，可以通过测试。
+
+保留上面的修改，将 LSU 的 SRAM 延迟也改成 5，可以通过测试
+
+将 IFU 的 SRAM 延迟改为由 4 位 LFSR 决定，运行测例时第一条指令都跑不通，一开始就直接对 0 地址进行访问了。如果只是单纯把 LSU 的 SRAM 改成 LFSR 延迟，并不会有这个问题。给 IFU 的 SRAM 里加入一个判断，当 reset == 0 时访存的 valid 信号为 0，即解决。

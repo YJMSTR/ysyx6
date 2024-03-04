@@ -155,27 +155,11 @@ class Top extends Module {
   val stall = WireInit(Bool(), 0.B)
 
  
-  InstFetcher.io.out.ready := IDRegen
+  InstFetcher.io.out.ready := IDRegen && reset.asBool === 0.B
   InstFetcher.io.in.bits.isdnpc := pcsel
   InstFetcher.io.in.bits.dnpc := Mux(pcsel, ifu_dnpc, 0.U)
   InstFetcher.io.in.bits.stall := stall
-  // InstFetcher.io.in.bits.pc := PC
-  // when (stall) {
-  //   PC := PC
-  //   InstFetcher.io.in.bits.pc := InstFetcher.io.out.bits.pc(31, 0)
-  // }.elsewhen (pcsel) {
-  //   //todo:此处应该等待 IFU 的 ready 为真再赋值 dnpc
-  //   PC := ifu_dnpc
-  //   InstFetcher.io.in.bits.pc := PC
-  // } .otherwise {
-  //   // 如果没有指令，那么就不应该更新 PC
-  //   PC := Mux(InstFetcher.io.out.fire, InstFetcher.io.out.bits.pc + 4.U, PC)
-  //   InstFetcher.io.in.bits.pc := PC
-  // }
-
-  // 如果上一条指令（即当前处于译码阶段的指令）是跳转指令，那么就不应该更新 IDReg，
-  // 而应该冲刷掉 IFU 里正在取指的指令
-  // 
+  
   when (IDRegen) {
     IDReg.inst := Mux(InstFetcher.io.out.valid, InstFetcher.io.out.bits.inst, 0.U)
     IDReg.pc := Mux(InstFetcher.io.out.valid, InstFetcher.io.out.bits.pc, 0.U) 
@@ -432,9 +416,9 @@ class Top extends Module {
     EXReg.valid := 0.B
     ifu_dnpc := "x114514".U
   } .otherwise { 
-    InstFetcher.io.in.valid := 1.B
+    InstFetcher.io.in.valid := reset.asBool === 0.B
     IDRegen := EXRegen
-    EXReg.valid := 1.B
+    EXReg.valid := IDReg.valid
     ifu_dnpc := MuxCase(0.U, Array(
       (Decoder.io.inst === JALR)  -> (rs1v + Decoder.io.imm),
       (Decoder.io.inst === JAL)   -> (pc_plus_imm),
