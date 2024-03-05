@@ -2152,3 +2152,10 @@ Arbiter 和 Xbar 合在一起可以组成多进多出的 Xbar（也叫 Interconn
 可以给 IFU 和 LSU 增加总线请求线 bus_req 和总线授权线 bus_ac，当 bus_ac 才能和 slave  通信。通信完成的标志是 r 通道握手或 b 通道握手
 
 目前实现了简单的优先级仲裁，IFU 的优先级高于 LSU。运行时会卡死，检查波形发现是因为在 ifu 发起一次请求后，请求结束 req 信号还没归 0 时 Arbiter 已经回到了 idle 状态开始检测请求，于是又开启了新一次 IFU 的事务。并且 ac 信号用的是 wire，而 req 信号用的是 reg. 修改成 reg 之后 add 测例能跑通了
+
+### 多个设备的系统
+
+0x80000000 是负的，没法直接加 .U 转为 UInt，需要在 Configs 里把它们定义为 BigInt（也不行
+
+在 Configs 里加 L 后缀 ok
+

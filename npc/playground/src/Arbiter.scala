@@ -13,12 +13,12 @@ class MyArbiter extends Module {
   val io = IO(new Bundle {
     val ifu_bus = new BUS_IO
     val lsu_bus = new BUS_IO
-    val slave_sram  = Flipped(new AXI4LiteInterface)
+    val xbar_bus  = Flipped(new AXI4LiteInterface)
   })
 
   val empty_axi4lite_ifu = Module(new empty_axi4lite_slave)
   val empty_axi4lite_lsu = Module(new empty_axi4lite_slave)
-  val empty_axi4lite_sram = Module(new empty_axi4lite_master)
+  val empty_xbar_bus = Module(new empty_axi4lite_master)
 
 
 
@@ -35,21 +35,21 @@ class MyArbiter extends Module {
 
   io.ifu_bus.axi4lite <> empty_axi4lite_ifu.io.axi4lite
   io.lsu_bus.axi4lite <> empty_axi4lite_lsu.io.axi4lite
-  io.slave_sram <> empty_axi4lite_sram.io.axi4lite
+  io.xbar_bus <> empty_xbar_bus.io.axi4lite
   when(state === both_idle) {
     io.ifu_bus.axi4lite <> empty_axi4lite_ifu.io.axi4lite
     io.lsu_bus.axi4lite <> empty_axi4lite_lsu.io.axi4lite
-    io.slave_sram <> empty_axi4lite_sram.io.axi4lite
+    io.xbar_bus <> empty_xbar_bus.io.axi4lite
   }.elsewhen (state === ifu_waitr) {
-    io.ifu_bus.axi4lite <> io.slave_sram
+    io.ifu_bus.axi4lite <> io.xbar_bus
     io.lsu_bus.axi4lite <> empty_axi4lite_lsu.io.axi4lite
   }.elsewhen (state === lsu_waitr || state === lsu_waitw) {
-    io.lsu_bus.axi4lite <> io.slave_sram
+    io.lsu_bus.axi4lite <> io.xbar_bus
     io.ifu_bus.axi4lite <> empty_axi4lite_lsu.io.axi4lite
   }.otherwise {
     io.ifu_bus.axi4lite <> empty_axi4lite_ifu.io.axi4lite
     io.lsu_bus.axi4lite <> empty_axi4lite_lsu.io.axi4lite
-    io.slave_sram <> empty_axi4lite_sram.io.axi4lite
+    io.xbar_bus <> empty_xbar_bus.io.axi4lite
   }
 
   // 轮询 先询 ifu 再询 lsu

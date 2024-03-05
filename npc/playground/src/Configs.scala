@@ -5,6 +5,11 @@ object Configs {
   val WMASKLEN              = 8
   val RESET_VECTOR          = "x80000000"
   val RIDXLEN               = 5
+
+  val MEM_BASE              = 0x80000000L
+  val MEM_SIZE              = 0x8000000L
+  val DEVICE_BASE           = 0xa0000000L
+  val SERIAL_PORT           = DEVICE_BASE + (0x000003f8L)
   
   val ALU_DATASEL_WIDTH     = 3
   val IMM_SEL_WIDTH         = 3
