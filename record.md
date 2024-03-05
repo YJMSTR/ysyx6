@@ -2140,3 +2140,15 @@ val MEM_RS1_Hazard = Decoder.io.rs1 === Mux(NPC_Mem.io.out.valid, NPC_Mem.io.out
 保留上面的修改，将 LSU 的 SRAM 延迟也改成 5，可以通过测试
 
 将 IFU 的 SRAM 延迟改为由 4 位 LFSR 决定，运行测例时第一条指令都跑不通，一开始就直接对 0 地址进行访问了。如果只是单纯把 LSU 的 SRAM 改成 LFSR 延迟，并不会有这个问题。给 IFU 的 SRAM 里加入一个判断，当 reset == 0 时访存的 valid 信号为 0，即解决。
+
+### 总线仲裁
+
+多周期处理器的 IFU 和 LSU 不会同时访问 SRAM，但目前我写的流水线会，因此需要合适的总线仲裁调度策略
+
+多个 master 发送请求时，需要由仲裁器 Arbiter 来决定对哪一个提供服务。而 slave 也可能不止一个，Arbiter 仲裁出的请求会发送给 Xbar，由 Xbar 转发给特定的设备。
+
+Arbiter 和 Xbar 合在一起可以组成多进多出的 Xbar（也叫 Interconnect，总线桥等）
+
+可以给 IFU 和 LSU 增加总线请求线 bus_req 和总线授权线 bus_ac，当 bus_ac 才能和 slave  通信。通信完成的标志是 r 通道握手或 b 通道握手
+
+目前实现了简单的优先级仲裁，IFU 的优先级高于 LSU。运行时会卡死，检查波形发现是因为在 ifu 发起一次请求后，请求结束 req 信号还没归 0 时 Arbiter 已经回到了 idle 状态开始检测请求，于是又开启了新一次 IFU 的事务。并且 ac 信号用的是 wire，而 req 信号用的是 reg. 修改成 reg 之后 add 测例能跑通了

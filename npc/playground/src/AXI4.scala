@@ -3,7 +3,7 @@ import chisel3.util._
 import Configs._
 
 
-
+// slave 视角
 class AXI4LiteInterface extends Bundle {
   // AR 读地址
   val araddr = Input(UInt(32.W))

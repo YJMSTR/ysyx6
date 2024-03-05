@@ -20,29 +20,33 @@ class IFU extends Module {
   val io = IO(new Bundle {
     val in = Flipped(Decoupled(new IFUIn))
     val out = Decoupled(new IFUOut)
+    val axi4lite_to_arbiter = Flipped(new AXI4LiteInterface)
+    val bus_ac = Input(Bool())
+    val bus_reqr = Output(Bool())
+    val bus_reqw = Output(Bool())
   })
 
+  io.bus_reqw := 0.B // ifu 没有写操作
+  val reqr = RegInit(0.B)
+  io.bus_reqr := reqr
+
   val PC = RegInit(RESET_VECTOR.U(XLEN.W))
-  val fake_sram = Module(new FAKE_SRAM_IFU)
   val readAddr = RegInit(0.U(32.W))
   val outAddr = RegInit(0.U(32.W))
   val outData = RegInit(0.U(32.W))
 
-  // fake_sram.io.isdnpc := io.in.bits.isdnpc
-
   val s_idle :: s_wait_arready :: s_wait_rvalid :: Nil = Enum(3)
   val state = RegInit(s_idle)
 
-  fake_sram.io.axi4lite.arvalid := state === s_wait_arready && reset.asBool === 0.B
-  fake_sram.io.axi4lite.rready := state === s_wait_rvalid && reset.asBool === 0.B
-  fake_sram.io.axi4lite.araddr := readAddr
-
-  fake_sram.io.axi4lite.awaddr := 0.U
-  fake_sram.io.axi4lite.awvalid := 0.B
-  fake_sram.io.axi4lite.wdata := 0.U
-  fake_sram.io.axi4lite.wstrb := 0.U
-  fake_sram.io.axi4lite.wvalid := 0.U
-  fake_sram.io.axi4lite.bready := 0.U
+  io.axi4lite_to_arbiter.arvalid := state === s_wait_arready && reset.asBool === 0.B
+  io.axi4lite_to_arbiter.rready := state === s_wait_rvalid && reset.asBool === 0.B
+  io.axi4lite_to_arbiter.araddr := readAddr
+  io.axi4lite_to_arbiter.awaddr := 0.U
+  io.axi4lite_to_arbiter.awvalid := 0.B
+  io.axi4lite_to_arbiter.wdata := 0.U
+  io.axi4lite_to_arbiter.wstrb := 0.U
+  io.axi4lite_to_arbiter.wvalid := 0.U
+  io.axi4lite_to_arbiter.bready := 0.U
   
   val dnpc_idle :: dnpc_wait_ready :: dnpc_wait :: Nil = Enum(3)
   val dnpc_state = RegInit(dnpc_idle)
@@ -53,28 +57,29 @@ class IFU extends Module {
   switch(state){
     is(s_idle){ 
       when (io.in.valid && reset.asBool === 0.B) {
-        printf("reset == 0 PC == %d\n", PC)
+        //printf("reset == 0 PC == %d\n", PC)
         when (io.out.ready) {
           // 如果成功输出了，再转移状态 + 接收输入。
           readAddr := PC
           state := s_wait_arready
+          reqr := 1.B
         }
       }
     }
     is(s_wait_arready){ // 此时 arvalid 为 true
-      when(fake_sram.io.axi4lite.arready){
-        // 读地址通道握手成功，等待 rvalid.
-        //PC := Mux(io.in.bits.stall, PC, Mux(dnpc_valid, PC + 4.U, dnpc_reg))
+      // 必须要有总线仲裁器的授权，才能转移到下一个状态。不过实际上若 bus_ac = 0, arready 只会是 0
+      when(io.bus_ac & io.axi4lite_to_arbiter.arready){
         PC := Mux(dnpc_valid, PC + 4.U, dnpc_reg)
         // 切换到 wait_rvalid 状态，即将 rready 置为 1 
         state := s_wait_rvalid
       }
     }
-    is(s_wait_rvalid){  // 保持数据，等待输出
-      when(fake_sram.io.axi4lite.rvalid){
+    is(s_wait_rvalid){  // 等待 rvalid
+      when(io.axi4lite_to_arbiter.rvalid){
         state := s_idle
-        outData := fake_sram.io.axi4lite.rdata
+        outData := io.axi4lite_to_arbiter.rdata
         outAddr := readAddr
+        reqr := 0.B
       }
     }
   }
@@ -94,5 +99,5 @@ class IFU extends Module {
   io.out.valid := state === s_idle && dnpc_valid && !io.in.bits.isdnpc
   io.out.bits.pc := readAddr
   io.out.bits.inst := outData
-  io.in.ready := fake_sram.io.axi4lite.arready & io.out.ready
+  io.in.ready := io.axi4lite_to_arbiter.arready & io.out.ready
 }

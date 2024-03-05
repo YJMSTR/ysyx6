@@ -141,6 +141,9 @@ class Top extends Module {
       _.pc -> 0.U
     )
   )
+  val AXI4liteArbiter = Module(new MyArbiter)
+  val SRAM = Module(new FAKE_SRAM_ONLY)
+
   val IDRegen = WireInit(Bool(), 1.B)
   val EXRegen = WireInit(Bool(), 1.B)
   val LSRegen = WireInit(Bool(), 1.B)
@@ -154,7 +157,13 @@ class Top extends Module {
   val dataHazard = WireInit(Bool(), 0.B)
   val stall = WireInit(Bool(), 0.B)
 
- 
+  InstFetcher.io.axi4lite_to_arbiter <> AXI4liteArbiter.io.ifu_bus.axi4lite
+  InstFetcher.io.bus_ac := AXI4liteArbiter.io.ifu_bus.bus_ac
+
+  AXI4liteArbiter.io.ifu_bus.bus_reqr := InstFetcher.io.bus_reqr
+  AXI4liteArbiter.io.ifu_bus.bus_reqw := InstFetcher.io.bus_reqw
+  AXI4liteArbiter.io.slave_sram <> SRAM.io.axi4lite
+
   InstFetcher.io.out.ready := IDRegen && reset.asBool === 0.B
   InstFetcher.io.in.bits.isdnpc := pcsel
   InstFetcher.io.in.bits.dnpc := Mux(pcsel, ifu_dnpc, 0.U)
@@ -288,6 +297,10 @@ class Top extends Module {
   
   val NPC_Mem = Module(new LSU)
   NPC_Mem.io.out.ready := WBRegen
+  NPC_Mem.io.bus_ac := AXI4liteArbiter.io.lsu_bus.bus_ac
+  AXI4liteArbiter.io.lsu_bus.bus_reqr := NPC_Mem.io.bus_reqr
+  AXI4liteArbiter.io.lsu_bus.bus_reqw := NPC_Mem.io.bus_reqw
+  AXI4liteArbiter.io.lsu_bus.axi4lite <> NPC_Mem.io.axi4lite_to_arbiter
 
   // printf("LSRegen=%d LSReg.pc = %x\n", LSRegen, LSReg.pc)
   LSRegen := NPC_Mem.io.in.ready //| !LSReg.valid

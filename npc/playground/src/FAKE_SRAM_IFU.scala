@@ -30,7 +30,7 @@ class FAKE_SRAM_IFU() extends Module {
 
   io.axi4lite.arready := ar_state === ar_idle 
   // 规范推荐 arready 默认为高电平 
-  printf("delaydone === %d\n", delayDone)
+  //printf("delaydone === %d\n", delayDone)
   dpic_ifu.io.pc := readAddr
   dpic_ifu.io.valid := delayDone && reset.asBool === 0.B
 
@@ -56,7 +56,7 @@ class FAKE_SRAM_IFU() extends Module {
         readAddr := io.axi4lite.araddr
         delayCounter := 0.U
         delay := LFSR(4, 1.B, Some(1))
-        printf("ifu delay === %d\n", delay)
+        //printf("ifu delay === %d\n", delay)
       }
     }
     is(ar_read) {
