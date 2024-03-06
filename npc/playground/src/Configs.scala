@@ -10,7 +10,8 @@ object Configs {
   val MEM_SIZE              = 0x8000000L
   val DEVICE_BASE           = 0xa0000000L
   val SERIAL_PORT           = DEVICE_BASE + (0x000003f8L)
-  
+  val RTC_ADDR              = DEVICE_BASE + (0x00000048L) 
+
   val ALU_DATASEL_WIDTH     = 3
   val IMM_SEL_WIDTH         = 3
   // none 8 16 32 一共四种

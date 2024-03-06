@@ -50,7 +50,7 @@ enum NPC_STATES npc_state;
 word_t npc_halt_pc;
 int npc_ret;
 bool difftest_is_enable = 0;
-bool is_batch_mode = 1;
+bool is_batch_mode = 0;
 bool is_itrace = 0;
 char logbuf[128];
 static uint64_t boot_time = 0;

@@ -27,10 +27,12 @@ int vsprintf(char *out, const char *fmt, va_list ap) {
         switch (fmt[i+1]) {
           case 'd': 
             int tmp = va_arg(ap, int);
-            char stk[35];
+            char stk[100];
             int stk_top = 0, f = 1;
             if (tmp == 0) {
               stk[++stk_top] = '0';
+              i++;
+              break;
             }
             while (tmp != 0) {
               if (tmp < 0) {
@@ -40,7 +42,7 @@ int vsprintf(char *out, const char *fmt, va_list ap) {
               stk[++stk_top] = (tmp % 10) + '0';
               tmp /= 10;
             }
-            if (f < 0) out[cur++] = '-';
+            if (f == -1) out[cur++] = '-';
             while (stk_top > 0) {
               out[cur++] = stk[stk_top];
               stk_top--; 

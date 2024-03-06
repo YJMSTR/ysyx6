@@ -2159,5 +2159,42 @@ Arbiter 和 Xbar 合在一起可以组成多进多出的 Xbar（也叫 Interconn
 
 在 Configs 里加 L 后缀 ok.
 
-写好 UART 后发现，当 awaddr 为 SERIAL_PORT 时，还是访问了 SRAM 而没有访问 UART
+写好 UART 后发现，当 awaddr 为 SERIAL_PORT 时，还是访问了 SRAM 而没有访问 UART。检查发现 XBar 里只用了 araddr 没用 awaddr.
+
+跑 demo 里的 ant demo 有问题，输出两个 c 字符之后就卡死了，检查后发现 这个测例访问了 RTC 寄存器的地址，但 NPC 目前实现的 RTC 是交给 SRAM 的。Bad Apple 测例也在尝试访问 a000004c
+
+#### alu-test 有问题
+
+为了测试串口，跑 alu-tests 挂了一堆 unsigned int 的边界测试点。用 NEMU 跑挂的测试点少一些，但还是挂了 4 个。native 跑没有问题，说明我的 NEMU 和 NPC 的实现有问题
+
+下面是 NEMU 挂的点：
+
+```shell
+                                                                         
+line 14532: unsigned int: -214748364(  /  1  ==  -214748364( =>  FAIL (-214748364()                            
+line 14567: unsigned int: -2147483647  /  1  ==  -2147483647 =>  FAIL (-2147483647)                            
+line 14597: unsigned int: -2  /  1  ==  -2 =>  FAIL (-2)                              
+line 14622: unsigned int: -1  /  1  ==  -1 =>  FAIL (-1)          
+```
+
+输出里面的括号估计是 Klib 实现有问题，但这报错的点结果和答案一样啊，不懂咋挂的。NPC 也有类似的输出，但是结果和答案不一样
+
+```
+line 14537: unsigned int: -214748364(  /  2  ==  1073741824 =>  FAIL (-1073741824)                                                                                                                                                
+line 14542: unsigned int: -214748364(  /  2147483646  ==  1 =>  FAIL (7)                                                                                                                                                          
+line 14547: unsigned int: -214748364(  /  2147483647  ==  1 =>  FAIL (3)                                       
+line 14572: unsigned int: -2147483647  /  2  ==  1073741824 =>  FAIL (-1073741824)                             
+line 14577: unsigned int: -2147483647  /  2147483646  ==  1 =>  FAIL (7)                                       
+line 14582: unsigned int: -2147483647  /  2147483647  ==  1 =>  FAIL (3)                                       
+line 14602: unsigned int: -2  /  2  ==  2147483647 =>  FAIL (-1)                                               
+line 14607: unsigned int: -2  /  2147483646  ==  2 =>  FAIL (8)                                                
+line 14612: unsigned int: -2  /  2147483647  ==  2 =>  FAIL (4)                                                
+line 14627: unsigned int: -1  /  2  ==  2147483647 =>  FAIL (-1)                                               
+line 14632: unsigned int: -1  /  2147483646  ==  2 =>  FAIL (8)                                                
+line 14637: unsigned int: -1  /  2147483647  ==  2 =>  FAIL (4)
+```
+
+查看 alu_test.c 的源码，发现字符 8 变成了 '('，
+
+
 
