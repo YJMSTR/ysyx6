@@ -2163,7 +2163,22 @@ Arbiter 和 Xbar 合在一起可以组成多进多出的 Xbar（也叫 Interconn
 
 跑 demo 里的 ant demo 有问题，输出两个 c 字符之后就卡死了，检查后发现 这个测例访问了 RTC 寄存器的地址，但 NPC 目前实现的 RTC 是交给 SRAM 的。Bad Apple 测例也在尝试访问 a000004c。在 XBar 里将对 RTC 的访问转发给 SRAM 后，能够运行 Bad Apple，但性能比之前的低。
 
-实现 mtime 寄存器后，将 IOE 里 uptime 函数读出的时间乘以 0.25 的系数，让其接近真实时间
+实现 mtime 寄存器后，将 IOE 里 uptime 函数读出的时间乘以 0.2 的系数，让其接近真实时间
+
+### 评估NPC的主频和程序性能
+
+microbench train 花费了 1360494334 个周期
+
+```
+[/home/yjmstr/ysyx-workbench/npc/sim_main.cpp:442 cpu_exec] npc cycles = 1360494334
+
+```
+
+为了综合，Top 模块中不实例化 ebreak 和 SRAM 模块，并且把它们所需的信号作为 Top 模块的接口引出，并注释掉 sim_main.cpp 中 dpic 相关的头文件随后进行综合。
+
+iSTA 表示我的这个只能跑 37Mhz，但是余博讲义里的单周期频率都比我高
+
+
 
 #### alu-test 有问题
 
@@ -2197,6 +2212,8 @@ line 14637: unsigned int: -1  /  2147483647  ==  2 =>  FAIL (4)
 ```
 
 查看 alu_test.c 的源码，发现字符 8 变成了 '('，
+
+### SoC 计算机系统
 
 
 

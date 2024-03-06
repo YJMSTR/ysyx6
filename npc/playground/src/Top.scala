@@ -71,6 +71,8 @@ class Top extends Module {
     val inst = Output(UInt(32.W))
     val pc = Output(UInt(XLEN.W))
     val npc = Output(UInt(XLEN.W))
+    // val empty_sram = Flipped(new AXI4LiteInterface)
+    // val isebreak = Output(Bool())
   })
   
   val IDReg = RegInit(
@@ -143,6 +145,7 @@ class Top extends Module {
   )
   val AXI4liteArbiter = Module(new MyArbiter)
   val SRAM = Module(new FAKE_SRAM_ONLY)
+
   val XBar2 = Module(new XBar)
   val MyUart = Module(new MyUART)
   val MyClint = Module(new MyCLINT)
@@ -166,6 +169,8 @@ class Top extends Module {
   AXI4liteArbiter.io.ifu_bus.bus_reqr := InstFetcher.io.bus_reqr
   AXI4liteArbiter.io.ifu_bus.bus_reqw := InstFetcher.io.bus_reqw
   AXI4liteArbiter.io.xbar_bus <> XBar2.io.axi4litein
+
+  // XBar2.io.axi4liteout1 <> io.empty_sram
   XBar2.io.axi4liteout1 <> SRAM.io.axi4lite
   XBar2.io.axi4liteout0 <> MyUart.io.axi4lite
   XBar2.io.axi4liteout2 <> MyClint.io.axi4lite
@@ -463,5 +468,7 @@ class Top extends Module {
   val Ebreak = Module(new DPIC_EBREAK)
   Ebreak.io.isEbreak := EXReg.isEbreak
   Ebreak.io.clk := clock
+
+  // io.isebreak := EXReg.isEbreak
 }
 

@@ -49,6 +49,7 @@ VTop* topp = new VTop{contextp};
 enum NPC_STATES npc_state;
 word_t npc_halt_pc;
 int npc_ret;
+static unsigned long long cycles = 0;
 bool difftest_is_enable = 0;
 bool is_batch_mode = 0;
 bool is_itrace = 0;
@@ -311,7 +312,7 @@ extern "C" void disassemble(char *str, int size, uint64_t pc, uint8_t *code, int
 static void single_cycle() {
   if (npc_state != NPC_RUN) return;
   char *p = logbuf;
-  
+  cycles ++;
 	contextp->timeInc(1);
   topp->clock = 0;
   topp->eval();
@@ -434,9 +435,11 @@ void cpu_exec(uint32_t n) {
     Log("npc: %s at pc = 0x%08lx", (npc_state == NPC_ABORT ? "abort":
     (npc_ret == 0 ? ANSI_FMT("HIT GOOD TRAP", ANSI_FG_GREEN) : ANSI_FMT("HIT BAD TRAP", ANSI_FG_RED))),
      cpu.pc);
+    Log("npc cycles = %llu\n", cycles);
     print_iringbuf();
   case NPC_QUIT: 
     Log("QUIT!");
+    Log("npc cycles = %llu\n", cycles);
   default:
     break;
   }
