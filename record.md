@@ -532,7 +532,7 @@ pa1 24197
 
 mul-longlong 测例过不去，等接入 difftest 再调一下
 
-## 程序、运行时环境和AM
+### 程序、运行时环境和AM
 
 ### RTFSC（3）
 
@@ -1295,6 +1295,10 @@ riscv64-linux-gnu-objcopy -S --set-section-flags .bss=alloc,contents -O binary /
 am 和 klib 作为静态库被链接进最终的文件
 
 编译出的 elf 文件通过 objdump -d 去掉符号表之类的得到 bin 文件，并输出到 txt 中
+
+## PA3
+
+
 
 ## 最简单的处理器
 
@@ -2212,6 +2216,8 @@ line 14637: unsigned int: -1  /  2147483647  ==  2 =>  FAIL (4)
 ```
 
 查看 alu_test.c 的源码，发现字符 8 变成了 '('，
+
+### 异常处理和RT-Thread
 
 ### SoC 计算机系统
 
