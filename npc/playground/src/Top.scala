@@ -145,6 +145,7 @@ class Top extends Module {
   val SRAM = Module(new FAKE_SRAM_ONLY)
   val XBar2 = Module(new XBar)
   val MyUart = Module(new MyUART)
+  val MyClint = Module(new MyCLINT)
 
   val IDRegen = WireInit(Bool(), 1.B)
   val EXRegen = WireInit(Bool(), 1.B)
@@ -167,6 +168,7 @@ class Top extends Module {
   AXI4liteArbiter.io.xbar_bus <> XBar2.io.axi4litein
   XBar2.io.axi4liteout1 <> SRAM.io.axi4lite
   XBar2.io.axi4liteout0 <> MyUart.io.axi4lite
+  XBar2.io.axi4liteout2 <> MyClint.io.axi4lite
 
   InstFetcher.io.out.ready := IDRegen && reset.asBool === 0.B
   InstFetcher.io.in.bits.isdnpc := pcsel

@@ -2161,7 +2161,9 @@ Arbiter 和 Xbar 合在一起可以组成多进多出的 Xbar（也叫 Interconn
 
 写好 UART 后发现，当 awaddr 为 SERIAL_PORT 时，还是访问了 SRAM 而没有访问 UART。检查发现 XBar 里只用了 araddr 没用 awaddr.
 
-跑 demo 里的 ant demo 有问题，输出两个 c 字符之后就卡死了，检查后发现 这个测例访问了 RTC 寄存器的地址，但 NPC 目前实现的 RTC 是交给 SRAM 的。Bad Apple 测例也在尝试访问 a000004c
+跑 demo 里的 ant demo 有问题，输出两个 c 字符之后就卡死了，检查后发现 这个测例访问了 RTC 寄存器的地址，但 NPC 目前实现的 RTC 是交给 SRAM 的。Bad Apple 测例也在尝试访问 a000004c。在 XBar 里将对 RTC 的访问转发给 SRAM 后，能够运行 Bad Apple，但性能比之前的低。
+
+实现 mtime 寄存器后，将 IOE 里 uptime 函数读出的时间乘以 0.25 的系数，让其接近真实时间
 
 #### alu-test 有问题
 
