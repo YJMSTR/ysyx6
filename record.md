@@ -2157,5 +2157,7 @@ Arbiter 和 Xbar 合在一起可以组成多进多出的 Xbar（也叫 Interconn
 
 0x80000000 是负的，没法直接加 .U 转为 UInt，需要在 Configs 里把它们定义为 BigInt（也不行
 
-在 Configs 里加 L 后缀 ok
+在 Configs 里加 L 后缀 ok.
+
+写好 UART 后发现，当 awaddr 为 SERIAL_PORT 时，还是访问了 SRAM 而没有访问 UART
 

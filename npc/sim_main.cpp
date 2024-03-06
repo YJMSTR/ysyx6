@@ -270,16 +270,16 @@ extern "C" void npc_pmem_write(int waddr, long long wdata, char wmask) {
   //int addr = waddr & ~0x3u;
   uint32_t addr = waddr;
   //printf("pmem_write: waddr = 0x%08llx wdata = 0x%08llx wmask = 0x%x\n", waddr, wdata, 0xff & wmask);
-  if (addr == SERIAL_PORT) {
-    difftest_skip_ref();
-    //Log("dtrace: pc = 0x%08x serial wdata = %d, wmask = %d", topp->io_pc, wdata, wmask);
-    if ((wmask & 0xff) == 1) {
-      putchar(wdata);
-    } else {
-      Log("serial don't support wmask = 0x%x putch", wmask & 0xff);
-    }
-    return;
-  }
+  // if (addr == SERIAL_PORT) {
+  //   difftest_skip_ref();
+  //   //Log("dtrace: pc = 0x%08x serial wdata = %d, wmask = %d", topp->io_pc, wdata, wmask);
+  //   if ((wmask & 0xff) == 1) {
+  //     putchar(wdata);
+  //   } else {
+  //     Log("serial don't support wmask = 0x%x putch", wmask & 0xff);
+  //   }
+  //   return;
+  // }
   assert((word_t)addr >= MEM_BASE && ((word_t)(addr - MEM_BASE + 7)) < MEM_SIZE);
   for (int i = 0; i < 8; i++) {
     if (wmask & (1 << i)) {
