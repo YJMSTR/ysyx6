@@ -29,6 +29,9 @@ extern unsigned char isa_logo[];
 void init_isa();
 
 // reg
+#define CSR_MTVEC   0x305
+#define CSR_MEPC    0x341
+#define CSR_MCAUSE  0x342
 extern CPU_state cpu;
 void isa_reg_display();
 word_t isa_reg_str2val(const char *name, bool *success);

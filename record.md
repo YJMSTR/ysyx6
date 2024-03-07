@@ -1298,6 +1298,28 @@ am 和 klib 作为静态库被链接进最终的文件
 
 ## PA3
 
+直接看我自己写的文章：
+
+https://gitee.com/tinylab/riscv-linux/blob/master/articles/20230427-tinyemu-exception.md，
+
+https://gitee.com/tinylab/riscv-linux/blob/master/articles/20230315-tinyemu-csr-and-privileged-isa.md
+
+NEMU 里实现了 mret 和 csrrw, csrrs 指令后，跑 yield-test 发现进入 trap 之后并没有从 trap 中返回，检查 log 发现没有调用 mret 指令，说明调用 ecall 以后没有正确跳转。原因是 am_irq_handle 还未添加处理当前 event 的代码
+
+###  必答题(需要在实验报告中回答) - 理解上下文结构体的前世今生
+
+###  必答题(需要在实验报告中回答) - 理解穿越时空的旅程
+
+上面两个一起答：
+
+yield 里会执行 hello_intr 函数，并将回调函数设置为 simple_trap。hello_intr 中会无限循环调用 yield 函数，yield 函数通过内联汇编调用 ecall 指令来实现自陷操作。此时 NEMU 会调用 isa_raise_intr 函数，来完成触发异常时硬件自动进行的设置。而软件部分需要提前设置好 mtvec，使其指向异常处理程序的位置，这是在 cte_init 函数里完成的，异常处理程序是 am_asm_trap (trap.S 里定义)，其中包含了跳转到 am_irq_handle 的代码，而跳转时的参数是通过 a0 寄存器传递的 sp 的地址。sp 是栈顶，栈中包含了软件保存的上下文，之前是先开辟了 CONTEXT_SIZE 的栈空间（`addi sp, sp, -CONTEXT_SIZE`），然后按照 gpr, xcause, xstatus, xepc 的顺序放到栈里的，gpr 是栈顶存放的。其中 gpr 不包含 $0 和 sp 寄存器
+
+NEMU 负责硬件，am_asm_trap 负责软件，软件设置 mtvec，硬件负责 mepc mstatus mcause。
+
+### 实现etrace
+
+没啥好说的
+
 
 
 ## 最简单的处理器

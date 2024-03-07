@@ -31,7 +31,7 @@ static const uint32_t img [] = {
   0x00b00713, //li a4, 11 
   0x3a100613, //li a2, 929
   0x3a100593, //li a1, 929
-  0x00001073  //ebreak
+  0x00100073  //ebreak
 };
 
 static void restart() {

@@ -23,6 +23,12 @@ const char *regs[] = {
   "s8", "s9", "s10", "s11", "t3", "t4", "t5", "t6"
 };
 
+#define CSR_MTVEC   0x305
+#define CSR_MEPC    0x341
+#define CSR_MCAUSE  0x342
+
+
+
 void isa_reg_display() {
   for (int i = 0; i < MUXDEF(CONFIG_RVE, 16, 32); i++) {
     printf("%s: %lx\n", regs[i], cpu.gpr[i]);

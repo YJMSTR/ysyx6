@@ -19,7 +19,17 @@ word_t isa_raise_intr(word_t NO, vaddr_t epc) {
   /* TODO: Trigger an interrupt/exception with ``NO''.
    * Then return the address of the interrupt/exception vector.
    */
-
+#ifdef CONFIG_ETRACE
+  Log("[ETRACE] isa_raise_intr NO = %lx epc = %lx", NO, epc);
+#endif
+  if (NO == 1) {
+    cpu.csrs[CSR_MCAUSE] = 11; // ecall from M mode
+    cpu.csrs[CSR_MEPC] = epc;
+    //printf("isa_raise_intr csr_mtvec: %lx csr_mepc: %lx\n", cpu.csrs[CSR_MTVEC], cpu.csrs[CSR_MEPC]);
+    return cpu.csrs[CSR_MTVEC];
+  } else {
+    return 0;
+  }
   return 0;
 }
 

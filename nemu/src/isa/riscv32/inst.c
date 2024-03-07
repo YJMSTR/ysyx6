@@ -19,6 +19,7 @@
 #include <cpu/decode.h>
 
 #define R(i) gpr(i)
+#define CSR(i) CPU_CSR(i)
 // #define Mr(_ADDR, _LEN) vaddr_read((_ADDR)&(~0x3u),_LEN)
 // #define Mw(_ADDR, _LEN, _DATA) vaddr_write((_ADDR)&(~0x3u), _LEN, _DATA)
 
@@ -26,9 +27,13 @@
 #define Mw vaddr_write
 
 enum {
-  TYPE_I, TYPE_U, TYPE_S, TYPE_J, TYPE_R, TYPE_B, 
+  TYPE_I, TYPE_U, TYPE_S, TYPE_J, TYPE_R, TYPE_B, TYPE_ZICSR,
   TYPE_N, // none
 };
+#define CSR_MTVEC   0x305
+#define CSR_MEPC    0x341
+#define CSR_MCAUSE  0x342
+#define CSR_MSTATUS 0x300
 
 #define src1R() do { *src1 = R(rs1); } while (0)
 #define src2R() do { *src2 = R(rs2); } while (0)
@@ -37,6 +42,7 @@ enum {
 #define immS() do { *imm = (SEXT(BITS(i, 31, 25), 7) << 5) | BITS(i, 11, 7); } while(0)
 #define immJ() do { *imm = (SEXT(BITS(i, 31, 31), 1) << 20) | BITS(i, 30, 21) << 1 | (BITS(i, 20, 20) << 11) | (BITS(i, 19, 12) << 12);} while(0)
 #define immB() do { *imm = (SEXT(BITS(i, 31, 31), 1) << 12) | (BITS(i, 30, 25) << 5) | (BITS(i, 11, 8) << 1) | (BITS(i, 7, 7) << 11);} while(0)
+#define idxCSR() do { *imm = BITS(i, 31, 20);} while(0)
 
 static void decode_operand(Decode *s, int *rd, word_t *src1, word_t *src2, word_t *imm, int type) {
   uint32_t i = s->isa.inst.val;
@@ -54,6 +60,10 @@ static void decode_operand(Decode *s, int *rd, word_t *src1, word_t *src2, word_
     case TYPE_B:
       src1R(); src2R();
       immB();
+      break;
+    case TYPE_ZICSR:
+      idxCSR();
+      src1R();
       break;
   }
 }
@@ -141,9 +151,16 @@ static int decode_exec(Decode *s) {
   INSTPAT("??????? ????? ????? 110 ????? 11000 11", bltu   , B, if (src1 < src2) s->dnpc = s->pc + imm);
   INSTPAT("??????? ????? ????? 111 ????? 11000 11", bgeu   , B, if (src1 >= src2) s->dnpc = s->pc + imm);
 
+  INSTPAT("??????? ????? ????? 010 ????? 11100 11", csrrs  , ZICSR, R(rd) = CSR(imm), CSR(imm) = src1 | CSR(imm));
+  INSTPAT("??????? ????? ????? 001 ????? 11100 11", csrrw  , ZICSR, R(rd) = CSR(imm), CSR(imm) = src1);
 
+  INSTPAT("0011000 00010 00000 000 00000 11100 11", mret   , N, s->dnpc = CSR(CSR_MEPC));
+  INSTPAT("0000000 00000 00000 000 00000 11100 11", ecall  , N, s->dnpc = isa_raise_intr(1, s->pc));
   INSTPAT("0000000 00001 00000 000 00000 11100 11", ebreak , N, NEMUTRAP(s->pc, R(10))); // R(10) is $a0
   INSTPAT("??????? ????? ????? ??? ????? ????? ??", inv    , N, INV(s->pc));
+
+  
+
   INSTPAT_END();
 
   R(0) = 0; // reset $zero to 0
@@ -153,5 +170,8 @@ static int decode_exec(Decode *s) {
 
 int isa_exec_once(Decode *s) {
   s->isa.inst.val = inst_fetch(&s->snpc, 4);
+  if (s->isa.inst.val == 0x302000073) {
+    Log("inst === mret");
+  }
   return decode_exec(s);
 }
