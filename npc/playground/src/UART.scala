@@ -2,9 +2,9 @@ import chisel3._
 import chisel3.util._ 
 import Configs._
 
-class MyUART extends Module {
+class ysyx_23060110_UART extends Module {
   val io = IO(new Bundle {
-    val axi4lite = new AXI4LiteInterface
+    val axi4full = new AXI4FullInterface
   })
 
 
@@ -16,28 +16,28 @@ class MyUART extends Module {
   val writeStrb = RegInit(0.U((XLEN/8).W))
   val bresp = RegInit(0.U(2.W)) //default 0b00 === OKAY
 
-  io.axi4lite.arready := 0.B 
-  io.axi4lite.rvalid := 0.B 
-  io.axi4lite.rdata := 0.U
-  io.axi4lite.rresp := 0.U
-  io.axi4lite.awready := w_state === w_idle
-  io.axi4lite.wready := w_state === w_wait_wvalid
-  io.axi4lite.bvalid := w_state === w_wait_bready
-  io.axi4lite.bresp := bresp
+  io.axi4full.arready := 0.B 
+  io.axi4full.rvalid := 0.B 
+  io.axi4full.rdata := 0.U
+  io.axi4full.rresp := 0.U
+  io.axi4full.awready := w_state === w_idle
+  io.axi4full.wready := w_state === w_wait_wvalid
+  io.axi4full.bvalid := w_state === w_wait_bready
+  io.axi4full.bresp := bresp
 
 
   switch(w_state) {
     is(w_idle) {  // awready = 1
-      when(io.axi4lite.awvalid) {
+      when(io.axi4full.awvalid) {
         w_state := w_wait_wvalid
-        writeAddr := io.axi4lite.awaddr
+        writeAddr := io.axi4full.awaddr
       }
     }
 
     is(w_wait_wvalid) { // w_ready = 1
-      when(io.axi4lite.wvalid) {
-        writeData := io.axi4lite.wdata
-        writeStrb := io.axi4lite.wstrb
+      when(io.axi4full.wvalid) {
+        writeData := io.axi4full.wdata
+        writeStrb := io.axi4full.wstrb
         w_state := w_write
       }
     }
@@ -48,7 +48,7 @@ class MyUART extends Module {
     }
 
     is(w_wait_bready) { // b_valid = 1
-      when(io.axi4lite.bready) {
+      when(io.axi4full.bready) {
         w_state := w_idle
       }
     }

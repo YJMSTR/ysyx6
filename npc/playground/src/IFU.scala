@@ -16,16 +16,17 @@ class IFUOut extends Bundle {
   val inst = UInt(32.W)
 }
 
-class IFU extends Module {
+class ysyx_23060110_IFU extends Module {
   val io = IO(new Bundle {
     val in = Flipped(Decoupled(new IFUIn))
     val out = Decoupled(new IFUOut)
-    val axi4lite_to_arbiter = Flipped(new AXI4LiteInterface)
+    val axi4full_to_arbiter = Flipped(new AXI4FullInterface)
     val bus_ac = Input(Bool())
     val bus_reqr = Output(Bool())
     val bus_reqw = Output(Bool())
   })
-
+  val empty_master = Module(new ysyx_23060110_empty_axi4full_master)
+  io.axi4full_to_arbiter <> empty_master.io.axi4full
   io.bus_reqw := 0.B // ifu 没有写操作
   val reqr = RegInit(0.B)
   io.bus_reqr := reqr
@@ -38,15 +39,15 @@ class IFU extends Module {
   val s_idle :: s_wait_arready :: s_wait_rvalid :: Nil = Enum(3)
   val state = RegInit(s_idle)
 
-  io.axi4lite_to_arbiter.arvalid := state === s_wait_arready && reset.asBool === 0.B
-  io.axi4lite_to_arbiter.rready := state === s_wait_rvalid && reset.asBool === 0.B
-  io.axi4lite_to_arbiter.araddr := readAddr
-  io.axi4lite_to_arbiter.awaddr := 0.U
-  io.axi4lite_to_arbiter.awvalid := 0.B
-  io.axi4lite_to_arbiter.wdata := 0.U
-  io.axi4lite_to_arbiter.wstrb := 0.U
-  io.axi4lite_to_arbiter.wvalid := 0.U
-  io.axi4lite_to_arbiter.bready := 0.U
+  io.axi4full_to_arbiter.arvalid := state === s_wait_arready && reset.asBool === 0.B
+  io.axi4full_to_arbiter.rready := state === s_wait_rvalid && reset.asBool === 0.B
+  io.axi4full_to_arbiter.araddr := readAddr
+  io.axi4full_to_arbiter.awaddr := 0.U
+  io.axi4full_to_arbiter.awvalid := 0.B
+  io.axi4full_to_arbiter.wdata := 0.U
+  io.axi4full_to_arbiter.wstrb := 0.U
+  io.axi4full_to_arbiter.wvalid := 0.U
+  io.axi4full_to_arbiter.bready := 0.U
   
   val dnpc_idle :: dnpc_wait_ready :: dnpc_wait :: Nil = Enum(3)
   val dnpc_state = RegInit(dnpc_idle)
@@ -68,16 +69,16 @@ class IFU extends Module {
     }
     is(s_wait_arready){ // 此时 arvalid 为 true
       // 必须要有总线仲裁器的授权，才能转移到下一个状态。不过实际上若 bus_ac = 0, arready 只会是 0
-      when(io.bus_ac & io.axi4lite_to_arbiter.arready){
+      when(io.bus_ac & io.axi4full_to_arbiter.arready){
         PC := Mux(dnpc_valid, PC + 4.U, dnpc_reg)
         // 切换到 wait_rvalid 状态，即将 rready 置为 1 
         state := s_wait_rvalid
       }
     }
     is(s_wait_rvalid){  // 等待 rvalid
-      when(io.axi4lite_to_arbiter.rvalid){
+      when(io.axi4full_to_arbiter.rvalid){
         state := s_idle
-        outData := io.axi4lite_to_arbiter.rdata
+        outData := io.axi4full_to_arbiter.rdata
         outAddr := readAddr
         reqr := 0.B
       }
@@ -99,5 +100,5 @@ class IFU extends Module {
   io.out.valid := state === s_idle && dnpc_valid && !io.in.bits.isdnpc
   io.out.bits.pc := readAddr
   io.out.bits.inst := outData
-  io.in.ready := io.axi4lite_to_arbiter.arready & io.out.ready
+  io.in.ready := io.axi4full_to_arbiter.arready & io.out.ready
 }

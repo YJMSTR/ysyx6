@@ -1,13 +1,13 @@
-#include "VTop.h"
+#include "VysyxSoCFull.h"
 // #include "verilated_vcd_c.h"
 // #include <nvboard.h>
 #include <unistd.h>
 #include "verilated.h"
-#include "VTop__Dpi.h"
+#include "VysyxSoCFull__Dpi.h"
 #include "svdpi.h"
 #include "sim.h"
 #include <ftrace.h>
-#include "VTop___024root.h"
+#include "VysyxSoCFull___024root.h"
 #include <readline/readline.h>
 #include <readline/history.h>
 #include <string.h>
@@ -35,6 +35,8 @@
 #define FB_ADDR         (MMIO_BASE   + 0x1000000)
 #define AUDIO_SBUF_ADDR (MMIO_BASE   + 0x1200000)
 
+#define ysyxSoC
+
 #ifndef CONFIG_ITRACE_RINGBUFFER_SIZE
   #define CONFIG_ITRACE_RINGBUFFER_SIZE 16
 #endif
@@ -45,7 +47,7 @@
   VerilatedVcdC* tfp = nullptr;
 #endif
 VerilatedContext* contextp = new VerilatedContext;
-VTop* topp = new VTop{contextp};
+VysyxSoCFull* topp = new VysyxSoCFull{contextp};
 enum NPC_STATES npc_state;
 word_t npc_halt_pc;
 int npc_ret;
@@ -59,7 +61,7 @@ static uint64_t rtc_us = 0;
 static uint64_t nz_pc = 0;
 static uint64_t nz_npc = 0;
 
-// void nvboard_bind_all_pins(VTop *top);
+// void nvboard_bind_all_pins(VysyxSoCFull *top);
 const char *regs[] = {
   "$0", "ra", "sp", "gp", "tp", "t0", "t1", "t2",
   "s0", "s1", "a0", "a1", "a2", "a3", "a4", "a5",
@@ -68,7 +70,7 @@ const char *regs[] = {
 };
 
 word_t Rread(uint32_t idx) {
-  return topp->rootp->Top__DOT__R_ext__DOT__Memory[idx];
+  return topp->rootp->ysyxSoCFull__DOT__asic__DOT__cpu__DOT__cpu__DOT__R_ext__DOT__Memory[idx];
 }
 
 struct Iringbuf 
@@ -234,6 +236,10 @@ static void trace_and_difftest(vaddr_t pc, vaddr_t dnpc) {
   }
 }
 
+// 接入 ysyxSoC 所需的代码
+extern "C" void flash_read(int addr, int *data) { assert(0); }
+extern "C" void mrom_read(int addr, int *data) { assert(0); }
+
 extern "C" void npc_pmem_read(int raddr, long long *rdata) {
   uint32_t addr = raddr;
   //addr = addr & ~0x3u;
@@ -322,16 +328,20 @@ static void single_cycle() {
   contextp->timeInc(1);
   topp->clock = 1;
   topp->eval();
+  #ifndef ysyxSoC
   word_t instval = topp->io_inst;
   word_t pc = topp->io_pc;
   word_t npc = topp->io_npc;
+  
   //static word_t nz_pc = 0, nz_npc = 0;
   if (pc != 0) nz_pc = pc;
   if (npc != 0) nz_npc = npc;
+  #endif
 
 #ifdef VCD
   tfp->dump(contextp->time());
 #endif
+#ifndef ysyxSoC
   if (topp->reset == 0 && is_itrace) {
     //printf("[itrace] inst = 0x%08x\n", topp->io_inst);
     p += snprintf(p, sizeof(logbuf), "0x%08lx :", pc);
@@ -347,16 +357,19 @@ static void single_cycle() {
     memset(p, ' ', space_len);
     p += space_len;
     disassemble(p, logbuf + sizeof(logbuf) - p, pc, inst, ilen);
+    #ifndef ysyxSoC
     if (ftrace_is_enable()) {
       word_t reg_val = Rread(1);
       ftrace(pc, npc, iringbuf.inst[iringbuf.cur], reg_val);
     }
+    #endif
     for (int i = 0; i < 32; i++) {
       cpu.gpr[i] = Rread(i);
     }
     trace_and_difftest(nz_pc, nz_npc);
   }
   //sleep(1);
+#endif
 }
 
 extern "C" void ebreak() {
@@ -425,7 +438,9 @@ void cpu_exec(uint32_t n) {
   }
   while (n--) {
     if (npc_state != NPC_RUN) break;
+    #ifndef ysyxSoC
     cpu.pc = topp->io_pc;
+    #endif
     single_cycle();
     if (npc_state != NPC_RUN) break;
   }
@@ -454,7 +469,9 @@ void npc_reg_display() {
 }
 
 int sim_main(int argc, char** argv) {
-  
+  // begin：ysyxSoC 所需的代码
+  Verilated::commandArgs(argc, argv);
+  // end
 #ifdef VCD
   //Verilated::mkdir("logs");
   Verilated::traceEverOn(true);

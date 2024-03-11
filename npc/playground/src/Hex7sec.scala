@@ -1,7 +1,7 @@
 import chisel3._
 import chisel3.util._
 
-class Hex7sec extends Module {
+class ysyx_23060110_Hex7seg extends Module {
   val io = IO(new Bundle {
     val data = Input(UInt(4.W))
     val seg  = Output(UInt(7.W))

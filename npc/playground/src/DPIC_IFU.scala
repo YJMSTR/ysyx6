@@ -2,7 +2,7 @@ import chisel3._
 import chisel3.util._ 
 import Configs._
 
-class DPIC_IFU extends BlackBox with HasBlackBoxPath{
+class ysyx_23060110_DPIC_IFU extends BlackBox with HasBlackBoxPath{
   val io = IO(new Bundle {
     //val clk = Input(Clock())
     val valid = Input(Bool())

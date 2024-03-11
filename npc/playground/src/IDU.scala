@@ -5,7 +5,7 @@ import chisel3.util._
 
 // import chisel3.util.experimental.loadMemoryFromFileInline
 
-class IDU() extends Module {
+class ysyx_23060110_IDU() extends Module {
   val io = IO(new Bundle {
     // RV32 和 64 的指令都是 32 位长，除非是 C 扩展
     val inst = Input(UInt(32.W))

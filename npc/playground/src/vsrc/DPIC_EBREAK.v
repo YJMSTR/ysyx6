@@ -1,4 +1,4 @@
-module DPIC_EBREAK(isEbreak, clk);
+module ysyx_23060110_DPIC_EBREAK(isEbreak, clk);
   input isEbreak;
   input clk;
   import "DPI-C" function void ebreak();

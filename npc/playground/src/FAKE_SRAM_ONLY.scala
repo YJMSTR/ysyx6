@@ -3,9 +3,9 @@ import chisel3.util._
 import chisel3.util.random.LFSR
 import Configs._ 
 
-class FAKE_SRAM_ONLY extends Module {
+class ysyx_23060110_FAKE_SRAM_ONLY extends Module {
   val io = IO(new Bundle {
-    val axi4lite = new AXI4LiteInterface 
+    val slave = new AXI4FullInterface 
   })
   val r_idle :: r_read :: r_wait_ready :: Nil = Enum(3)
   val r_state = RegInit(r_idle)
@@ -14,17 +14,17 @@ class FAKE_SRAM_ONLY extends Module {
   val delayCounter = RegInit(0.U(5.W))
   val delayDone = delayCounter === delay 
 
-  val dpic_mem = Module(new DPIC_MEM)
+  val dpic_mem = Module(new ysyx_23060110_DPIC_MEM)
 
   val readData = RegInit(0.U(XLEN.W))
   val readAddr = RegInit(0.U(32.W))
   val rvalidReg = RegInit(false.B)
 
-  io.axi4lite.rvalid := rvalidReg
-  io.axi4lite.rdata := readData
-  io.axi4lite.rresp := 0.U
+  io.slave.rvalid := rvalidReg
+  io.slave.rdata := readData
+  io.slave.rresp := 0.U
 
-  io.axi4lite.arready := r_state === r_idle
+  io.slave.arready := r_state === r_idle
 
   dpic_mem.io.raddr := readAddr
  
@@ -34,8 +34,8 @@ class FAKE_SRAM_ONLY extends Module {
   switch(r_state) {
     is(r_idle) {
       readData := 0.U
-      when(io.axi4lite.arvalid){
-        readAddr := io.axi4lite.araddr
+      when(io.slave.arvalid){
+        readAddr := io.slave.araddr
         r_state := r_read
         delayCounter := 0.U
         delay := delaygen
@@ -53,7 +53,7 @@ class FAKE_SRAM_ONLY extends Module {
       }
     }
     is(r_wait_ready) {
-      when(io.axi4lite.rready) {
+      when(io.slave.rready) {
         rvalidReg := false.B  //传输完成，置为false
         r_state := r_idle
       }
@@ -69,10 +69,10 @@ class FAKE_SRAM_ONLY extends Module {
   val writeStrb = RegInit(0.U((XLEN/8).W))
   val bresp = RegInit(0.U(2.W)) //default 0b00 === OKAY
 
-  io.axi4lite.awready := w_state === w_idle
-  io.axi4lite.wready := w_state === w_wait_wvalid
-  io.axi4lite.bvalid := w_state === w_wait_bready
-  io.axi4lite.bresp := bresp
+  io.slave.awready := w_state === w_idle
+  io.slave.wready := w_state === w_wait_wvalid
+  io.slave.bvalid := w_state === w_wait_bready
+  io.slave.bresp := bresp
 
   dpic_mem.io.wen := w_state === w_write
   dpic_mem.io.waddr := writeAddr
@@ -81,15 +81,15 @@ class FAKE_SRAM_ONLY extends Module {
 
   switch(w_state) {
     is(w_idle) {  // awready = 1
-      when(io.axi4lite.awvalid) {
+      when(io.slave.awvalid) {
         w_state := w_wait_wvalid
-        writeAddr := io.axi4lite.awaddr
+        writeAddr := io.slave.awaddr
       }
     }
     is(w_wait_wvalid) { // w_ready = 1
-      when(io.axi4lite.wvalid) {
-        writeData := io.axi4lite.wdata
-        writeStrb := io.axi4lite.wstrb
+      when(io.slave.wvalid) {
+        writeData := io.slave.wdata
+        writeStrb := io.slave.wstrb
         w_state := w_write
       }
     }
@@ -97,7 +97,7 @@ class FAKE_SRAM_ONLY extends Module {
       w_state := w_wait_bready
     }
     is(w_wait_bready) { // b_valid = 1
-      when(io.axi4lite.bready) {
+      when(io.slave.bready) {
         w_state := w_idle
       }
     }

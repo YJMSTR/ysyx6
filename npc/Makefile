@@ -2,16 +2,16 @@ BUILD_DIR = ./build
 OBJ_DIR = $(BUILD_DIR)/obj_dir
 BIN = $(BUILD_DIR)/$(TOPNAME)
 # NXDC_FILES = constr/top.nxdc
-TOPNAME = Top
+TOPNAME = ysyxSoCFull
 # TOP_V = $(BUILD_DIR)/$(TOPNAME).v
 
 
-export PATH := $(PATH):$(abspath ./utils)
+# export PATH := $(PATH):$(abspath ./utils)
 
 VERILATOR = verilator
 VERILATOR_CFLAGS += -MMD --build -cc  \
-				--trace -O3 --x-assign fast --x-initial fast --noassert
-VERILATOR_CFLAGS += --timescale 1us/1us
+				--trace -O3 --x-assign fast --x-initial fast --noassert -I$(abspath ../ysyxSoC/perip/spi/rtl) -I$(abspath ../ysyxSoC/perip/uart16550/rtl)
+VERILATOR_CFLAGS += --timescale "1ns/1ns" --no-timing
 $(shell mkdir -p $(BUILD_DIR))
 
 # # constraint file
@@ -23,6 +23,8 @@ $(shell mkdir -p $(BUILD_DIR))
 
 SCALA_FILE = $(shell find $(abspath ./playground/src/) -name "*.scala")
 VSRCS = $(shell find $(BUILD_DIR) -name "*.v" -or -name "*.sv")
+VSRCS += $(shell find $(abspath ../ysyxSoC/perip) -name "*.v")
+VSRCS += $(abspath ../ysyxSoC/generated/ysyxSoCFull.v)
 CSRCS = $(shell find $(abspath ./) -name "*.c" -or -name "*.cc" -or -name "*.cpp")
 CSRCS += $(SRC_AUTO_BIND)
 LDFLAGS += -lreadline $(shell llvm-config --libs)

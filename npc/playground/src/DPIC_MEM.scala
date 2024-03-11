@@ -1,7 +1,7 @@
 import chisel3._ 
 import chisel3.util._ 
 import Configs._ 
-class DPIC_MEM extends BlackBox with HasBlackBoxPath{
+class ysyx_23060110_DPIC_MEM extends BlackBox with HasBlackBoxPath{
   val io = IO(new Bundle{
     val valid = Input(Bool())
     val wen = Input(Bool())
