@@ -159,7 +159,7 @@ void init_monitor() {
   if (is_itrace)
     init_disasm("riscv64" "-pc-linux-gnu");
 }
-
+extern int npc_ret;
 extern bool is_batch_mode;
 void sdb_mainloop() {
   if (is_batch_mode) {
@@ -185,7 +185,10 @@ void sdb_mainloop() {
     int i;
     for (i = 0; i < NR_CMD; i ++) {
       if (strcmp(cmd, cmd_table[i].name) == 0) {
-        if (cmd_table[i].handler(args) < 0) { return; }
+        if (cmd_table[i].handler(args) < 0) {
+          Log("QUIT ret=%d", npc_ret=0);
+          return; 
+        }
         break;
       } 
     }

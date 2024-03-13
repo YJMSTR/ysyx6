@@ -37,10 +37,6 @@ class ysyx_23060110_empty_axi4full_slave extends Module {
     val axi4full = new AXI4FullInterface
   })
   io.axi4full.arready := RegInit(0.U)
-  io.axi4full.arid :=    RegInit(0.U)
-  io.axi4full.arlen :=   RegInit(0.U)
-  io.axi4full.arsize :=  RegInit(0.U)
-  io.axi4full.arburst := RegInit(0.U)
   io.axi4full.rvalid :=  RegInit(0.U)
   io.axi4full.rdata :=   RegInit(0.U)
   io.axi4full.rresp :=   RegInit(0.U)
@@ -60,6 +56,10 @@ class ysyx_23060110_empty_axi4full_master extends Module {
 
   io.axi4full.araddr :=   RegInit(0.U)
   io.axi4full.arvalid :=  RegInit(0.U) 
+  io.axi4full.arid :=     RegInit(0.U)
+  io.axi4full.arlen :=    RegInit(0.U)
+  io.axi4full.arsize :=   RegInit(0.U)
+  io.axi4full.arburst :=  RegInit(0.U)
   io.axi4full.rready :=   RegInit(0.U) 
   io.axi4full.awaddr :=   RegInit(0.U)
   io.axi4full.awvalid :=  RegInit(0.U)

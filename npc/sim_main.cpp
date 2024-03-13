@@ -235,10 +235,38 @@ static void trace_and_difftest(vaddr_t pc, vaddr_t dnpc) {
     last_pc = pc;
   }
 }
+#define MROM_BASE 0x20000000
+#define MROM_SIZE 0x1000
+static uint8_t mrom[MROM_SIZE] = {
+  0x93, 0x02, 0x00, 0x08, //addi	t0, zero, 128
+  0xef, 0x00, 0xc0, 0x00, //jal ra, 80000010
+  0x13, 0x03, 0x10, 0x08, //addi	t1, zero, 129
+  0x13, 0x05, 0x10, 0x00, //li a0, 1
+  0x13, 0x07, 0xb0, 0x00, //li a4, 11 
+  0x13, 0x06, 0x10, 0x3a, //li a2, 929
+  0x93, 0x05, 0x10, 0x3a, //li a1, 929
+  0x73, 0x00, 0x10, 0x00  //ebreak
+  // 如果改了这里，记得把默认的 img_size 也改了
+}; 
 
 // 接入 ysyxSoC 所需的代码
 extern "C" void flash_read(int addr, int *data) { assert(0); }
-extern "C" void mrom_read(int addr, int *data) { assert(0); }
+extern "C" void mrom_read(int addr, int *data) {
+  
+  word_t res = 0;
+  for (int i = 0; i < 8; i++) {
+    res = res + ((word_t)mrom[addr-MROM_BASE+i] << (i*8));
+  }
+  //*data = 0x00100073;	//ebreak 
+  *data = res;
+  printf("mrom read[%x]=", addr);
+  for (int i = 0; i < 4; i++) {
+    printf("%02x ", mrom[addr-MROM_BASE+i]);
+  }
+  printf("\n");
+  //sleep(1);
+	//assert(0); 
+}
 
 extern "C" void npc_pmem_read(int raddr, long long *rdata) {
   uint32_t addr = raddr;
@@ -406,6 +434,8 @@ long load_img() {
     //记得改了 默认 img 之后，默认的 img size 也要改
     return 32;
   }
+#ifndef ysyxSoC
+  // load 到 sram 中
   memset(mem, 0, sizeof(mem));
 	printf("img == %s\n", img_file);
 	FILE *fp = fopen(img_file, "rb");
@@ -417,6 +447,21 @@ long load_img() {
 	fclose(fp);
   assert(ret == size);
 	return size;
+#endif
+#ifdef ysyxSoC
+  // load 到 mrom 中
+  memset(mrom, 0, sizeof(mrom));
+  printf("mrom img == %s\n", img_file);
+  FILE *fp = fopen(img_file, "rb");
+	assert(fp);
+	fseek(fp, 0, SEEK_END);
+	long size = ftell(fp);
+	fseek(fp, 0, SEEK_SET);
+	int ret = fread(mrom, 1, size, fp);
+  fclose(fp);
+  assert(ret == size);
+  return size;
+#endif
 }
 
 void print_iringbuf() {
@@ -483,10 +528,12 @@ int sim_main(int argc, char** argv) {
 	// nvboard_init();
   if (argc > 1) {
     img_file = argv[1];
+    if (ftrace_is_enable()) {
     elf_file = (char *)malloc(strlen(img_file)+1);
-    memset(elf_file, '\0', sizeof(elf_file));
-    memcpy(elf_file, img_file, strlen(img_file)-3);
-    strcat(elf_file, "elf");
+      memset(elf_file, '\0', sizeof(elf_file));
+      memcpy(elf_file, img_file, strlen(img_file)-3);
+      strcat(elf_file, "elf");
+    }
   }
   init_monitor();
   Log("argv[1] = %s", argv[1]);

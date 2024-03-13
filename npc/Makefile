@@ -11,7 +11,7 @@ TOPNAME = ysyxSoCFull
 VERILATOR = verilator
 VERILATOR_CFLAGS += -MMD --build -cc  \
 				--trace -O3 --x-assign fast --x-initial fast --noassert -I$(abspath ../ysyxSoC/perip/spi/rtl) -I$(abspath ../ysyxSoC/perip/uart16550/rtl)
-VERILATOR_CFLAGS += --timescale "1ns/1ns" --no-timing
+VERILATOR_CFLAGS += --timescale "1ns/1ns" --no-timing 
 $(shell mkdir -p $(BUILD_DIR))
 
 # # constraint file

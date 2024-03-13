@@ -8,22 +8,25 @@ class ysyx_23060110_XBar extends Module {
     val axi4fullout0 = Flipped(new AXI4FullInterface)
     val axi4fullout1 = Flipped(new AXI4FullInterface)
     val axi4fullout2 = Flipped(new AXI4FullInterface)
+    val axi4fullout_mrom = Flipped(new AXI4FullInterface)
   })
   // out(0): uart
   // out(1): sram
   val empty_slave_in0 = Module(new ysyx_23060110_empty_axi4full_master)
   val empty_slave_in1 = Module(new ysyx_23060110_empty_axi4full_master)
   val empty_slave_in2 = Module(new ysyx_23060110_empty_axi4full_master)
+  val empty_slave_in_mrom = Module(new ysyx_23060110_empty_axi4full_master)
   val empty_master_out = Module(new ysyx_23060110_empty_axi4full_slave)
   
   io.axi4fullout0 <> empty_slave_in0.io.axi4full
   io.axi4fullout1 <> empty_slave_in1.io.axi4full
   io.axi4fullout2 <> empty_slave_in2.io.axi4full
+  io.axi4fullout_mrom <> empty_slave_in_mrom.io.axi4full
   io.axi4fullin <> empty_master_out.io.axi4full
 
   val s_addr = RegInit(0.U(XLEN.W))
 
-  val r_idle :: r_sram_wait :: r_mtime_wait :: Nil = Enum(3)
+  val r_idle :: r_sram_wait :: r_mtime_wait :: r_mrom_wait :: Nil = Enum(4)
   val state_r = RegInit(r_idle)
 
   val w_idle :: w_sram_wait :: w_uart_wait :: Nil = Enum(3)
@@ -34,13 +37,15 @@ class ysyx_23060110_XBar extends Module {
   switch(state_r) {
     is (r_idle) {
       when (io.axi4fullin.arvalid) {
-        when(io.axi4fullin.araddr >= MEM_BASE.U(XLEN.W) && io.axi4fullin.araddr < MEM_BASE.U(XLEN.W) + MEM_SIZE.U(XLEN.W)) {
+        when(io.axi4fullin.araddr >= MEM_BASE.U(XLEN.W) && io.axi4fullin.araddr < (MEM_BASE + MEM_SIZE).U(XLEN.W)) {
           state_r := r_sram_wait
           // 暂时把 RTC 转发给 SRAM
         // }.elsewhen (io.axi4fullin.araddr === RTC_ADDR.U(XLEN.W) || io.axi4fullin.araddr === (RTC_ADDR.U(XLEN.W) + 4.U)) {
         //   state_r := r_sram_wait
         }.elsewhen(io.axi4fullin.araddr === RTC_ADDR.U(XLEN.W) || io.axi4fullin.araddr === (RTC_ADDR.U(XLEN.W) + 4.U)){
           state_r := r_mtime_wait
+        }.elsewhen(io.axi4fullin.araddr >= MROM_BASE.U(XLEN.W) && io.axi4fullin.araddr < (MROM_BASE + MROM_SIZE).U(XLEN.W)) {
+          state_r := r_mrom_wait
         }.otherwise {
           io.axi4fullin.rresp := 3.U // decerr
           io.axi4fullin.rvalid := true.B
@@ -58,6 +63,12 @@ class ysyx_23060110_XBar extends Module {
     }
     is (r_mtime_wait) {
       io.axi4fullin <> io.axi4fullout2
+      when (io.axi4fullin.rready & io.axi4fullin.rvalid) {
+        state_r := r_idle
+      }
+    }
+    is (r_mrom_wait) {
+      io.axi4fullin <> io.axi4fullout_mrom
       when (io.axi4fullin.rready & io.axi4fullin.rvalid) {
         state_r := r_idle
       }

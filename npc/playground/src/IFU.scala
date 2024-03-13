@@ -42,6 +42,7 @@ class ysyx_23060110_IFU extends Module {
   io.axi4full_to_arbiter.arvalid := state === s_wait_arready && reset.asBool === 0.B
   io.axi4full_to_arbiter.rready := state === s_wait_rvalid && reset.asBool === 0.B
   io.axi4full_to_arbiter.araddr := readAddr
+  io.axi4full_to_arbiter.arsize := 2.U // 取指默认取 32 位的指令
   io.axi4full_to_arbiter.awaddr := 0.U
   io.axi4full_to_arbiter.awvalid := 0.B
   io.axi4full_to_arbiter.wdata := 0.U

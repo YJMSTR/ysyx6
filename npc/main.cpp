@@ -12,5 +12,7 @@ int main(int argc, char *argv[]) {
   // } else {
   //   printf("\033[0m\033[1;31mFAIL\033[0m\n");
   // }
+  printf("ret: %d\n", ret);
   return ret;
 }
+

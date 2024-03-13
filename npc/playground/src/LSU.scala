@@ -74,17 +74,34 @@ class ysyx_23060110_LSU extends Module {
 
   val r_idle :: r_wait_arready :: r_wait_rvalid :: Nil = Enum(3)
   val r_state = RegInit(r_idle)
+  
+  val instreg = RegInit(0.U(32.W))
+  val pcreg = RegInit(0.U(XLEN.W))
+  val memvalidreg = RegInit(0.B)
+  val aluresreg = RegInit(0.U(XLEN.W))
+  val rdenreg = RegInit(0.B)
+  val rdreg = RegInit(0.U(RIDXLEN.W))
+  val memsextreg = RegInit(MEM_SEXT_NONE)
 
   // 由于顺序五级流水不会同时进行读和写， 当 io.in.valid 并且 wen 为 0 即为读
   io.axi4full_to_arbiter.arvalid := r_state === r_wait_arready 
   io.axi4full_to_arbiter.araddr := readAddr
   io.axi4full_to_arbiter.rready := r_state === r_wait_rvalid & io.out.ready
-
+  io.axi4full_to_arbiter.arsize := MuxLookup(memsextreg, 3.U, Seq(
+    MEM_NSEXT_8 ->  0.U,
+    MEM_NSEXT_16->  1.U,
+    MEM_NSEXT_32->  2.U,
+    MEM_SEXT_8  ->  0.U,
+    MEM_SEXT_16 ->  1.U,
+    MEM_SEXT_32 ->  2.U,
+  ))
+  // printf("lsu r_state === %d\n", r_state);
   switch(r_state){
     is(r_idle){
       when(io.in.valid && io.in.bits.memvalid && !io.in.bits.wen){
         readAddr := io.in.bits.raddr
         r_state := r_wait_arready
+        // printf("io.axi4full.arsize=%d\n", io.axi4full_to_arbiter.arsize)
         reqr := 1.B
       }
     }
@@ -110,14 +127,24 @@ class ysyx_23060110_LSU extends Module {
   val writeAddr = RegInit(0.U(32.W))
   val writeData = RegInit(0.U(XLEN.W))
   val writeStrb = RegInit(0.U((XLEN/8).W))
+  val writeSize = WireInit(3.U(3.W))
+
+  writeSize := MuxLookup(writeStrb, 2.U, Seq(
+    1.U -> 0.U,
+    3.U -> 1.U,
+    15.U -> 2.U,
+    255.U -> 3.U,
+  ))
 
   io.axi4full_to_arbiter.awaddr := writeAddr
+  io.axi4full_to_arbiter.awsize := writeSize
   io.axi4full_to_arbiter.awvalid := w_state === w_wait_awready
   io.axi4full_to_arbiter.wdata := writeData
   io.axi4full_to_arbiter.wvalid := w_state === w_wait_wready
   io.axi4full_to_arbiter.wstrb := writeStrb
   io.axi4full_to_arbiter.bready := w_state === w_wait_bvalid
-
+  //printf("wsize = %d\n", writeSize)
+  //printf("lsu r_state w_state == %d %d\n", r_state, w_state)
   switch(w_state) {
     is(w_idle) {
       // 由于目前没有同时进行读写，当 valid = 1 且 wen = 1 为写
@@ -125,6 +152,7 @@ class ysyx_23060110_LSU extends Module {
         writeAddr := io.in.bits.waddr
         writeData := io.in.bits.wdata 
         writeStrb := io.in.bits.wmask
+        
         w_state := w_wait_awready
         reqw := 1.B
       }
@@ -154,13 +182,7 @@ class ysyx_23060110_LSU extends Module {
   io.out.bits.rdata := readData
   io.in.ready := r_state === r_idle && w_state === w_idle
   
-  val instreg = RegInit(0.U(32.W))
-  val pcreg = RegInit(0.U(XLEN.W))
-  val memvalidreg = RegInit(0.B)
-  val aluresreg = RegInit(0.U(XLEN.W))
-  val rdenreg = RegInit(0.B)
-  val rdreg = RegInit(0.U(RIDXLEN.W))
-  val memsextreg = RegInit(MEM_SEXT_NONE)
+
 
   io.out.bits.inst := instreg 
   io.out.bits.pc := pcreg 

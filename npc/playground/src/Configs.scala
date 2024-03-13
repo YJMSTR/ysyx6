@@ -3,9 +3,14 @@ import chisel3._
 object Configs {
   val XLEN                  = 64
   val WMASKLEN              = 8
-  val RESET_VECTOR          = "x80000000"
+  val RESET_VECTOR          = "x20000000"
   val RIDXLEN               = 5
 
+
+  val CLINT_BASE            = 0x0200_0000L
+  val CLINT_SIZE            = 0x0001_0000L
+  val MROM_BASE             = 0x2000_0000L
+  val MROM_SIZE             = 0x0000_1000L
   val MEM_BASE              = 0x80000000L
   val MEM_SIZE              = 0x8000000L
   val DEVICE_BASE           = 0xa0000000L

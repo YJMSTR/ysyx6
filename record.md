@@ -2243,5 +2243,39 @@ line 14637: unsigned int: -1  /  2147483647  ==  2 =>  FAIL (4)
 
 ### SoC 计算机系统
 
+#### 接入 ysyxSoC
 
+generated/ysyxSoCFull 里的 ar 开头几个信号不能连向 0 ，否则 verilator 会报错。需要用 `/* unused */`
+
+直接把 Arbiter 连到了顶层模块的 master 作为输出，原来留在模块里的 XBar 就不再使用了。接入 SoC 后会使用 SoC 的 Xbar，后面那道 MROM 的习题验证了这一点。
+
+#### 在ysyxSoC中输出第一个字符
+
+注意用交叉编译工具链来编译。不管使用 riscv64-unknown-linux-gnu-gcc 还是 riscv64-unknown-elf-gcc，链接时都会报错 crt0 之类的文件找不到。直接用 objdump 将生成的 .o 文件转为 .bin 文件
+
+`./build/ysyxSoCFull /home/yjmstr/ysyx-workbench/npc/char-test/char-test.bin`
+
+看手册猜的地址偏移是 0，手册一共就一个地方写了寄存器的地址，发送和接收的地址都是0，但是按 0 写没有任何输出
+
+```verilog
+// Register addresses
+`define UART_REG_RB	`UART_ADDR_WIDTH'd0	// receiver buffer
+`define UART_REG_TR  `UART_ADDR_WIDTH'd0	// transmitter
+`define UART_REG_IE	`UART_ADDR_WIDTH'd1	// Interrupt enable
+`define UART_REG_II  `UART_ADDR_WIDTH'd2	// Interrupt identification
+`define UART_REG_FC  `UART_ADDR_WIDTH'd2	// FIFO control
+`define UART_REG_LC	`UART_ADDR_WIDTH'd3	// Line Control
+`define UART_REG_MC	`UART_ADDR_WIDTH'd4	// Modem control
+`define UART_REG_LS  `UART_ADDR_WIDTH'd5	// Line status
+`define UART_REG_MS  `UART_ADDR_WIDTH'd6	// Modem status
+`define UART_REG_SR  `UART_ADDR_WIDTH'd7	// Scratch register
+`define UART_REG_DL1	`UART_ADDR_WIDTH'd0	// Divisor latch bytes (1-2)
+`define UART_REG_DL2	`UART_ADDR_WIDTH'd1
+```
+
+猜测是因为我仅仅新加了几个信号将 axi4-lite 扩为 axi4-full,但是没有用上新加的信号的原因。尝试补全 AXI4-Full. 发现之前 arid arlen arsize 和 arburst 的方向写反了。改正以后仍然没有输出字符，在 LSU 中 printf 发现读通道状态机一直是 idle 状态，没有进行过读取，重新看了下 char-test 的汇编代码发现是我傻逼了，S 开头的指令是往内存里写寄存器值而不是从寄存器读取值到内存
+
+awsize 的功能还未实现，实现之后 uart 还是没输出，怀疑是总线协议的其它部分实现有问题。
+
+update：发现是制作的 bin 映像有问题，之前是用 objdump 做的 bin 文件，实际上应该用 objcopy
 

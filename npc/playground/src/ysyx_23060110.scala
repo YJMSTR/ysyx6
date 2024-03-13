@@ -78,36 +78,6 @@ class ysyx_23060110 extends Module {
   val io_empty_master = Module(new ysyx_23060110_empty_axi4full_master)
   io.slave <> io_empty_slave.io.axi4full
   io.master <> io_empty_master.io.axi4full
-  // io.master.araddr :=   0.U
-  // io.master.arvalid :=  0.U 
-  // io.master.rready :=   0.U 
-  // io.master.awaddr :=   0.U
-  // io.master.awvalid :=  0.U
-  // io.master.awid :=     0.U
-  // io.master.awlen :=    0.U
-  // io.master.awsize :=   0.U
-  // io.master.awburst :=  0.U
-  // io.master.wdata :=    0.U
-  // io.master.wstrb :=    0.U 
-  // io.master.wvalid :=   0.U
-  // io.master.wlast :=    0.U
-  // io.master.bready :=   0.U
-  
-  // io.slave.arready := 0.U
-  // io.slave.arid :=    0.U
-  // io.slave.arlen :=   0.U
-  // io.slave.arsize :=  0.U
-  // io.slave.arburst := 0.U
-  // io.slave.rvalid :=  0.U
-  // io.slave.rdata :=   0.U
-  // io.slave.rresp :=   0.U
-  // io.slave.rlast :=   0.U
-  // io.slave.rid   :=   0.U
-  // io.slave.awready := 0.U 
-  // io.slave.wready :=  0.U 
-  // io.slave.bresp :=   0.U
-  // io.slave.bvalid :=  0.U
-  // io.slave.bid :=     0.U
 
   val IDReg = RegInit(
     (new IDRegBundle).Lit(
@@ -202,16 +172,21 @@ class ysyx_23060110 extends Module {
 
   AXI4FullArbiter.io.ifu_bus.bus_reqr := InstFetcher.io.bus_reqr
   AXI4FullArbiter.io.ifu_bus.bus_reqw := InstFetcher.io.bus_reqw
-  AXI4FullArbiter.io.xbar_bus <> XBar2.io.axi4fullin
-
+  val empty_master = Module (new ysyx_23060110_empty_axi4full_master)
+  empty_master.io.axi4full <> XBar2.io.axi4fullin
+  // 将 Arbiter 连到 顶层模块的 master
+  AXI4FullArbiter.io.xbar_bus <> io.master
+  MyClint.io.axi4full <> io.slave
   // XBar2.io.axi4fullout1 <> io.empty_sram
   // XBar2.io.axi4fullout1 <> SRAM.io.axi4full
   // XBar2.io.axi4fullout0 <> MyUart.io.axi4full
   val empty_slave0 = Module(new ysyx_23060110_empty_axi4full_slave)
   val empty_slave1 = Module(new ysyx_23060110_empty_axi4full_slave)
+  val empty_slave_mrom = Module(new ysyx_23060110_empty_axi4full_slave)
   XBar2.io.axi4fullout0 <> empty_slave0.io.axi4full
   XBar2.io.axi4fullout2 <> MyClint.io.axi4full
   XBar2.io.axi4fullout1 <> empty_slave1.io.axi4full
+  XBar2.io.axi4fullout_mrom <> empty_slave_mrom.io.axi4full
 
   InstFetcher.io.out.ready := IDRegen && reset.asBool === 0.B
   InstFetcher.io.in.bits.isdnpc := pcsel
@@ -347,6 +322,8 @@ class ysyx_23060110 extends Module {
   val NPC_Mem = Module(new ysyx_23060110_LSU)
   NPC_Mem.io.out.ready := WBRegen
   NPC_Mem.io.bus_ac := AXI4FullArbiter.io.lsu_bus.bus_ac
+
+
   AXI4FullArbiter.io.lsu_bus.bus_reqr := NPC_Mem.io.bus_reqr
   AXI4FullArbiter.io.lsu_bus.bus_reqw := NPC_Mem.io.bus_reqw
   AXI4FullArbiter.io.lsu_bus.axi4full <> NPC_Mem.io.axi4full_to_arbiter
