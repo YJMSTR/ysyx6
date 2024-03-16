@@ -25,7 +25,7 @@ SCALA_FILE = $(shell find $(abspath ./playground/src/) -name "*.scala")
 VSRCS = $(shell find $(BUILD_DIR) -name "*.v" -or -name "*.sv")
 VSRCS += $(shell find $(abspath ../ysyxSoC/perip) -name "*.v")
 VSRCS += $(abspath ../ysyxSoC/generated/ysyxSoCFull.v)
-CSRCS = $(shell find $(abspath ./) -name "*.c" -or -name "*.cc" -or -name "*.cpp")
+CSRCS = $(shell find $(abspath ./) -name "*.c" -or -name "*.cc" -or -name "*.cpp" -not -path "./char-test/*")
 CSRCS += $(SRC_AUTO_BIND)
 LDFLAGS += -lreadline $(shell llvm-config --libs)
 # # rules for NVBoard

@@ -237,7 +237,7 @@ static void trace_and_difftest(vaddr_t pc, vaddr_t dnpc) {
 }
 #define MROM_BASE 0x20000000
 #define MROM_SIZE 0x1000
-static uint8_t mrom[MROM_SIZE] = {
+static uint8_t mrom[MROM_SIZE*10] = {
   0x93, 0x02, 0x00, 0x08, //addi	t0, zero, 128
   0xef, 0x00, 0xc0, 0x00, //jal ra, 80000010
   0x13, 0x03, 0x10, 0x08, //addi	t1, zero, 129
@@ -259,12 +259,13 @@ extern "C" void mrom_read(int addr, int *data) {
   }
   //*data = 0x00100073;	//ebreak 
   *data = res;
+  Assert(addr >= MROM_BASE && addr < MROM_BASE + MROM_SIZE, "addr = %x out of mrom", addr);
   printf("mrom read[%x]=", addr);
   for (int i = 0; i < 4; i++) {
     printf("%02x ", mrom[addr-MROM_BASE+i]);
   }
   printf("\n");
-  //sleep(1);
+  // sleep(1);
 	//assert(0); 
 }
 
@@ -456,6 +457,7 @@ long load_img() {
 	assert(fp);
 	fseek(fp, 0, SEEK_END);
 	long size = ftell(fp);
+  printf("mrom fp size = %d\n", size);
 	fseek(fp, 0, SEEK_SET);
 	int ret = fread(mrom, 1, size, fp);
   fclose(fp);

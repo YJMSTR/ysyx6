@@ -152,7 +152,7 @@ class ysyx_23060110_LSU extends Module {
         writeAddr := io.in.bits.waddr
         writeData := io.in.bits.wdata 
         writeStrb := io.in.bits.wmask
-        
+        printf("wmask = %d\n", io.in.bits.wmask)
         w_state := w_wait_awready
         reqw := 1.B
       }

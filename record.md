@@ -2277,5 +2277,21 @@ generated/ysyxSoCFull 里的 ar 开头几个信号不能连向 0 ，否则 veril
 
 awsize 的功能还未实现，实现之后 uart 还是没输出，怀疑是总线协议的其它部分实现有问题。
 
-update：发现是制作的 bin 映像有问题，之前是用 objdump 做的 bin 文件，实际上应该用 objcopy
+update：发现是制作的 bin 映像有问题，之前是用 objdump 做的 bin 文件，实际上应该用 objcopy，不过修正之后 UART 仍然没有输出。用 printf 大法调试，发现程序在 mrom read 2000000c 处的指令之后就卡住了，因此没有输出。看波形发现  IFU 的 out.ready = IDRegen 一直是 0，导致 IFU 无法进行新的取指动作。溯源一下发现这个信号和 NPC_Mem.io.in.ready 有关，之前遇到过这个问题。
+
+NPC_Mem 进入了 w_wait_awready 状态，然后一直在等待，没有切换到其它状态。这是因为第二条指令 `sd s0, 8(sp)`中 sp = fffffffffffffff0，不属于 xbar 的任何一个下游设备，xbar 无法转发，。这可能是因为交叉编译工具链没有链接到 C 库导致的，应该用 riscv64-linux-gnu- 来编译，链接时会报错 `multiple definition of '_start'`。
+
+解决方法：看 ysyx 视频课对应的 ppt，应该把程序编译到 freestanding 的环境上
+
+```bash
+$ riscv64-linux-gnu-gcc char-test.c -march=rv64im -mabi=lp64 -ffreestanding -nostdlib -static -Wl,-Ttext=0 -O2 -o char-test
+
+$ riscv64-linux-gnu-objcopy -j .text -O binary char-test char-test.bin
+```
+
+然后能跑了，但是还是不输出字符
+
+可能需要完整实现 AXI4-Full 才行
+
+
 
