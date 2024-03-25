@@ -260,11 +260,11 @@ extern "C" void mrom_read(int addr, int *data) {
   //*data = 0x00100073;	//ebreak 
   *data = res;
   Assert(addr >= MROM_BASE && addr < MROM_BASE + MROM_SIZE, "addr = %x out of mrom", addr);
-  printf("mrom read[%x]=", addr);
-  for (int i = 0; i < 4; i++) {
-    printf("%02x ", mrom[addr-MROM_BASE+i]);
-  }
-  printf("\n");
+  //printf("mrom read[%x]=", addr);
+  // for (int i = 0; i < 4; i++) {
+  //   printf("%02x ", mrom[addr-MROM_BASE+i]);
+  // }
+  // printf("\n");
   // sleep(1);
 	//assert(0); 
 }

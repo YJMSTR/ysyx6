@@ -58,15 +58,15 @@ class ysyx_23060110_MyArbiter extends Module {
       when(io.ifu_bus.bus_reqr) {
         state := ifu_waitr 
         ifu_ac := 1.B 
-        //printf("arbiter->IFU\n")
+        printf("arbiter->IFU\n")
       }.elsewhen(io.lsu_bus.bus_reqr) {
         state := lsu_waitr 
         lsu_ac := 1.B 
-        //printf("arbiter->LSUR\n")
+        printf("arbiter->LSUR\n")
       }.elsewhen(io.lsu_bus.bus_reqw) {
         state := lsu_waitw
         lsu_ac := 1.B 
-        //printf("arbiter->LSUW\n")
+        printf("arbiter->LSUW\n")
       }
     }
     is(ifu_waitr) {

@@ -121,7 +121,7 @@ class ysyx_23060110_LSU extends Module {
   }
 
   
-  val w_idle :: w_wait_awready :: w_wait_wready :: w_wait_bvalid :: Nil = Enum(4)
+  val w_idle :: w_wait_awready_wready:: w_wait_bvalid :: Nil = Enum(3)
   val w_state = RegInit(w_idle)
 
   val writeAddr = RegInit(0.U(32.W))
@@ -138,9 +138,9 @@ class ysyx_23060110_LSU extends Module {
 
   io.axi4full_to_arbiter.awaddr := writeAddr
   io.axi4full_to_arbiter.awsize := writeSize
-  io.axi4full_to_arbiter.awvalid := w_state === w_wait_awready
+  io.axi4full_to_arbiter.awvalid := w_state === w_wait_awready_wready
   io.axi4full_to_arbiter.wdata := writeData
-  io.axi4full_to_arbiter.wvalid := w_state === w_wait_wready
+  io.axi4full_to_arbiter.wvalid := w_state === w_wait_awready_wready
   io.axi4full_to_arbiter.wstrb := writeStrb
   io.axi4full_to_arbiter.bready := w_state === w_wait_bvalid
   //printf("wsize = %d\n", writeSize)
@@ -153,19 +153,13 @@ class ysyx_23060110_LSU extends Module {
         writeData := io.in.bits.wdata 
         writeStrb := io.in.bits.wmask
         printf("wmask = %d\n", io.in.bits.wmask)
-        w_state := w_wait_awready
+        w_state := w_wait_awready_wready
         reqw := 1.B
       }
     }
-    is(w_wait_awready) {
-      when(io.bus_ac & io.axi4full_to_arbiter.awready) {
-        // waddr 传输完成
-        w_state := w_wait_wready
-      }
-    }
-    is(w_wait_wready) {
-      when(io.axi4full_to_arbiter.wready) {
-        // wdata 传输完成
+    is(w_wait_awready_wready) {
+      when(io.bus_ac & io.axi4full_to_arbiter.awready & io.axi4full_to_arbiter.wready) {
+        // waddr 和 wdata 传输完成
         w_state := w_wait_bvalid
       }
     }
