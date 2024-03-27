@@ -121,7 +121,7 @@ class ysyx_23060110_LSU extends Module {
   }
 
   
-  val w_idle :: w_wait_awready_wready:: w_wait_bvalid :: Nil = Enum(3)
+  val w_idle :: w_wait_wready :: w_wait_bvalid :: Nil = Enum(3)
   val w_state = RegInit(w_idle)
 
   val writeAddr = RegInit(0.U(32.W))
@@ -138,9 +138,9 @@ class ysyx_23060110_LSU extends Module {
 
   io.axi4full_to_arbiter.awaddr := writeAddr
   io.axi4full_to_arbiter.awsize := writeSize
-  io.axi4full_to_arbiter.awvalid := w_state === w_wait_awready_wready
+  io.axi4full_to_arbiter.awvalid := w_state =/= w_idle
   io.axi4full_to_arbiter.wdata := writeData
-  io.axi4full_to_arbiter.wvalid := w_state === w_wait_awready_wready
+  io.axi4full_to_arbiter.wvalid := w_state =/= w_idle
   io.axi4full_to_arbiter.wstrb := writeStrb
   io.axi4full_to_arbiter.bready := w_state === w_wait_bvalid
   //printf("wsize = %d\n", writeSize)
@@ -152,15 +152,18 @@ class ysyx_23060110_LSU extends Module {
         writeAddr := io.in.bits.waddr
         writeData := io.in.bits.wdata 
         writeStrb := io.in.bits.wmask
-        printf("wmask = %d\n", io.in.bits.wmask)
-        w_state := w_wait_awready_wready
+        // printf("wmask = %d\n", io.in.bits.wmask)
+        w_state := w_wait_wready
         reqw := 1.B
       }
     }
-    is(w_wait_awready_wready) {
+    is(w_wait_wready) {
       when(io.bus_ac & io.axi4full_to_arbiter.awready & io.axi4full_to_arbiter.wready) {
-        // waddr 和 wdata 传输完成
-        w_state := w_wait_bvalid
+        // waddr wdata 传输完成
+        // Keep in mind that slaves may do this: awready := wvalid, wready := awvalid
+        // To not cause a loop, we cannot have: wvalid := awready
+        w_state := w_wait_bvalid 
+        //在从设备的AWREADY信号有效后的第一个时钟上升沿，主设备的AWVALID信号必须保持有效
       }
     }
     is(w_wait_bvalid) {

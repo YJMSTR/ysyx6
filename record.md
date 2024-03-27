@@ -2285,3 +2285,47 @@ $ riscv64-linux-gnu-objcopy -j .text -O binary char-test char-test.bin
 然后能跑了，但是还是不输出字符
 
 看波形发现SoC会在同一个周期判断awvalid和wvalid，改了 lsu 状态机后正确
+
+#### 为 ysyxsoc 添加 am 运行时环境
+
+看ysyx视频学写链接脚本，能跑 dummy。
+
+#### 无法运行的测试
+
+但 fib 运行时会卡死，看波形发现 SoC 里的 RAM 的 awready 已经是 1 了，但是 soc xbar 的 awready 仍为 0，SoC xbar 的 awaddr 和 SoC RAM 的 awaddr 一致
+
+```verilog
+assign nodeIn_awready = in_0_awready & _nodeIn_awready_T & casez_tmp_0;
+```
+
+看波形，in_0_awready 的值为 1，但最终 nodeIn_awready 为 0，casez_tmp_0 一直是 1，这说明 `_nodeIn_awready_T = latched | _awIn_0_io_enq_ready` 一直为 0。直接看其对应的 chisel 代码，发现了这样一段话：
+
+```scala
+        // Keep in mind that slaves may do this: awready := wvalid, wready := awvalid
+        // To not cause a loop, we cannot have: wvalid := awready
+```
+
+回头看 LSU 的代码，我对总线协议的理解有误。awready信号和 wready 信号都同时依赖于 awvalid 和 wvalid，这两个 valid 要同时拉高。并且依赖关系的图看错了，看成 axi3 的了。axi4 的写事务依赖关系图是下面这张
+
+![](/home/yjmstr/ysyx-workbench/axi4w.png)
+
+看波形发现 fib 测例卡在 sd 指令的时候，axi4ram 的 awvalid 是 0，ysyxsoc 中有如下代码
+
+```
+    in. b.valid := w_full
+    in.aw.ready := in. w.valid && (in.b.ready || !w_full)
+    in. w.ready := in.aw.valid && (in.b.ready || !w_full)
+```
+
+awvalid 是 0 会导致 wready 也为 0，这与波形的结果一致。
+
+波形中 ram 的 wvalid 为 1 但 awvalid 为 0，就很奇怪。如果不是 ram 改了 awvalid ，就是 xbar 或者 arbiter 改的。
+
+XBar 里有如下代码
+
+```scala
+        in(i).aw.valid := io_in(i).aw.valid && (latched || awIn(i).io.enq.ready) && allowAW
+        io_in(i).aw.ready := in(i).aw.ready && (latched || awIn(i).io.enq.ready) && allowAW
+```
+
+看波形，io enq ready 和 latched 都是 0，导致这两个信号都是 0。io_enq_ready 初始时是 1，在上一次成功执行写事务之后就变成了 0。这个信号是 chisel 中的 queue 使用的，enq 是向队列写入数据时用到的信号。
