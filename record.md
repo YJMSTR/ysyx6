@@ -2329,3 +2329,14 @@ XBar 里有如下代码
 ```
 
 看波形，io enq ready 和 latched 都是 0，导致这两个信号都是 0。io_enq_ready 初始时是 1，在上一次成功执行写事务之后就变成了 0。这个信号是 chisel 中的 queue 使用的，enq 是向队列写入数据时用到的信号。
+
+暂时搁置？
+
+#### 重新添加 difftest
+
+要给 NEMU 加 MROM 和 SRAM，并把 NPC 读入 MROM 的 img 存到 NEMU 中，并不添加新的 Difftest API
+
+- MROM 和 SRAM 可以用哪片地址空间呢？
+- 重新启用 NPC 仿真环境，需要在新的顶层模块当中添加 pc 和 inst 相关的信号？
+  - 不一定，寄存器就没有拉到顶，但也可以访问
+  - 

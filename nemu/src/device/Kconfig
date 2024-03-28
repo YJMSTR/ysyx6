@@ -151,4 +151,17 @@ config SDCARD_IMG_PATH
 endif # HAS_SDCARD
 endif
 
+menuconfig HAS_MROM
+  bool "Enable mrom"
+  default y
+
+if HAS_MROM 
+config MROM_BASE
+  hex "MROM base address"
+  default 0x20000000
+
+config MROM_SIZE
+  hex "MROM size"
+  default 0x1000
+
 endif # DEVICE
