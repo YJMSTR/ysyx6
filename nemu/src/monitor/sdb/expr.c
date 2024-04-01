@@ -109,8 +109,8 @@ static bool make_token(char *e) {
         char *substr_start = e + position;
         int substr_len = pmatch.rm_eo;
 
-        Log("match rules[%d] = \"%s\" at position %d with len %d: %.*s",
-            i, rules[i].regex, position, substr_len, substr_len, substr_start);
+        // Log("match rules[%d] = \"%s\" at position %d with len %d: %.*s",
+            // i, rules[i].regex, position, substr_len, substr_len, substr_start);
 
         position += substr_len;
 
@@ -159,7 +159,7 @@ static bool make_token(char *e) {
   }
   for (int i = 0; i < real_nr_token; i++) {
     tokens[i] = real_tokens[i];
-    Log("real_tokens[%d].type=%d str=%s\n", i, tokens[i].type, tokens[i].str);
+    // Log("real_tokens[%d].type=%d str=%s\n", i, tokens[i].type, tokens[i].str);
   }
   nr_token = real_nr_token;
   return true;
@@ -187,7 +187,7 @@ bool check_parentheses(int p, int q) {
 }
 
 word_t eval(int p, int q) {
-  Log("eval %d %d", p, q);
+  // Log("eval %d %d", p, q);
   if (p > q) {
     Log("Bad expression, p > q");
     return -1;

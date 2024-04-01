@@ -141,7 +141,7 @@ void init_monitor(int argc, char *argv[]) {
 
   /* Initialize the FTrace. */
   #ifdef CONFIG_ITRACE
-  //set_ftrace_enable();
+  // set_ftrace_enable();
   #endif
   if (ftrace_is_enable())
     init_ftrace(elf_file);
