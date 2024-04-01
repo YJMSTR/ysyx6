@@ -27,9 +27,9 @@ word_t isa_raise_intr(word_t NO, vaddr_t epc) {
     cpu.csrs[CSR_MCAUSE] = 11; // ecall from M mode
     cpu.csrs[CSR_MEPC] = epc;
 
-    // #ifdef CONFIG_ETRACE
-    //   Log("isa_raise_intr csr_mtvec: %lx csr_mepc: %lx", cpu.csrs[CSR_MTVEC], cpu.csrs[CSR_MEPC]);
-    // #endif
+    #ifdef CONFIG_ETRACE
+      Log("isa_raise_intr csr_mtvec: %lx csr_mepc: %lx", cpu.csrs[CSR_MTVEC], cpu.csrs[CSR_MEPC]);
+    #endif
     
     return cpu.csrs[CSR_MTVEC];
   } else {

@@ -13,7 +13,7 @@ Context* __am_irq_handle(Context *c) {
     }
 
     c = user_handler(ev, c);
-    assert(c->mepc);
+    // assert(c->mepc);
     // printf("irq c->mepc == %x c->mcause=%x\n", c->mepc, c->mcause);
     
   }
@@ -45,13 +45,15 @@ Context *kcontext(Area kstack, void (*entry)(void *), void *arg) {
 
   kstack.end 是栈底，start 是栈顶，ctx 指向的地址是栈顶，栈中只有上下文
   */
+  
   Context *ctx = (Context *)((uintptr_t)kstack.end - sizeof(Context));
-  assert((uintptr_t)ctx + sizeof(Context) == (uintptr_t)kstack.end);
-  ctx->mepc = (uintptr_t)entry;
+  ctx->mepc = (uintptr_t)entry - 4;
+  ctx->gpr[10] = (uintptr_t)arg;
+  
   // 恢复上下文的通用寄存器时候并不会恢复 sp 寄存器，sp 寄存器是在出栈后手动 addi 加回去的 
-  // 在 trap.S 中，通过 mv sp, a0 把 ctx 指向的地址作为栈顶。ctx 存在 a0 寄存器里
+  // 在 trap.S 中，通过 mv sp, a0; 把 ctx 指向的地址作为栈顶。ctx 存在 a0 寄存器里
   ctx->mstatus = 0xa00001800;
-  ctx->mcause = 0xb;
+
   return ctx;
 }
 

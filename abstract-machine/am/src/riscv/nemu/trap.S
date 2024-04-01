@@ -58,23 +58,15 @@ __am_asm_trap:
   csrw mstatus, t1
 
   mv a0, sp
-  
   jal __am_irq_handle
-  
-  mv t0, sp
   mv sp, a0
 
   LOAD t1, OFFSET_STATUS(sp)
   LOAD t2, OFFSET_EPC(sp)
-
-  # 摧毁旧的上下文，将其 epc 设置为 f
-  
-  STORE t2, OFFSET_EPC(t0)
-
   csrw mstatus, t1
   csrw mepc, t2
-  MAP(REGS, POP) 
-  
+
+  MAP(REGS, POP)
+
   addi sp, sp, CONTEXT_SIZE
- 
   mret
