@@ -48,6 +48,8 @@ Context *kcontext(Area kstack, void (*entry)(void *), void *arg) {
   
   Context *ctx = (Context *)((uintptr_t)kstack.end - sizeof(Context));
   ctx->mepc = (uintptr_t)entry - 4;
+  // epc 原本是产生异常的那条指令，从epc返回后epc处的指令不会被执行
+  // 所以这里得 -4,不然 f 的第一条指令会被丢了
   ctx->gpr[10] = (uintptr_t)arg;
   
   // 恢复上下文的通用寄存器时候并不会恢复 sp 寄存器，sp 寄存器是在出栈后手动 addi 加回去的 
