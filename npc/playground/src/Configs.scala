@@ -5,12 +5,21 @@ object Configs {
   val WMASKLEN              = 8
   val RESET_VECTOR          = "x80000000"
   val RIDXLEN               = 5
+  val CSRIDXLEN             = 12
 
   val MEM_BASE              = 0x80000000L
   val MEM_SIZE              = 0x8000000L
   val DEVICE_BASE           = 0xa0000000L
   val SERIAL_PORT           = DEVICE_BASE + (0x000003f8L)
   val RTC_ADDR              = DEVICE_BASE + (0x00000048L) 
+
+// #define CSR_MTVEC   0x305
+// #define CSR_MEPC    0x341
+// #define CSR_MCAUSE  0x342
+  val CSR_MTVEC             = 0x305
+  val CSR_MEPC              = 0x341
+  val CSR_MCAUSE            = 0x342
+  val CSR_MSTATUS           = 0x300
 
   val ALU_DATASEL_WIDTH     = 3
   val IMM_SEL_WIDTH         = 3
@@ -53,12 +62,13 @@ object Configs {
   val ALU_REMUW             = 23.U(ALUCtrlWidth.W)
 
   // ALU 的数据来源:
-  val ALU_DATA_NONE         = 0.U(ALUCtrlWidth.W)
-  val ALU_DATA_RS1          = 1.U(ALUCtrlWidth.W)
-  val ALU_DATA_RS2          = 2.U(ALUCtrlWidth.W)
-  val ALU_DATA_PC           = 3.U(ALUCtrlWidth.W)
-  val ALU_DATA_IMM          = 4.U(ALUCtrlWidth.W)
-  val ALU_DATA_SHAMT        = 5.U(ALUCtrlWidth.W)
+  val ALU_DATA_NONE         = 0.U(ALU_DATASEL_WIDTH.W)
+  val ALU_DATA_RS1          = 1.U(ALU_DATASEL_WIDTH.W)
+  val ALU_DATA_RS2          = 2.U(ALU_DATASEL_WIDTH.W)
+  val ALU_DATA_PC           = 3.U(ALU_DATASEL_WIDTH.W)
+  val ALU_DATA_IMM          = 4.U(ALU_DATASEL_WIDTH.W)
+  val ALU_DATA_SHAMT        = 5.U(ALU_DATASEL_WIDTH.W)
+  val ALU_DATA_CSR          = 6.U(ALU_DATASEL_WIDTH.W)
   
 
   // IMMSEL

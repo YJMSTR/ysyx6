@@ -112,6 +112,7 @@ static int skip_dut_nr_inst = 0;
 
 void difftest_skip_ref() {
   is_skip_ref = true;
+  Log("difftest_skip_ref");
   skip_dut_nr_inst = 0;
 }
 
@@ -203,7 +204,7 @@ void difftest_step(vaddr_t pc, vaddr_t npc) {
 
   if (is_skip_ref) {
     // to skip the checking of an instruction, just copy the reg state to reference design
-    //Log("skip ref pc=0x%08x, npc=0x%08x", pc, npc);
+    Log("skip ref pc=0x%08x, npc=0x%08x", pc, npc);
     ref_difftest_regcpy(&cpu, DIFFTEST_TO_REF);
     is_skip_ref = false;
     return;
@@ -238,7 +239,7 @@ extern "C" void npc_pmem_read(int raddr, long long *rdata) {
   uint32_t addr = raddr;
   //addr = addr & ~0x3u;
   if (addr == RTC_ADDR + 4) {
-    //Log("DTRACE RTC_ADDR + 4");
+    Log("DTRACE RTC_ADDR + 4");
     difftest_skip_ref();
     struct timeval now;
     gettimeofday(&now, NULL);
@@ -249,7 +250,7 @@ extern "C" void npc_pmem_read(int raddr, long long *rdata) {
     *rdata = rtc_us >> 32ull;
     return;
   } else if (addr == RTC_ADDR) {
-    //Log("DTRACE RTC_ADDR");
+    Log("DTRACE RTC_ADDR");
     difftest_skip_ref();
     *rdata = (uint32_t)rtc_us;
     return;
@@ -271,16 +272,16 @@ extern "C" void npc_pmem_write(int waddr, long long wdata, char wmask) {
   //int addr = waddr & ~0x3u;
   uint32_t addr = waddr;
   //printf("pmem_write: waddr = 0x%08llx wdata = 0x%08llx wmask = 0x%x\n", waddr, wdata, 0xff & wmask);
-  // if (addr == SERIAL_PORT) {
-  //   difftest_skip_ref();
-  //   //Log("dtrace: pc = 0x%08x serial wdata = %d, wmask = %d", topp->io_pc, wdata, wmask);
-  //   if ((wmask & 0xff) == 1) {
-  //     putchar(wdata);
-  //   } else {
-  //     Log("serial don't support wmask = 0x%x putch", wmask & 0xff);
-  //   }
-  //   return;
-  // }
+  if (addr == SERIAL_PORT) {
+    difftest_skip_ref();
+    //Log("dtrace: pc = 0x%08x serial wdata = %d, wmask = %d", topp->io_pc, wdata, wmask);
+    if ((wmask & 0xff) == 1) {
+      putchar(wdata);
+    } else {
+      Log("serial don't support wmask = 0x%x putch", wmask & 0xff);
+    }
+    return;
+  }
   assert((word_t)addr >= MEM_BASE && ((word_t)(addr - MEM_BASE + 7)) < MEM_SIZE);
   for (int i = 0; i < 8; i++) {
     if (wmask & (1 << i)) {

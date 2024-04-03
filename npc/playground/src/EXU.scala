@@ -11,6 +11,8 @@ class EXU() extends Module {
     val inst = Input(UInt(32.W))
     val rs1v = Input(UInt(XLEN.W))
     val rs2v = Input(UInt(XLEN.W))
+    val csridx = Input(UInt(CSRIDXLEN.W))
+    val csrrv = Input(UInt(XLEN.W))
     val pc   = Input(UInt(XLEN.W))
     val asel = Input(UInt(ALU_DATASEL_WIDTH.W))
     val bsel = Input(UInt(ALU_DATASEL_WIDTH.W))
@@ -28,6 +30,7 @@ class EXU() extends Module {
     ALU_DATA_RS2->io.rs2v,
     ALU_DATA_PC->io.pc, 
     ALU_DATA_IMM->io.imm,
+    ALU_DATA_CSR->io.csrrv,
   ))
   val data_B = MuxLookup(io.bsel, 0.U(XLEN.W))(Seq(
     ALU_DATA_NONE->0.U(XLEN.W),
@@ -36,6 +39,7 @@ class EXU() extends Module {
     ALU_DATA_PC->io.pc, 
     ALU_DATA_IMM->io.imm,
     ALU_DATA_SHAMT->shamt,
+    ALU_DATA_CSR->io.csrrv,
   ))
 
   val data_res = Wire(UInt(XLEN.W))

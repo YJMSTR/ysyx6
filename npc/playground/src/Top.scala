@@ -19,6 +19,10 @@ class EXRegBundle extends Bundle {
   val rs2v  = UInt(XLEN.W)
   val rs1   = UInt(RIDXLEN.W)
   val rs2   = UInt(RIDXLEN.W)
+  val csridx = UInt(CSRIDXLEN.W)
+  val csrrv  = UInt(XLEN.W)
+  val csrwv = UInt(XLEN.W)
+  val csr_en = Bool()
   val imm   = UInt(XLEN.W)
   val dataAsel  = UInt(ALU_DATASEL_WIDTH.W)
   val dataBsel  = UInt(ALU_DATASEL_WIDTH.W)
@@ -40,6 +44,10 @@ class LSRegBundle extends Bundle {
   val pc = UInt(XLEN.W)
   val alures = UInt(XLEN.W)
   val rs2v = UInt(XLEN.W)
+  val csridx = UInt(CSRIDXLEN.W)
+  val csrrv  = UInt(XLEN.W)
+  val csrwv = UInt(XLEN.W)
+  val csr_en = Bool()
   val memvalid = Bool()
   val memwen = Bool()
   val memwmask = UInt(WMASKLEN.W)
@@ -53,6 +61,10 @@ class WBRegBundle extends Bundle {
   val inst = UInt(32.W)
   val pc = UInt(XLEN.W)
   val alures = UInt(XLEN.W)
+  val csridx = UInt(CSRIDXLEN.W)
+  val csrrv  = UInt(XLEN.W)
+  val csrwv = UInt(XLEN.W)
+  val csr_en = Bool()
   val rden = Bool()
   val rd = UInt(RIDXLEN.W)
   val memvalid = Bool()
@@ -91,6 +103,10 @@ class Top extends Module {
       _.rs2       -> 0.U,
       _.rs1v      -> 0.U,
       _.rs2v      -> 0.U,
+      _.csridx    -> 0.U,
+      _.csrrv     -> 0.U,
+      _.csrwv     -> 0.U,
+      _.csr_en    -> 0.B,
       _.imm       -> 0.U,
       _.dataAsel  -> ALU_DATA_NONE,
       _.dataBsel  -> ALU_DATA_NONE,
@@ -113,6 +129,10 @@ class Top extends Module {
       _.pc        -> 0.U,
       _.alures    -> 0.U,
       _.rs2v      -> 0.U,
+      _.csridx    -> 0.U,
+      _.csrrv     -> 0.U,
+      _.csrwv     -> 0.U,
+      _.csr_en    -> 0.B,
       _.memvalid  -> 0.B,
       _.memwen    -> 0.B,
       _.memwmask  -> 0.U,
@@ -128,6 +148,10 @@ class Top extends Module {
       _.pc        -> 0.U,
       _.memvalid  -> 0.B,
       _.alures    -> 0.U,
+      _.csridx    -> 0.U,
+      _.csrrv     -> 0.U,
+      _.csrwv     -> 0.U,
+      _.csr_en    -> 0.B,
       //_.sextrdata -> 0.U,
       _.rden      -> 0.B,
       _.rd        -> 0.U,
@@ -160,6 +184,14 @@ class Top extends Module {
   val InstFetcher = Module(new IFU)
   val PC = RegInit(UInt(XLEN.W), RESET_VECTOR.U)
   val R = Mem(32, UInt(XLEN.W))
+  
+  val mstatus = RegInit("xa00001800".U(XLEN.W))
+  val mtvec   = RegInit(0.U(XLEN.W))
+  val mepc    = RegInit(0.U(XLEN.W))
+  val mcause  = RegInit(0.U(XLEN.W))
+
+  
+
   val dataHazard = WireInit(Bool(), 0.B)
   val stall = WireInit(Bool(), 0.B)
 
@@ -202,6 +234,20 @@ class Top extends Module {
   val rs2v = Rread(Decoder.io.rs2)
   val rs1v = Rread(Decoder.io.rs1)
   
+  val csridx = Mux(Decoder.io.inst === ECALL, CSR_MTVEC.U(12.W), Decoder.io.inst(31, 20))
+  val csrrv  = MuxLookup(csridx, 0.U(XLEN.W), Seq(
+    CSR_MCAUSE.U  -> mcause,
+    CSR_MSTATUS.U -> mstatus,
+    CSR_MEPC.U    -> mepc,
+    CSR_MTVEC.U   -> mtvec
+  ))
+
+  // csrwv 是要写回 csridx 对应的 csr 的值，当 csr_en 为真时写回
+
+  val csrwv = MuxCase(0.U(XLEN.W), Seq(
+    (Decoder.io.inst === CSRRS) -> (rs1v | csrrv),
+    (Decoder.io.inst === CSRRW) -> csrrv
+  ))
   // val snpc = Decoder.io.pc + 4.U
   EXRegen := LSRegen //| !EXReg.valid
   // 流水线阻塞会导致  EXReg.valid 被拉低，但其实拉低后 EXReg 中保存的仍然是有效数据，不应该冲刷掉
@@ -212,6 +258,10 @@ class Top extends Module {
     EXReg.rs1 := Decoder.io.rs1
     EXReg.rs2 := Decoder.io.rs2
     EXReg.rs2v := rs2v
+    EXReg.csridx := csridx
+    EXReg.csrrv := csrrv
+    EXReg.csrwv := csrwv
+    EXReg.csr_en := Decoder.io.csr_en
     EXReg.imm  := Decoder.io.imm
     
     EXReg.aluop := Decoder.io.alu_op
@@ -269,6 +319,8 @@ class Top extends Module {
     ALU.io.rs1v := EXReg.rs1v
     ALU.io.rs2v := EXReg.rs2v
     ALU.io.isword := EXReg.isword
+    ALU.io.csridx := EXReg.csridx
+    ALU.io.csrrv  := EXReg.csrrv
     when (LSRegen) {
       LSReg.valid := EXReg.valid
       LSReg.inst := EXReg.inst
@@ -281,6 +333,10 @@ class Top extends Module {
       LSReg.rden := EXReg.rden
       LSReg.rd := EXReg.rd
       LSReg.alures := ALU.io.res
+      LSReg.csridx := ALU.io.csridx
+      LSReg.csrrv := ALU.io.csrrv
+      LSReg.csrwv := EXReg.csrwv
+      LSReg.csr_en := EXReg.csr_en
     }
   } .otherwise {
     ALU.io.inst := 0.U 
@@ -291,16 +347,22 @@ class Top extends Module {
     ALU.io.imm := 0.U
     ALU.io.rs1v := 0.U
     ALU.io.rs2v := 0.U
+    ALU.io.csridx := 0.U 
+    ALU.io.csrrv  := 0.U
     ALU.io.isword := 0.B
     when (LSRegen) {
       LSReg.inst := 0.U
       LSReg.pc := 0.U
       LSReg.rs2v := 0.U
+      LSReg.csridx := 0.U 
+      LSReg.csrrv := 0.U
+      LSReg.csrwv := 0.U
       LSReg.memvalid := 0.B
       LSReg.memwen := 0.B
       LSReg.memwmask := 0.U
       LSReg.memsext := MEM_SEXT_NONE
       LSReg.rden := 0.B
+      LSReg.csr_en := 0.B
       LSReg.rd := 0.U
     }
   }
@@ -341,6 +403,10 @@ class Top extends Module {
     NPC_Mem.io.in.bits.wdata := LSReg.rs2v
     NPC_Mem.io.in.bits.rden := LSReg.rden
     NPC_Mem.io.in.bits.rd := LSReg.rd   
+    NPC_Mem.io.in.bits.csridx := LSReg.csridx
+    NPC_Mem.io.in.bits.csrrv := LSReg.csrrv
+    NPC_Mem.io.in.bits.csrwv := LSReg.csrwv
+    NPC_Mem.io.in.bits.csr_en := LSReg.csr_en
   }.otherwise {
     //when (NPC_Mem.io.in.ready) {
       NPC_Mem.io.in.bits.inst := 0.U
@@ -356,6 +422,10 @@ class Top extends Module {
       NPC_Mem.io.in.bits.wsext := MEM_SEXT_NONE
       NPC_Mem.io.in.bits.rden := 0.B 
       NPC_Mem.io.in.bits.rd := 0.U
+      NPC_Mem.io.in.bits.csridx := 0.U 
+      NPC_Mem.io.in.bits.csrrv := 0.U
+      NPC_Mem.io.in.bits.csrwv := 0.U
+      NPC_Mem.io.in.bits.csr_en := 0.B
     //}
   }
 
@@ -371,6 +441,10 @@ class Top extends Module {
       WBReg.rd := NPC_Mem.io.out.bits.rd
       WBReg.memsext := NPC_Mem.io.out.bits.memsext
       WBReg.rdata := NPC_Mem.io.out.bits.rdata
+      WBReg.csridx := NPC_Mem.io.out.bits.csridx
+      WBReg.csrrv := NPC_Mem.io.out.bits.csrrv
+      WBReg.csrwv := NPC_Mem.io.out.bits.csrwv  
+      WBReg.csr_en := NPC_Mem.io.out.bits.csr_en
     }
   }.otherwise {
     when (WBRegen) {
@@ -383,10 +457,14 @@ class Top extends Module {
       WBReg.rd := 0.U 
       WBReg.memsext := MEM_SEXT_NONE
       WBReg.rdata := 0.B
+      WBReg.csridx := NPC_Mem.io.out.bits.csridx
+      WBReg.csrrv := NPC_Mem.io.out.bits.csrrv
+      WBReg.csrwv := NPC_Mem.io.out.bits.csrwv
+      WBReg.csr_en := NPC_Mem.io.out.bits.csr_en
     }
   }
 
-  when (WBReg.valid & ISRegen) {
+  when (WBReg.valid) {
     ISReg.valid := WBReg.valid
     ISReg.inst := WBReg.inst
     ISReg.pc := WBReg.pc
@@ -400,8 +478,28 @@ class Top extends Module {
       MEM_SEXT_16 ->  Cat(Fill(XLEN-16, rdata15), rdata(15, 0)),
       MEM_SEXT_32 ->  Cat(Fill(XLEN-32, rdata31), rdata(31, 0)),
     ))
-    when(WBReg.rden && WBReg.rd =/= 0.U) {
-      R(WBReg.rd) := Mux(WBReg.memvalid === 1.B, wbsextrdata, WBReg.alures)
+
+    when(WBReg.inst === ECALL) {
+      mepc := WBReg.pc 
+      mcause := 11.U
+    }
+    when(WBReg.rden) {
+      when (WBReg.rd =/= 0.U) {
+        R(WBReg.rd) := Mux(WBReg.memvalid === 1.B, wbsextrdata, WBReg.alures)
+      }
+    }
+    when(WBReg.csr_en) {
+      when(WBReg.csridx === CSR_MEPC.U) {
+        mepc := WBReg.csrwv
+      } .elsewhen (WBReg.csridx === CSR_MCAUSE.U) {
+        mcause := WBReg.csrwv 
+      } .elsewhen (WBReg.csridx === CSR_MSTATUS.U) {
+        mstatus := WBReg.csrwv 
+      } .elsewhen (WBReg.csridx === CSR_MTVEC.U) {
+        mtvec := WBReg.csrwv 
+      } .otherwise {
+
+      }
     }
     // wbalures := WBReg.alures
   } .otherwise {
@@ -429,10 +527,25 @@ class Top extends Module {
   val MEM_RS2_Hazard = Decoder.io.rs2 === NPC_Mem.io.out.bits.rd && NPC_Mem.io.out.bits.rden
   val WB_RS1_Hazard = Decoder.io.rs1 === Mux(WBReg.valid, WBReg.rd, 0.U) && WBReg.rden
   val WB_RS2_Hazard = Decoder.io.rs2 === Mux(WBReg.valid, WBReg.rd, 0.U) && WBReg.rden
-  dataHazard := MuxCase(0.U, Array (
+
+  // 对于 ECALL 指令，其会将 csridx 设置为 mtvec
+  val zicsr_ren = (Decoder.io.inst === CSRRS || Decoder.io.inst === CSRRW)
+  val EX_CSR_Hazard = (csridx === Mux(EXReg.valid, EXReg.csridx, 0.U) && (EXReg.csr_en)) || (EXReg.inst === ECALL && EXReg.valid && (csridx === CSR_MEPC.U || csridx === CSR_MCAUSE.U)) 
+  val LS_CSR_Hazard = (csridx === Mux(LSReg.valid, LSReg.csridx, 0.U) && LSReg.csr_en) || (LSReg.inst === ECALL && LSReg.valid && (csridx === CSR_MEPC.U || csridx === CSR_MCAUSE.U))
+  val MEM_CSR_Hazard = (csridx === NPC_Mem.io.out.bits.csridx && NPC_Mem.io.out.bits.csr_en) || (NPC_Mem.io.out.bits.inst === ECALL && NPC_Mem.io.out.valid && (csridx === CSR_MEPC.U || csridx === CSR_MCAUSE.U))
+  val WB_CSR_Hazard = (csridx === Mux(WBReg.valid, WBReg.csridx, 0.U) && WBReg.csr_en) || (WBReg.inst === ECALL && WBReg.valid && (csridx === CSR_MEPC.U || csridx === CSR_MCAUSE.U))
+
+  val gpr_data_hazard = MuxCase(0.B, Array(
     (rs1ren && (EX_RS1_Hazard | LS_RS1_Hazard | MEM_RS1_Hazard | WB_RS1_Hazard)) -> 1.B,
     (rs2ren && (EX_RS2_Hazard | LS_RS2_Hazard | MEM_RS2_Hazard | WB_RS2_Hazard)) -> 1.B,
   ))
+
+  val csr_data_hazard = zicsr_ren && (EX_CSR_Hazard | LS_CSR_Hazard | MEM_CSR_Hazard | WB_CSR_Hazard)
+
+  dataHazard := gpr_data_hazard | csr_data_hazard
+   
+  // ecall: 写入 mepc 和 mcause, 读 mtvec。读写的冒险上面都处理了
+
   //printf("IDUpc=%x rs1ren: %d, rs2ren: %d, EX_RS1_Hazard: %d, EX_RS2_Hazard: %d, WB_RS1_Hazard: %d, WB_RS2_Hazard: %d, LS_RS1_Hazard: %d, LS_RS2_Hazard: %d\n", IDReg.pc, rs1ren, rs2ren, EX_RS1_Hazard, EX_RS2_Hazard, WB_RS1_Hazard, WB_RS2_Hazard, LS_RS1_Hazard, LS_RS2_Hazard)
   when (stall) {
     InstFetcher.io.in.valid := 0.B
@@ -452,6 +565,8 @@ class Top extends Module {
       (Decoder.io.inst === BGEU)  -> pc_plus_imm,
       (Decoder.io.inst === BLT)   -> pc_plus_imm,
       (Decoder.io.inst === BLTU)  -> pc_plus_imm,
+      (Decoder.io.inst === MRET)  -> mepc,
+      (Decoder.io.inst === ECALL) -> mtvec,
     ))
     pcsel := MuxCase(0.U, Array(
       (Decoder.io.inst === JALR)  -> 1.B,
@@ -462,6 +577,8 @@ class Top extends Module {
       (Decoder.io.inst === BGEU)  -> (rs1v >= rs2v),
       (Decoder.io.inst === BLT)   -> (rs1v.asSInt < rs2v.asSInt),
       (Decoder.io.inst === BLTU)  -> (rs1v < rs2v),
+      (Decoder.io.inst === MRET)  -> 1.B,
+      (Decoder.io.inst === ECALL) -> 1.B,
     ))
   }
   
