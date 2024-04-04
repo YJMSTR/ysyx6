@@ -23,6 +23,7 @@ const char *regs[] = {
   "s8", "s9", "s10", "s11", "t3", "t4", "t5", "t6"
 };
 
+#define CSR_MSTATUS 0x300
 #define CSR_MTVEC   0x305
 #define CSR_MEPC    0x341
 #define CSR_MCAUSE  0x342
@@ -48,6 +49,10 @@ word_t isa_reg_str2val(const char *s, bool *success) {
     //Log("isa_reg_str2val %s = %u 0x%x", s, cpu.pc, cpu.pc);
     *success = true;
     return cpu.pc;
+  }
+  if (strcmp(s, "$mepc") == 0) {
+    *success = true;
+    return cpu.csrs[CSR_MEPC];
   }
   return 0;
 }

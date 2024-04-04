@@ -45,6 +45,7 @@ class XBar extends Module {
           io.axi4litein.rresp := 3.U // decerr
           io.axi4litein.rvalid := true.B
           printf("decerr r %x\n", io.axi4litein.araddr)
+          stop()
           io.axi4litein.rdata := 0.U
           state_r := r_idle
         }
@@ -71,7 +72,9 @@ class XBar extends Module {
         when (io.axi4litein.awaddr >= MEM_BASE.U(XLEN.W) && io.axi4litein.awaddr < MEM_BASE.U(XLEN.W) + MEM_SIZE.U(XLEN.W)) {
           state_w := w_sram_wait
         }.elsewhen (io.axi4litein.awaddr === SERIAL_PORT.U(XLEN.W)) {
+       
           state_w := w_uart_wait
+          // state_w := w_sram_wait
         }.otherwise {
           io.axi4litein.bresp := 3.U // decerr
           printf("decerr w\n")

@@ -18,6 +18,10 @@ class LSUIn extends Bundle {
   val wdata = UInt(XLEN.W)
   val rden = Bool()
   val rd = UInt(RIDXLEN.W)
+  val csridx = UInt(CSRIDXLEN.W)
+  val csrrv = UInt(XLEN.W)
+  val csrwv = UInt(XLEN.W)
+  val csr_en = Bool()
 }
 
 class LSUOut extends Bundle {
@@ -27,6 +31,10 @@ class LSUOut extends Bundle {
   val memvalid = Bool()
   val rden = Bool()
   val rd = UInt(RIDXLEN.W)
+  val csridx = UInt(CSRIDXLEN.W)
+  val csrrv = UInt(XLEN.W)
+  val csrwv = UInt(XLEN.W)
+  val csr_en = Bool()
   val memsext = UInt(MEM_SEXT_SEL_WIDTH.W)
   val rdata = UInt(XLEN.W)
 }
@@ -132,6 +140,7 @@ class LSU extends Module {
       when(io.bus_ac & io.axi4lite_to_arbiter.awready) {
         // waddr 传输完成
         w_state := w_wait_wready
+        // printf("pc = %x lsu addr = %x\n", io.out.bits.pc, writeAddr)
       }
     }
     is(w_wait_wready) {
@@ -160,6 +169,10 @@ class LSU extends Module {
   val rdenreg = RegInit(0.B)
   val rdreg = RegInit(0.U(RIDXLEN.W))
   val memsextreg = RegInit(MEM_SEXT_NONE)
+  val csridxreg = RegInit(0.U(CSRIDXLEN.W))
+  val csrrvreg = RegInit(0.U(XLEN.W))
+  val csrwvreg = RegInit(0.U(XLEN.W))
+  val csrenreg = RegInit(0.B)
 
   io.out.bits.inst := instreg 
   io.out.bits.pc := pcreg 
@@ -168,6 +181,10 @@ class LSU extends Module {
   io.out.bits.rden := rdenreg 
   io.out.bits.rd := rdreg 
   io.out.bits.memsext := memsextreg 
+  io.out.bits.csridx := csridxreg
+  io.out.bits.csrrv := csrrvreg
+  io.out.bits.csrwv := csrwvreg
+  io.out.bits.csr_en := csrenreg
 
   io.out.valid := r_state === r_idle && w_state === w_idle
   // when (io.in.valid & io.in.ready){
@@ -188,6 +205,10 @@ class LSU extends Module {
     rdenreg := io.in.bits.rden
     rdreg := io.in.bits.rd
     memsextreg := io.in.bits.wsext
+    csridxreg := io.in.bits.csridx
+    csrrvreg := io.in.bits.csrrv
+    csrwvreg := io.in.bits.csrwv
+    csrenreg := io.in.bits.csr_en
   }
 }
 

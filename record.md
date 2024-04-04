@@ -1,4 +1,3 @@
-
 # 第六期一生一芯实验记录
 
 之前做过第四期一生一芯，完成到 PA2.3 和数电实验，单周期刚开始写。
@@ -1306,9 +1305,9 @@ https://gitee.com/tinylab/riscv-linux/blob/master/articles/20230315-tinyemu-csr-
 
 NEMU 里实现了 mret 和 csrrw, csrrs 指令后，跑 yield-test 发现进入 trap 之后并没有从 trap 中返回，检查 log 发现没有调用 mret 指令，说明调用 ecall 以后没有正确跳转。原因是 am_irq_handle 还未添加处理当前 event 的代码
 
-###  必答题(需要在实验报告中回答) - 理解上下文结构体的前世今生
+### 必答题(需要在实验报告中回答) - 理解上下文结构体的前世今生
 
-###  必答题(需要在实验报告中回答) - 理解穿越时空的旅程
+### 必答题(需要在实验报告中回答) - 理解穿越时空的旅程
 
 上面两个一起答：
 
@@ -1320,6 +1319,7 @@ NEMU 负责硬件，am_asm_trap 负责软件，软件设置 mtvec，硬件负责
 
 没啥好说的
 
+## PA4
 
 
 ## 最简单的处理器
@@ -2033,8 +2033,6 @@ todo：
 3. 改位宽，现在我的地址位宽和数据位宽都是 64 位，但按照第五期讲义的话，地址位宽应该是 32，数据位宽是 64 才对。(已经改成 32)
 4. 为访存部分加入 1 周期的读取延迟后，原先读取结果放入 LS/WBReg 改为直接放到一个 Wire 中，直通到 WB 阶段，这样一个周期之后的 WB 阶段正好能够得到上一个周期访存时对应的结果。
 
-
-
 #### AXI4-Lite
 
 master 读取 slave 的数据时，首先要由 master 向 slave 传输读地址，这个过程需要进行一次握手，通过信号 `arvalid` 和 `arready` 实现。随后 slave 向 master 传回读到的数据也要进行一次握手，通过 `rvalid` 和 `rready` 实现。
@@ -2139,7 +2137,7 @@ val MEM_RS1_Hazard = Decoder.io.rs1 === Mux(NPC_Mem.io.out.valid, NPC_Mem.io.out
 
 现在能过这个测例了，但是 movsx 报错，addi 指令似乎读不到寄存器的原值。检查发现 80000060 执行完成之后漏掉了中间的 80000064 auipc 指令，直接跳到了 80000068，导致这个错。发现是 LSU 的 io.in.ready 变成 0 了，并且在 io.in.ready 为 0 时发送方没有保存数据导致的。当 valid = 1，ready = 0 时，发送方应该保持 valid = 1 并保持要发送的数据不变，直到 ready = 1。但是代码里 `LSRegen := NPC_Mem.io.in.ready | !LSReg.valid`，当 NPC_Mem.io.in.ready 为 0 时 LSReg.valid 并不为 0，此时 LSRegen 为 0 正在保持数据才对，但是 LSReg.pc 还是发生了变化。发现是给 LSReg 在 EXReg.valid = 0 时赋值时漏判了 LSRegen
 
-修正以后再次运行 movsx 会在 80000070 处指令访存时越界，`80000070:	1af72423          	sw	a5,424(a4) # 80000214 <b>` 在 log 里报的是访问了 000001a8 的地址，（0x1a8 就是 424），由于这条指令还没进入提交阶段，它和它的上一条指令都还没有 difftest. 看 cpu-tests 的反汇编结果发现上一条指令是 `auipc a4, 0`，和这一条访存指令存在数据冒险，从结果来看上一条指令还没写回，当前这条指令就进行访存了，导致了这个错误。 
+修正以后再次运行 movsx 会在 80000070 处指令访存时越界，`80000070:	1af72423          	sw	a5,424(a4) # 80000214 <b>` 在 log 里报的是访问了 000001a8 的地址，（0x1a8 就是 424），由于这条指令还没进入提交阶段，它和它的上一条指令都还没有 difftest. 看 cpu-tests 的反汇编结果发现上一条指令是 `auipc a4, 0`，和这一条访存指令存在数据冒险，从结果来看上一条指令还没写回，当前这条指令就进行访存了，导致了这个错误。
 
 查看波形发现并不是因为数据冒险了没有停顿，而是 8000006c 处的指令根本没有执行，直接被跳过了。原因：当 IDRegen 为 false 时，IFU 没有保持数据。修改后此处运行正确了，但随后 80000080 处的指令也被跳过了，查看波形发现是访存部分丢指令了。检查后发现 LSReg 没有在 valid = 1 且下游 ready = 0 时保存数据，即使 LSRegen = 0 传进去的 pc 还是变成 0 了，发现是 MEM 的 in.ready  设置有问题，改成 io.in.ready := r_state === r_idle && w_state === w_idle 后又把 8000008c 丢了
 
@@ -2204,8 +2202,6 @@ microbench train 花费了 1360494334 个周期
 
 iSTA 表示我的这个只能跑 37Mhz，但是余博讲义里的单周期频率都比我高
 
-
-
 #### alu-test 有问题
 
 为了测试串口，跑 alu-tests 挂了一堆 unsigned int 的边界测试点。用 NEMU 跑挂的测试点少一些，但还是挂了 4 个。native 跑没有问题，说明我的 NEMU 和 NPC 的实现有问题
@@ -2213,27 +2209,27 @@ iSTA 表示我的这个只能跑 37Mhz，但是余博讲义里的单周期频率
 下面是 NEMU 挂的点：
 
 ```shell
-                                                                         
-line 14532: unsigned int: -214748364(  /  1  ==  -214748364( =>  FAIL (-214748364()                            
-line 14567: unsigned int: -2147483647  /  1  ==  -2147483647 =>  FAIL (-2147483647)                            
-line 14597: unsigned int: -2  /  1  ==  -2 =>  FAIL (-2)                              
-line 14622: unsigned int: -1  /  1  ==  -1 =>  FAIL (-1)          
+                                                                       
+line 14532: unsigned int: -214748364(  /  1  ==  -214748364( =>  FAIL (-214748364()                          
+line 14567: unsigned int: -2147483647  /  1  ==  -2147483647 =>  FAIL (-2147483647)                          
+line 14597: unsigned int: -2  /  1  ==  -2 =>  FAIL (-2)                            
+line 14622: unsigned int: -1  /  1  ==  -1 =>  FAIL (-1)        
 ```
 
 输出里面的括号估计是 Klib 实现有问题，但这报错的点结果和答案一样啊，不懂咋挂的。NPC 也有类似的输出，但是结果和答案不一样
 
 ```
-line 14537: unsigned int: -214748364(  /  2  ==  1073741824 =>  FAIL (-1073741824)                                                                                                                                                
-line 14542: unsigned int: -214748364(  /  2147483646  ==  1 =>  FAIL (7)                                                                                                                                                          
-line 14547: unsigned int: -214748364(  /  2147483647  ==  1 =>  FAIL (3)                                       
-line 14572: unsigned int: -2147483647  /  2  ==  1073741824 =>  FAIL (-1073741824)                             
-line 14577: unsigned int: -2147483647  /  2147483646  ==  1 =>  FAIL (7)                                       
-line 14582: unsigned int: -2147483647  /  2147483647  ==  1 =>  FAIL (3)                                       
-line 14602: unsigned int: -2  /  2  ==  2147483647 =>  FAIL (-1)                                               
-line 14607: unsigned int: -2  /  2147483646  ==  2 =>  FAIL (8)                                                
-line 14612: unsigned int: -2  /  2147483647  ==  2 =>  FAIL (4)                                                
-line 14627: unsigned int: -1  /  2  ==  2147483647 =>  FAIL (-1)                                               
-line 14632: unsigned int: -1  /  2147483646  ==  2 =>  FAIL (8)                                                
+line 14537: unsigned int: -214748364(  /  2  ==  1073741824 =>  FAIL (-1073741824)                                                                                                                                              
+line 14542: unsigned int: -214748364(  /  2147483646  ==  1 =>  FAIL (7)                                                                                                                                                        
+line 14547: unsigned int: -214748364(  /  2147483647  ==  1 =>  FAIL (3)                                     
+line 14572: unsigned int: -2147483647  /  2  ==  1073741824 =>  FAIL (-1073741824)                           
+line 14577: unsigned int: -2147483647  /  2147483646  ==  1 =>  FAIL (7)                                     
+line 14582: unsigned int: -2147483647  /  2147483647  ==  1 =>  FAIL (3)                                     
+line 14602: unsigned int: -2  /  2  ==  2147483647 =>  FAIL (-1)                                             
+line 14607: unsigned int: -2  /  2147483646  ==  2 =>  FAIL (8)                                              
+line 14612: unsigned int: -2  /  2147483647  ==  2 =>  FAIL (4)                                              
+line 14627: unsigned int: -1  /  2  ==  2147483647 =>  FAIL (-1)                                             
+line 14632: unsigned int: -1  /  2147483646  ==  2 =>  FAIL (8)                                              
 line 14637: unsigned int: -1  /  2147483647  ==  2 =>  FAIL (4)
 ```
 
@@ -2242,6 +2238,3 @@ line 14637: unsigned int: -1  /  2147483647  ==  2 =>  FAIL (4)
 ### 异常处理和RT-Thread
 
 ### SoC 计算机系统
-
-
-

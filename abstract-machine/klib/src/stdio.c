@@ -58,6 +58,52 @@ int vsprintf(char *out, const char *fmt, va_list ap) {
             }
             i++;
             break;
+          case 'x':
+            unsigned int tmpx = va_arg(ap, int);
+            char stkx[100];
+            unsigned int stkx_top = 0;
+            if (tmpx == 0) {
+              stkx[++stkx_top] = '0';
+              i++;
+              break;
+            }
+            while (tmpx != 0) {
+              char res = 'A';
+              if (tmpx % 16 > 9) {
+                switch (tmpx % 16)
+                {
+                case 11:
+                  res = 'B';
+                  break;
+                case 12:
+                  res = 'C';
+                  break;
+                case 13:
+                  res = 'D';
+                  break;
+                case 14:
+                  res = 'E';
+                  break;
+                case 15:
+                  res = 'F';
+                  break;
+                default:
+                  res = 'A';
+                  break;
+                }
+              } else {
+                res = (tmpx % 16) + '0';
+              }
+              stkx[++stkx_top] = res;
+              tmpx >>= 4;
+            }
+            
+            while (stkx_top > 0) {
+              out[cur++] = stkx[stkx_top];
+              stkx_top--; 
+            }
+            i++;
+            break;
         }
       }
       continue;
