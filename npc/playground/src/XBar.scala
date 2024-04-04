@@ -72,9 +72,9 @@ class XBar extends Module {
         when (io.axi4litein.awaddr >= MEM_BASE.U(XLEN.W) && io.axi4litein.awaddr < MEM_BASE.U(XLEN.W) + MEM_SIZE.U(XLEN.W)) {
           state_w := w_sram_wait
         }.elsewhen (io.axi4litein.awaddr === SERIAL_PORT.U(XLEN.W)) {
-          // 为了方便测试，将 uart 转发给 sram dpic
-          // state_w := w_uart_wait
-          state_w := w_sram_wait
+       
+          state_w := w_uart_wait
+          // state_w := w_sram_wait
         }.otherwise {
           io.axi4litein.bresp := 3.U // decerr
           printf("decerr w\n")

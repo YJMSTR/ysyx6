@@ -38,12 +38,14 @@ __EXPORT void difftest_regcpy(void *dut, bool direction) {
     for (int i = 0; i < RISCV_GPR_NUM; i++) {
       dutr->gpr[i] = cpu.gpr[i];
     }
-    //dutr->pc = cpu.pc;
+    // dutr->pc = cpu.pc;
+    
   } else if (direction == DIFFTEST_TO_REF) {
     for (int i = 0; i < RISCV_GPR_NUM; i++) {
       cpu.gpr[i] = dutr->gpr[i];
     }
-    //cpu.pc = dutr->pc;
+    // assert(0);
+    // cpu.pc = dutr->pc;
   }
   //assert(0);
 }
@@ -60,6 +62,8 @@ __EXPORT void difftest_raise_intr(word_t NO) {
 __EXPORT void difftest_init(int port) {
   void init_mem();
   init_mem();
+  Log("ref init_mem done");
   /* Perform ISA dependent initialization. */
   init_isa();
+  Log("ref init_isa done");
 }

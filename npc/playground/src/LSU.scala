@@ -140,7 +140,7 @@ class LSU extends Module {
       when(io.bus_ac & io.axi4lite_to_arbiter.awready) {
         // waddr 传输完成
         w_state := w_wait_wready
-        printf("pc = %x lsu addr = %x\n", io.out.bits.pc, writeAddr)
+        // printf("pc = %x lsu addr = %x\n", io.out.bits.pc, writeAddr)
       }
     }
     is(w_wait_wready) {

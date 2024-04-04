@@ -50,9 +50,9 @@ enum NPC_STATES npc_state;
 word_t npc_halt_pc;
 int npc_ret;
 static unsigned long long cycles = 0;
-bool difftest_is_enable = 1;
+bool difftest_is_enable = 0;
 bool is_batch_mode = 0;
-bool is_itrace = 1;
+bool is_itrace = 0;
 char logbuf[128];
 static uint64_t boot_time = 0;
 static uint64_t rtc_us = 0;
@@ -112,7 +112,7 @@ static int skip_dut_nr_inst = 0;
 
 void difftest_skip_ref() {
   is_skip_ref = true;
-  Log("difftest_skip_ref");
+  // Log("difftest_skip_ref");
   skip_dut_nr_inst = 0;
 }
 

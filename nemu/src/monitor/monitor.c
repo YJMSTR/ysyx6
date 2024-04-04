@@ -169,9 +169,12 @@ static long load_img() {
 }
 
 void am_init_monitor() {
+  // Log("NEMU am init monitor");
   init_rand();
   init_mem();
+  // Log("NEMU am init isa");
   init_isa();
+  // Log("NEMU am init img");
   load_img();
   IFDEF(CONFIG_DEVICE, init_device());
   welcome();

@@ -234,6 +234,7 @@ class Top extends Module {
   val rs2v = Rread(Decoder.io.rs2)
   val rs1v = Rread(Decoder.io.rs1)
   
+  // csridx：读 csr 的下标 csrrv：读出的值
   val csridx = Mux(Decoder.io.inst === ECALL, CSR_MTVEC.U(12.W), Decoder.io.inst(31, 20))
   val csrrv  = MuxLookup(csridx, 0.U(XLEN.W), Seq(
     CSR_MCAUSE.U  -> mcause,
@@ -246,7 +247,7 @@ class Top extends Module {
 
   val csrwv = MuxCase(0.U(XLEN.W), Seq(
     (Decoder.io.inst === CSRRS) -> (rs1v | csrrv),
-    (Decoder.io.inst === CSRRW) -> csrrv
+    (Decoder.io.inst === CSRRW) -> rs1v,
   ))
   // val snpc = Decoder.io.pc + 4.U
   EXRegen := LSRegen //| !EXReg.valid
@@ -496,6 +497,7 @@ class Top extends Module {
       } .elsewhen (WBReg.csridx === CSR_MSTATUS.U) {
         mstatus := WBReg.csrwv 
       } .elsewhen (WBReg.csridx === CSR_MTVEC.U) {
+        printf("mtvec old value = %x new value = %x pc = %x\n", mtvec, WBReg.csrwv, WBReg.pc)
         mtvec := WBReg.csrwv 
       } .otherwise {
 
@@ -556,6 +558,9 @@ class Top extends Module {
     InstFetcher.io.in.valid := reset.asBool === 0.B
     IDRegen := EXRegen
     EXReg.valid := IDReg.valid
+    when (Decoder.io.inst === ECALL) {
+      printf("wb ecall; mtvec = %x\n", mtvec)
+    }
     ifu_dnpc := MuxCase(0.U, Array(
       (Decoder.io.inst === JALR)  -> (rs1v + Decoder.io.imm),
       (Decoder.io.inst === JAL)   -> (pc_plus_imm),
