@@ -1,13 +1,13 @@
-#include "VTop.h"
+#include "VysyxSoCFull.h"
 // #include "verilated_vcd_c.h"
 // #include <nvboard.h>
 #include <unistd.h>
 #include "verilated.h"
-#include "VTop__Dpi.h"
+#include "VysyxSoCFull__Dpi.h"
 #include "svdpi.h"
 #include "sim.h"
 #include <ftrace.h>
-#include "VTop___024root.h"
+#include "VysyxSoCFull___024root.h"
 #include <readline/readline.h>
 #include <readline/history.h>
 #include <string.h>
@@ -35,6 +35,8 @@
 #define FB_ADDR         (MMIO_BASE   + 0x1000000)
 #define AUDIO_SBUF_ADDR (MMIO_BASE   + 0x1200000)
 
+#define ysyxSoC
+
 #ifndef CONFIG_ITRACE_RINGBUFFER_SIZE
   #define CONFIG_ITRACE_RINGBUFFER_SIZE 16
 #endif
@@ -45,21 +47,21 @@
   VerilatedVcdC* tfp = nullptr;
 #endif
 VerilatedContext* contextp = new VerilatedContext;
-VTop* topp = new VTop{contextp};
+VysyxSoCFull* topp = new VysyxSoCFull{contextp};
 enum NPC_STATES npc_state;
 word_t npc_halt_pc;
 int npc_ret;
 static unsigned long long cycles = 0;
 bool difftest_is_enable = 0;
-bool is_batch_mode = 1;
-bool is_itrace = 0;
+bool is_batch_mode = 0;
+bool is_itrace = 1;
 char logbuf[128];
 static uint64_t boot_time = 0;
 static uint64_t rtc_us = 0;
 static uint64_t nz_pc = 0;
 static uint64_t nz_npc = 0;
 
-// void nvboard_bind_all_pins(VTop *top);
+// void nvboard_bind_all_pins(VysyxSoCFull *top);
 const char *regs[] = {
   "$0", "ra", "sp", "gp", "tp", "t0", "t1", "t2",
   "s0", "s1", "a0", "a1", "a2", "a3", "a4", "a5",
@@ -68,7 +70,7 @@ const char *regs[] = {
 };
 
 word_t Rread(uint32_t idx) {
-  return topp->rootp->Top__DOT__R_ext__DOT__Memory[idx];
+  return topp->rootp->ysyxSoCFull__DOT__asic__DOT__cpu__DOT__cpu__DOT__R_ext__DOT__Memory[idx];
 }
 
 struct Iringbuf 
@@ -112,7 +114,6 @@ static int skip_dut_nr_inst = 0;
 
 void difftest_skip_ref() {
   is_skip_ref = true;
-  // Log("difftest_skip_ref");
   skip_dut_nr_inst = 0;
 }
 
@@ -204,7 +205,7 @@ void difftest_step(vaddr_t pc, vaddr_t npc) {
 
   if (is_skip_ref) {
     // to skip the checking of an instruction, just copy the reg state to reference design
-    Log("skip ref pc=0x%08x, npc=0x%08x", pc, npc);
+    //Log("skip ref pc=0x%08x, npc=0x%08x", pc, npc);
     ref_difftest_regcpy(&cpu, DIFFTEST_TO_REF);
     is_skip_ref = false;
     return;
@@ -234,12 +235,38 @@ static void trace_and_difftest(vaddr_t pc, vaddr_t dnpc) {
     last_pc = pc;
   }
 }
+#define MROM_BASE 0x20000000
+#define MROM_SIZE 0x1000
+static uint8_t mrom[MROM_SIZE*10] = {
+  0x93, 0x02, 0x00, 0x08, //addi	t0, zero, 128
+  0xef, 0x00, 0xc0, 0x00, //jal ra, 80000010
+  0x13, 0x03, 0x10, 0x08, //addi	t1, zero, 129
+  0x13, 0x05, 0x10, 0x00, //li a0, 1
+  0x13, 0x07, 0xb0, 0x00, //li a4, 11 
+  0x13, 0x06, 0x10, 0x3a, //li a2, 929
+  0x93, 0x05, 0x10, 0x3a, //li a1, 929
+  0x73, 0x00, 0x10, 0x00  //ebreak
+  // 如果改了这里，记得把默认的 img_size 也改了
+}; 
+
+// 接入 ysyxSoC 所需的代码
+extern "C" void flash_read(int addr, int *data) { assert(0); }
+extern "C" void mrom_read(int addr, int *data) {
+  // *data = 0x00100073;	//ebreak
+  word_t res = 0;
+  for (int i = 0; i < 8; i++) {
+    res = res + ((word_t)mrom[addr-MROM_BASE+i] << (i*8));
+  }
+   
+  *data = res;
+  Assert(addr >= MROM_BASE && addr < MROM_BASE + MROM_SIZE, "addr = %x out of mrom", addr);
+}
 
 extern "C" void npc_pmem_read(int raddr, long long *rdata) {
   uint32_t addr = raddr;
   //addr = addr & ~0x3u;
   if (addr == RTC_ADDR + 4) {
-    Log("DTRACE RTC_ADDR + 4");
+    //Log("DTRACE RTC_ADDR + 4");
     difftest_skip_ref();
     struct timeval now;
     gettimeofday(&now, NULL);
@@ -250,7 +277,7 @@ extern "C" void npc_pmem_read(int raddr, long long *rdata) {
     *rdata = rtc_us >> 32ull;
     return;
   } else if (addr == RTC_ADDR) {
-    Log("DTRACE RTC_ADDR");
+    //Log("DTRACE RTC_ADDR");
     difftest_skip_ref();
     *rdata = (uint32_t)rtc_us;
     return;
@@ -272,16 +299,16 @@ extern "C" void npc_pmem_write(int waddr, long long wdata, char wmask) {
   //int addr = waddr & ~0x3u;
   uint32_t addr = waddr;
   //printf("pmem_write: waddr = 0x%08llx wdata = 0x%08llx wmask = 0x%x\n", waddr, wdata, 0xff & wmask);
-  if (addr == SERIAL_PORT) {
-    difftest_skip_ref();
-    //Log("dtrace: pc = 0x%08x serial wdata = %d, wmask = %d", topp->io_pc, wdata, wmask);
-    if ((wmask & 0xff) == 1) {
-      putchar(wdata);
-    } else {
-      Log("serial don't support wmask = 0x%x putch", wmask & 0xff);
-    }
-    return;
-  }
+  // if (addr == SERIAL_PORT) {
+  //   difftest_skip_ref();
+  //   //Log("dtrace: pc = 0x%08x serial wdata = %d, wmask = %d", topp->io_pc, wdata, wmask);
+  //   if ((wmask & 0xff) == 1) {
+  //     putchar(wdata);
+  //   } else {
+  //     Log("serial don't support wmask = 0x%x putch", wmask & 0xff);
+  //   }
+  //   return;
+  // }
   assert((word_t)addr >= MEM_BASE && ((word_t)(addr - MEM_BASE + 7)) < MEM_SIZE);
   for (int i = 0; i < 8; i++) {
     if (wmask & (1 << i)) {
@@ -323,16 +350,20 @@ static void single_cycle() {
   contextp->timeInc(1);
   topp->clock = 1;
   topp->eval();
+  // #ifndef ysyxSoC
   word_t instval = topp->io_inst;
   word_t pc = topp->io_pc;
   word_t npc = topp->io_npc;
+  
   //static word_t nz_pc = 0, nz_npc = 0;
   if (pc != 0) nz_pc = pc;
   if (npc != 0) nz_npc = npc;
+  // #endif
 
 #ifdef VCD
   tfp->dump(contextp->time());
 #endif
+// #ifndef ysyxSoC
   if (topp->reset == 0 && is_itrace) {
     //printf("[itrace] inst = 0x%08x\n", topp->io_inst);
     p += snprintf(p, sizeof(logbuf), "0x%08lx :", pc);
@@ -358,6 +389,7 @@ static void single_cycle() {
     trace_and_difftest(nz_pc, nz_npc);
   }
   //sleep(1);
+// #endif
 }
 
 extern "C" void ebreak() {
@@ -394,6 +426,8 @@ long load_img() {
     //记得改了 默认 img 之后，默认的 img size 也要改
     return 32;
   }
+#ifndef ysyxSoC
+  // load 到 sram 中
   memset(mem, 0, sizeof(mem));
 	printf("img == %s\n", img_file);
 	FILE *fp = fopen(img_file, "rb");
@@ -405,6 +439,22 @@ long load_img() {
 	fclose(fp);
   assert(ret == size);
 	return size;
+#endif
+#ifdef ysyxSoC
+  // load 到 mrom 中
+  memset(mrom, 0, sizeof(mrom));
+  printf("mrom img == %s\n", img_file);
+  FILE *fp = fopen(img_file, "rb");
+	assert(fp);
+	fseek(fp, 0, SEEK_END);
+	long size = ftell(fp);
+  printf("mrom fp size = %d\n", size);
+	fseek(fp, 0, SEEK_SET);
+	int ret = fread(mrom, 1, size, fp);
+  fclose(fp);
+  assert(ret == size);
+  return size;
+#endif
 }
 
 void print_iringbuf() {
@@ -426,7 +476,9 @@ void cpu_exec(uint32_t n) {
   }
   while (n--) {
     if (npc_state != NPC_RUN) break;
+    #ifndef ysyxSoC
     cpu.pc = topp->io_pc;
+    #endif
     single_cycle();
     if (npc_state != NPC_RUN) break;
   }
@@ -455,7 +507,9 @@ void npc_reg_display() {
 }
 
 int sim_main(int argc, char** argv) {
-  
+  // begin：ysyxSoC 所需的代码
+  Verilated::commandArgs(argc, argv);
+  // end
 #ifdef VCD
   //Verilated::mkdir("logs");
   Verilated::traceEverOn(true);
@@ -467,10 +521,12 @@ int sim_main(int argc, char** argv) {
 	// nvboard_init();
   if (argc > 1) {
     img_file = argv[1];
+    if (ftrace_is_enable()) {
     elf_file = (char *)malloc(strlen(img_file)+1);
-    memset(elf_file, '\0', sizeof(elf_file));
-    memcpy(elf_file, img_file, strlen(img_file)-3);
-    strcat(elf_file, "elf");
+      memset(elf_file, '\0', sizeof(elf_file));
+      memcpy(elf_file, img_file, strlen(img_file)-3);
+      strcat(elf_file, "elf");
+    }
   }
   init_monitor();
   Log("argv[1] = %s", argv[1]);

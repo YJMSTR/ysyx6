@@ -78,14 +78,22 @@ class ISRegBundle extends Bundle {
   val pc = UInt(XLEN.W)
 }
 
-class Top extends Module {
+class ysyx_23060110 extends Module {
   val io = IO(new Bundle {
     val inst = Output(UInt(32.W))
     val pc = Output(UInt(XLEN.W))
     val npc = Output(UInt(XLEN.W))
-    // val empty_sram = Flipped(new AXI4LiteInterface)
+    val interrupt = Input(Bool())
+    val master = Flipped(new AXI4Interface)
+    val slave = new AXI4Interface
+    // val empty_sram = Flipped(new AXI4Interface)
     // val isebreak = Output(Bool())
   })
+
+  val io_empty_slave = Module(new ysyx_23060110_empty_axi4_slave)
+  val io_empty_master = Module(new ysyx_23060110_empty_axi4_master)
+  io.slave <> io_empty_slave.io.axi4
+  io.master <> io_empty_master.io.axi4
   
   val IDReg = RegInit(
     (new IDRegBundle).Lit(
@@ -167,12 +175,12 @@ class Top extends Module {
       _.pc -> 0.U
     )
   )
-  val AXI4liteArbiter = Module(new MyArbiter)
-  val SRAM = Module(new FAKE_SRAM_ONLY)
+  val AXI4Arbiter = Module(new ysyx_23060110_MyArbiter)
+  // val SRAM = Module(new FAKE_SRAM_ONLY)
 
-  val XBar2 = Module(new XBar)
-  val MyUart = Module(new MyUART)
-  val MyClint = Module(new MyCLINT)
+  val XBar2 = Module(new ysyx_23060110_XBar)
+  // val MyUart = Module(new MyUART)
+  val MyClint = Module(new ysyx_23060110_MyCLINT)
 
   val IDRegen = WireInit(Bool(), 1.B)
   val EXRegen = WireInit(Bool(), 1.B)
@@ -181,7 +189,7 @@ class Top extends Module {
   val ISRegen = WireInit(Bool(), 1.B)
   val ifu_dnpc = Wire(UInt(XLEN.W))
   val pcsel = WireInit(Bool(), 0.B)
-  val InstFetcher = Module(new IFU)
+  val InstFetcher = Module(new ysyx_23060110_IFU)
   val PC = RegInit(UInt(XLEN.W), RESET_VECTOR.U)
   val R = Mem(32, UInt(XLEN.W))
   
@@ -195,17 +203,29 @@ class Top extends Module {
   val dataHazard = WireInit(Bool(), 0.B)
   val stall = WireInit(Bool(), 0.B)
 
-  InstFetcher.io.axi4lite_to_arbiter <> AXI4liteArbiter.io.ifu_bus.axi4lite
-  InstFetcher.io.bus_ac := AXI4liteArbiter.io.ifu_bus.bus_ac
+  InstFetcher.io.axi4_to_arbiter <> AXI4Arbiter.io.ifu_bus.axi4
+  InstFetcher.io.bus_ac := AXI4Arbiter.io.ifu_bus.bus_ac
 
-  AXI4liteArbiter.io.ifu_bus.bus_reqr := InstFetcher.io.bus_reqr
-  AXI4liteArbiter.io.ifu_bus.bus_reqw := InstFetcher.io.bus_reqw
-  AXI4liteArbiter.io.xbar_bus <> XBar2.io.axi4litein
+  AXI4Arbiter.io.ifu_bus.bus_reqr := InstFetcher.io.bus_reqr
+  AXI4Arbiter.io.ifu_bus.bus_reqw := InstFetcher.io.bus_reqw
 
-  // XBar2.io.axi4liteout1 <> io.empty_sram
-  XBar2.io.axi4liteout1 <> SRAM.io.axi4lite
-  XBar2.io.axi4liteout0 <> MyUart.io.axi4lite
-  XBar2.io.axi4liteout2 <> MyClint.io.axi4lite
+  val empty_master = Module (new ysyx_23060110_empty_axi4_master)
+  empty_master.io.axi4 <> XBar2.io.axi4in
+  // 将 Arbiter 连到 顶层模块的 master
+  AXI4Arbiter.io.xbar_bus <> io.master
+  MyClint.io.axi4 <> io.slave
+
+  // XBar2.io.axi4out1 <> io.empty_sram
+  // XBar2.io.axi4out1 <> SRAM.io.axi4
+  // XBar2.io.axi4out0 <> MyUart.io.axi4
+  // XBar2.io.axi4out2 <> MyClint.io.axi4
+  val empty_slave0 = Module(new ysyx_23060110_empty_axi4_slave)
+  val empty_slave1 = Module(new ysyx_23060110_empty_axi4_slave)
+  val empty_slave_mrom = Module(new ysyx_23060110_empty_axi4_slave)
+  XBar2.io.axi4out0 <> empty_slave0.io.axi4
+  XBar2.io.axi4out2 <> MyClint.io.axi4
+  XBar2.io.axi4out1 <> empty_slave1.io.axi4
+  XBar2.io.axi4out_mrom <> empty_slave_mrom.io.axi4
 
   InstFetcher.io.out.ready := IDRegen && reset.asBool === 0.B
   InstFetcher.io.in.bits.isdnpc := pcsel
@@ -223,7 +243,7 @@ class Top extends Module {
   def Rread(idx: UInt) = Mux(idx === 0.U, 0.U(XLEN.W), R(idx))
   
   R(0) := 0.U
-  val Decoder = Module(new IDU)
+  val Decoder = Module(new ysyx_23060110_IDU)
   // when(Decoder.io.rd =/= 0.U && scoreboard(Decoder.io.rd) =/= 1.B && Decoder.io.rd_en) {
   //   scoreboard(Decoder.io.rd) := 1.B
   // } .otherwise {
@@ -309,7 +329,7 @@ class Top extends Module {
   }
   // pcsel := Decoder.io.isdnpc
 
-  val ALU = Module(new EXU)
+  val ALU = Module(new ysyx_23060110_EXU)
   when(EXReg.valid) {
     ALU.io.inst := EXReg.inst
     ALU.io.pc := EXReg.pc
@@ -369,12 +389,12 @@ class Top extends Module {
   }
 
   
-  val NPC_Mem = Module(new LSU)
+  val NPC_Mem = Module(new ysyx_23060110_LSU)
   NPC_Mem.io.out.ready := WBRegen
-  NPC_Mem.io.bus_ac := AXI4liteArbiter.io.lsu_bus.bus_ac
-  AXI4liteArbiter.io.lsu_bus.bus_reqr := NPC_Mem.io.bus_reqr
-  AXI4liteArbiter.io.lsu_bus.bus_reqw := NPC_Mem.io.bus_reqw
-  AXI4liteArbiter.io.lsu_bus.axi4lite <> NPC_Mem.io.axi4lite_to_arbiter
+  NPC_Mem.io.bus_ac := AXI4Arbiter.io.lsu_bus.bus_ac
+  AXI4Arbiter.io.lsu_bus.bus_reqr := NPC_Mem.io.bus_reqr
+  AXI4Arbiter.io.lsu_bus.bus_reqw := NPC_Mem.io.bus_reqw
+  AXI4Arbiter.io.lsu_bus.axi4 <> NPC_Mem.io.axi4_to_arbiter
 
   // printf("LSRegen=%d LSReg.pc = %x\n", LSRegen, LSReg.pc)
   LSRegen := NPC_Mem.io.in.ready //| !LSReg.valid

@@ -6,7 +6,7 @@ import Instr._
 
 // import chisel3.util.experimental.loadMemoryFromFileInline
 
-class EXU() extends Module {
+class ysyx_23060110_EXU() extends Module {
   val io = IO(new Bundle {
     val inst = Input(UInt(32.W))
     val rs1v = Input(UInt(XLEN.W))

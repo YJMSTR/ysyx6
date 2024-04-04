@@ -6,6 +6,7 @@
 extern enum NPC_STATES npc_state;
 
 int main(int argc, char *argv[]) {
+  
   int ret = sim_main(argc, argv);
   // if(sim_main(argc, argv) == 0) {
   //   printf("\033[0m\033[1;34mPASS\033[0m\n");

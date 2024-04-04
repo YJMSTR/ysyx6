@@ -7,6 +7,10 @@ object Configs {
   val RIDXLEN               = 5
   val CSRIDXLEN             = 12
 
+  val CLINT_BASE            = 0x0200_0000L
+  val CLINT_SIZE            = 0x0001_0000L
+  val MROM_BASE             = 0x2000_0000L
+  val MROM_SIZE             = 0x0000_1000L
   val MEM_BASE              = 0x80000000L
   val MEM_SIZE              = 0x8000000L
   val DEVICE_BASE           = 0xa0000000L
