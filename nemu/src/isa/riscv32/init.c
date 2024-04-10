@@ -36,7 +36,12 @@ static const uint32_t img [] = {
 
 static void restart() {
   /* Set the initial program counter. */
+  #ifndef CONFIG_HAS_MROM
   cpu.pc = RESET_VECTOR;
+  #else
+  cpu.pc = CONFIG_MROM_BASE;
+  Log("nemu pc = %lx", cpu.pc);
+  #endif
 
   /* The zero register is always 0. */
   cpu.gpr[0] = 0;

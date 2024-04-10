@@ -142,12 +142,12 @@ config TRACE_END
   default 10000
 
 config MTRACE
-  depends on TRACE && TARGET_NATIVE_ELF && ENGINE_INTERPRETER 
+  depends on TRACE 
   bool "Enable memory tracer"
   default y
 
 config DTRACE
-  depends on TRACE && TARGET_NATIVE_ELF && ENGINE_INTERPRETER 
+  depends on TRACE 
   bool "Enable device tracer"
   default y
 

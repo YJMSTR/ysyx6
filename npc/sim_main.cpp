@@ -35,6 +35,9 @@
 #define FB_ADDR         (MMIO_BASE   + 0x1000000)
 #define AUDIO_SBUF_ADDR (MMIO_BASE   + 0x1200000)
 
+#define MROM_BASE 0x20000000
+#define MROM_SIZE 0x1000
+
 #define ysyxSoC
 
 #ifndef CONFIG_ITRACE_RINGBUFFER_SIZE
@@ -52,7 +55,7 @@ enum NPC_STATES npc_state;
 word_t npc_halt_pc;
 int npc_ret;
 static unsigned long long cycles = 0;
-bool difftest_is_enable = 0;
+bool difftest_is_enable = 1;
 bool is_batch_mode = 0;
 bool is_itrace = 1;
 char logbuf[128];
@@ -90,6 +93,17 @@ struct CPU_state {
 
 enum { DIFFTEST_TO_DUT, DIFFTEST_TO_REF };
 
+static uint8_t mrom[MROM_SIZE*10] = {
+  0x93, 0x02, 0x00, 0x08, //addi	t0, zero, 128
+  0xef, 0x00, 0xc0, 0x00, //jal ra, 80000010
+  0x13, 0x03, 0x10, 0x08, //addi	t1, zero, 129
+  0x13, 0x05, 0x10, 0x00, //li a0, 1
+  0x13, 0x07, 0xb0, 0x00, //li a4, 11 
+  0x13, 0x06, 0x10, 0x3a, //li a2, 929
+  0x93, 0x05, 0x10, 0x3a, //li a1, 929
+  0x73, 0x00, 0x10, 0x00  //ebreak
+  // 如果改了这里，记得把默认的 img_size 也改了
+}; 
 
 
 static uint8_t mem[MEM_SIZE] = {
@@ -153,7 +167,8 @@ void init_difftest(char *ref_so_file, long img_size, int port) {
       "This will help you a lot for debugging, but also significantly reduce the performance. "
       "If it is not necessary, you can turn it off in menuconfig(NPC doesn't have menuconfig now).", ref_so_file);
   ref_difftest_init(port);
-  ref_difftest_memcpy(MEM_BASE, mem, img_size, DIFFTEST_TO_REF);
+  // ref_difftest_memcpy(MEM_BASE, mem, img_size, DIFFTEST_TO_REF);
+  ref_difftest_memcpy(MROM_BASE, mrom, img_size, DIFFTEST_TO_REF);
   ref_difftest_regcpy(&cpu, DIFFTEST_TO_REF);
 }
 
@@ -172,11 +187,11 @@ bool isa_difftest_checkregs(CPU_state *ref_r, vaddr_t pc) {
       ret = false;
     }
   }
-  // if (!ret) {
-  //   for (int i = 0; i < 32; i++) {
-  //     printf("%s: ref = %lx cur = %lx\n", regs[i], ref_r->gpr[i], cpu.gpr[i]);
-  //  }
-  // }
+  if (!ret) {
+    for (int i = 0; i < 32; i++) {
+      printf("%s: ref = %lx cur = %lx\n", regs[i], ref_r->gpr[i], cpu.gpr[i]);
+    }
+  }
   return ret;
 }
 
@@ -205,49 +220,30 @@ void difftest_step(vaddr_t pc, vaddr_t npc) {
 
   if (is_skip_ref) {
     // to skip the checking of an instruction, just copy the reg state to reference design
-    //Log("skip ref pc=0x%08x, npc=0x%08x", pc, npc);
+    Log("skip ref pc=0x%08x, npc=0x%08x", pc, npc);
     ref_difftest_regcpy(&cpu, DIFFTEST_TO_REF);
     is_skip_ref = false;
     return;
   }
-  if (pc >= 0x80000000) {
-    ref_difftest_exec(1);
-    printf("ref pc = %08x done\n", pc);
-    ref_difftest_regcpy(&ref_r, DIFFTEST_TO_DUT);
-    checkregs(&ref_r, pc);
-  }
+  
+  ref_difftest_exec(1);
+  printf("ref pc = %08x done\n", pc);
+  ref_difftest_regcpy(&ref_r, DIFFTEST_TO_DUT);
+  checkregs(&ref_r, pc);
+  
 }
 
 static void trace_and_difftest(vaddr_t pc, vaddr_t dnpc) {
   log_write("%s\n", logbuf);
   static vaddr_t last_pc = 0;
-  //printf("difftest pc == 0x%08x, dnpc == 0x%08x\n", pc, dnpc);
-  /**
-   * 如何判断 dut 的一条指令已经执行完成了，并让 ref 也执行该指令？
-   * 可以比较 WBReg 中读出的 非 0 pc 值进行判断
-   * 如果 WBReg 中读出的非 0 pc 值不同于上一次读出的非 0 pc 值
-   * 说明又有一条新指令完成了写回操作
-   * 此时应该让 ref 执行相应的操作
-   */
+  
   if (difftest_is_enable && pc != last_pc) {  // 传入参数时已经保证非 0
     printf("difftest_step pc = %x dnpc = %x lastpc= %x\n", pc, dnpc, last_pc);
     difftest_step(pc, dnpc);
     last_pc = pc;
   }
 }
-#define MROM_BASE 0x20000000
-#define MROM_SIZE 0x1000
-static uint8_t mrom[MROM_SIZE*10] = {
-  0x93, 0x02, 0x00, 0x08, //addi	t0, zero, 128
-  0xef, 0x00, 0xc0, 0x00, //jal ra, 80000010
-  0x13, 0x03, 0x10, 0x08, //addi	t1, zero, 129
-  0x13, 0x05, 0x10, 0x00, //li a0, 1
-  0x13, 0x07, 0xb0, 0x00, //li a4, 11 
-  0x13, 0x06, 0x10, 0x3a, //li a2, 929
-  0x93, 0x05, 0x10, 0x3a, //li a1, 929
-  0x73, 0x00, 0x10, 0x00  //ebreak
-  // 如果改了这里，记得把默认的 img_size 也改了
-}; 
+
 
 // 接入 ysyxSoC 所需的代码
 extern "C" void flash_read(int addr, int *data) { assert(0); }
