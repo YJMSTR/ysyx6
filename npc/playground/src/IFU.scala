@@ -83,6 +83,11 @@ class ysyx_23060110_IFU extends Module {
         outData := io.axi4_to_arbiter.rdata
         outAddr := readAddr
         reqr := 0.B
+        when (io.axi4_to_arbiter.rresp =/= 0.U) {
+          printf("r resp = %x\n", io.axi4_to_arbiter.rresp)
+          outAddr := 0.U
+          outData := 0.U
+        }
       }
     }
   }

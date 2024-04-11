@@ -255,6 +255,7 @@ extern "C" void mrom_read(int addr, int *data) {
   }
    
   *data = res;
+  Log("npc mrom read addr = %x res64 = %lx\n res32 = %08x res16 = %08x res8 = %08x", addr, res, res & 0xFFFFFFFF, res & 0xFFFF, res & 0xFF);
   Assert(addr >= MROM_BASE && addr < MROM_BASE + MROM_SIZE, "addr = %x out of mrom", addr);
 }
 
@@ -262,7 +263,7 @@ extern "C" void npc_pmem_read(int raddr, long long *rdata) {
   uint32_t addr = raddr;
   //addr = addr & ~0x3u;
   if (addr == RTC_ADDR + 4) {
-    //Log("DTRACE RTC_ADDR + 4");
+    Log("DTRACE RTC_ADDR + 4");
     difftest_skip_ref();
     struct timeval now;
     gettimeofday(&now, NULL);
@@ -273,7 +274,7 @@ extern "C" void npc_pmem_read(int raddr, long long *rdata) {
     *rdata = rtc_us >> 32ull;
     return;
   } else if (addr == RTC_ADDR) {
-    //Log("DTRACE RTC_ADDR");
+    Log("DTRACE RTC_ADDR");
     difftest_skip_ref();
     *rdata = (uint32_t)rtc_us;
     return;

@@ -126,8 +126,11 @@ class ysyx_23060110_LSU extends Module {
     is(r_wait_rvalid){ // rready = 1
       when(io.axi4_to_arbiter.rvalid){
         readData := io.axi4_to_arbiter.rdata
-        r_state := r_idle
-        reqr := 0.B
+        when(io.axi4_to_arbiter.rresp === 0.U) {
+          // printf("lsu rresp == %d\n", io.axi4_to_arbiter.rresp)
+          r_state := r_idle
+          reqr := 0.B
+        }
       }
     }
   }
@@ -140,6 +143,7 @@ class ysyx_23060110_LSU extends Module {
   val writeData = RegInit(0.U(XLEN.W))
   val writeStrb = RegInit(0.U((XLEN/8).W))
   val writeSize = WireInit(3.U(3.W))
+  val writeResp = RegInit(0.U(2.W))
 
   writeSize := MuxLookup(writeStrb, 2.U, Seq(
     1.U -> 0.U,
@@ -150,38 +154,57 @@ class ysyx_23060110_LSU extends Module {
 
   io.axi4_to_arbiter.awaddr := writeAddr
   io.axi4_to_arbiter.awsize := writeSize
-  io.axi4_to_arbiter.awvalid := w_state =/= w_idle
+  // io.axi4_to_arbiter.awvalid := w_state === w_wait_wready
   io.axi4_to_arbiter.wdata := writeData
-  io.axi4_to_arbiter.wvalid := w_state =/= w_idle
+  // io.axi4_to_arbiter.wvalid := w_state === w_wait_wready
   io.axi4_to_arbiter.wstrb := writeStrb
-  io.axi4_to_arbiter.bready := w_state === w_wait_bvalid
+  io.axi4_to_arbiter.wlast := 1.B
+  // io.axi4_to_arbiter.bready := w_state === w_wait_bvalid
   //printf("wsize = %d\n", writeSize)
   //printf("lsu r_state w_state == %d %d\n", r_state, w_state)
   switch(w_state) {
     is(w_idle) {
       // 由于目前没有同时进行读写，当 valid = 1 且 wen = 1 为写
+      io.axi4_to_arbiter.bready := 0.B
       when(io.in.valid && io.in.bits.memvalid && io.in.bits.wen) {
         writeAddr := io.in.bits.waddr
         writeData := io.in.bits.wdata 
         writeStrb := io.in.bits.wmask
         // printf("wmask = %d\n", io.in.bits.wmask)
         w_state := w_wait_wready
+        io.axi4_to_arbiter.awvalid := 1.B 
+        io.axi4_to_arbiter.wvalid := 1.B
         reqw := 1.B
       }
     }
     is(w_wait_wready) {
+      io.axi4_to_arbiter.awvalid := 1.B 
+      io.axi4_to_arbiter.wvalid := 1.B
       when(io.bus_ac & io.axi4_to_arbiter.awready & io.axi4_to_arbiter.wready) {
         // waddr wdata 传输完成
-        // Keep in mind that slaves may do this: awready := wvalid, wready := awvalid
-        // To not cause a loop, we cannot have: wvalid := awready
+        // Keep in mind that slaves may do this: awready := wvalid, wready := awvalid 
+        // To not cause a loop, we cannot have: wvalid := awready (awvalid := wready)
         w_state := w_wait_bvalid 
         //在从设备的AWREADY信号有效后的第一个时钟上升沿，主设备的AWVALID信号必须保持有效
+        //因此此处不修改 awvalid 的值
+        //但我可以在 bvalid 有效前先拉高 bready
+
       }
     }
     is(w_wait_bvalid) {
+      io.axi4_to_arbiter.bready := 1.B
       when(io.axi4_to_arbiter.bvalid) {
-        w_state := w_idle
-        reqw := 0.B
+        writeResp := io.axi4_to_arbiter.bresp
+        when(io.axi4_to_arbiter.bresp === 0.U) {  // bresp === 0 才表示写入成功，此时再切换状态
+          // printf("lsu bresp == %d waddr=%x wready = %d wvalid = %d awready = %d awvalid = %d\n", io.axi4_to_arbiter.bresp, writeAddr, io.axi4_to_arbiter.wready, io.axi4_to_arbiter.wvalid, io.axi4_to_arbiter.awready, io.axi4_to_arbiter.awvalid)
+          w_state := w_idle
+          io.axi4_to_arbiter.awvalid := 0.B
+          io.axi4_to_arbiter.wvalid := 0.B
+          reqw := 0.B
+        }.otherwise {
+          printf("lsu bresp == %d waddr=%x wready = %d wvalid = %d awready = %d awvalid = %d\n", io.axi4_to_arbiter.bresp, writeAddr, io.axi4_to_arbiter.wready, io.axi4_to_arbiter.wvalid, io.axi4_to_arbiter.awready, io.axi4_to_arbiter.awvalid)
+          
+        }
       }
     }
   }

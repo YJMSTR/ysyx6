@@ -232,11 +232,14 @@ class ysyx_23060110 extends Module {
   InstFetcher.io.in.bits.dnpc := Mux(pcsel, ifu_dnpc, 0.U)
   InstFetcher.io.in.bits.stall := stall
   
-  when (IDRegen) {
-    IDReg.inst := Mux(InstFetcher.io.out.valid, InstFetcher.io.out.bits.inst, 0.U)
-    IDReg.pc := Mux(InstFetcher.io.out.valid, InstFetcher.io.out.bits.pc, 0.U) 
-    IDReg.valid := InstFetcher.io.out.valid
-  } 
+  when (InstFetcher.io.out.valid) {
+    when (IDRegen) {
+      IDReg.inst := InstFetcher.io.out.bits.inst
+      IDReg.pc := InstFetcher.io.out.bits.pc 
+      IDReg.valid := 1.B
+    } 
+  }
+  
 
  
   stall := dataHazard
@@ -538,7 +541,6 @@ class ysyx_23060110 extends Module {
     io.inst := 0.U
     io.pc := 0.U
   }
-
   val rs1ren = Decoder.io.rrs1 && Decoder.io.rs1 =/= 0.U && IDReg.valid
   val rs2ren = Decoder.io.rrs2 && Decoder.io.rs2 =/= 0.U && IDReg.valid
   val EX_RS1_Hazard = Decoder.io.rs1 === Mux(EXReg.valid, EXReg.rd, 0.U) && EXReg.rden
