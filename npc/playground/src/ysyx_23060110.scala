@@ -238,6 +238,12 @@ class ysyx_23060110 extends Module {
       IDReg.pc := InstFetcher.io.out.bits.pc 
       IDReg.valid := 1.B
     } 
+  }.otherwise {
+    when (IDRegen) { 
+      IDReg.inst := 0.U 
+      IDReg.pc := 0.U 
+      IDReg.valid := 0.B
+    }
   }
   
 
@@ -275,7 +281,7 @@ class ysyx_23060110 extends Module {
   // val snpc = Decoder.io.pc + 4.U
   EXRegen := LSRegen //| !EXReg.valid
   // 流水线阻塞会导致  EXReg.valid 被拉低，但其实拉低后 EXReg 中保存的仍然是有效数据，不应该冲刷掉
-  when(EXRegen) {
+  when(EXRegen) { // 如果此时 EXReg.valid ，那么 EXReg 中的数据会丢失
     EXReg.inst := Mux(IDReg.valid, IDReg.inst, 0.U)
     EXReg.pc := Mux(IDReg.valid, IDReg.pc, 0.U)
     EXReg.rs1v := rs1v
@@ -541,6 +547,7 @@ class ysyx_23060110 extends Module {
     io.inst := 0.U
     io.pc := 0.U
   }
+
   val rs1ren = Decoder.io.rrs1 && Decoder.io.rs1 =/= 0.U && IDReg.valid
   val rs2ren = Decoder.io.rrs2 && Decoder.io.rs2 =/= 0.U && IDReg.valid
   val EX_RS1_Hazard = Decoder.io.rs1 === Mux(EXReg.valid, EXReg.rd, 0.U) && EXReg.rden
@@ -571,7 +578,7 @@ class ysyx_23060110 extends Module {
   // ecall: 写入 mepc 和 mcause, 读 mtvec。读写的冒险上面都处理了
 
   //printf("IDUpc=%x rs1ren: %d, rs2ren: %d, EX_RS1_Hazard: %d, EX_RS2_Hazard: %d, WB_RS1_Hazard: %d, WB_RS2_Hazard: %d, LS_RS1_Hazard: %d, LS_RS2_Hazard: %d\n", IDReg.pc, rs1ren, rs2ren, EX_RS1_Hazard, EX_RS2_Hazard, WB_RS1_Hazard, WB_RS2_Hazard, LS_RS1_Hazard, LS_RS2_Hazard)
-  when (stall) {
+  when (stall | !LSRegen) {
     InstFetcher.io.in.valid := 0.B
     IDRegen := 0.B
     EXReg.valid := 0.B
@@ -579,7 +586,7 @@ class ysyx_23060110 extends Module {
   } .otherwise { 
     InstFetcher.io.in.valid := reset.asBool === 0.B
     IDRegen := EXRegen
-    EXReg.valid := IDReg.valid
+    EXReg.valid := 1.B
     when (Decoder.io.inst === ECALL) {
       printf("wb ecall; mtvec = %x\n", mtvec)
     }
