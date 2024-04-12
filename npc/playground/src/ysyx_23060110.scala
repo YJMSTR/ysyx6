@@ -202,6 +202,7 @@ class ysyx_23060110 extends Module {
 
   val dataHazard = WireInit(Bool(), 0.B)
   val stall = WireInit(Bool(), 0.B)
+  val next_stall = RegNext(stall)
 
   InstFetcher.io.axi4_to_arbiter <> AXI4Arbiter.io.ifu_bus.axi4
   InstFetcher.io.bus_ac := AXI4Arbiter.io.ifu_bus.bus_ac
@@ -279,9 +280,16 @@ class ysyx_23060110 extends Module {
     (Decoder.io.inst === CSRRW) -> rs1v,
   ))
   // val snpc = Decoder.io.pc + 4.U
-  EXRegen := LSRegen //| !EXReg.valid
+  // 当 LSRegen 变高，EXReg 应该先把其内容写入 LSReg 再变高
+  // 当 LSRegen 变低，EXRegen 应该立刻变低，不然数据会丢失
+  when (LSRegen) {
+    EXRegen := RegNext(LSRegen)
+  } .otherwise {
+    EXRegen := LSRegen
+  }
+  printf("exregen %d lsregen %d\n", EXRegen, LSRegen);
   // 流水线阻塞会导致  EXReg.valid 被拉低，但其实拉低后 EXReg 中保存的仍然是有效数据，不应该冲刷掉
-  when(EXRegen) { // 如果此时 EXReg.valid ，那么 EXReg 中的数据会丢失
+  when(EXRegen) { // 如果此时 EXReg.valid ，此时 LSRegen 应该也是 1, 理应让 EXReg 当前的数据进入 LSReg
     EXReg.inst := Mux(IDReg.valid, IDReg.inst, 0.U)
     EXReg.pc := Mux(IDReg.valid, IDReg.pc, 0.U)
     EXReg.rs1v := rs1v
@@ -339,7 +347,7 @@ class ysyx_23060110 extends Module {
   // pcsel := Decoder.io.isdnpc
 
   val ALU = Module(new ysyx_23060110_EXU)
-  when(EXReg.valid) {
+  when(EXReg.valid ) { 
     ALU.io.inst := EXReg.inst
     ALU.io.pc := EXReg.pc
     ALU.io.alu_op := EXReg.aluop
@@ -573,12 +581,12 @@ class ysyx_23060110 extends Module {
 
   val csr_data_hazard = zicsr_ren && (EX_CSR_Hazard | LS_CSR_Hazard | MEM_CSR_Hazard | WB_CSR_Hazard)
 
-  dataHazard := gpr_data_hazard | csr_data_hazard
+  dataHazard := gpr_data_hazard | csr_data_hazard | !LSRegen
    
   // ecall: 写入 mepc 和 mcause, 读 mtvec。读写的冒险上面都处理了
 
   //printf("IDUpc=%x rs1ren: %d, rs2ren: %d, EX_RS1_Hazard: %d, EX_RS2_Hazard: %d, WB_RS1_Hazard: %d, WB_RS2_Hazard: %d, LS_RS1_Hazard: %d, LS_RS2_Hazard: %d\n", IDReg.pc, rs1ren, rs2ren, EX_RS1_Hazard, EX_RS2_Hazard, WB_RS1_Hazard, WB_RS2_Hazard, LS_RS1_Hazard, LS_RS2_Hazard)
-  when (stall | !LSRegen) {
+  when (stall) {
     InstFetcher.io.in.valid := 0.B
     IDRegen := 0.B
     EXReg.valid := 0.B
@@ -586,7 +594,10 @@ class ysyx_23060110 extends Module {
   } .otherwise { 
     InstFetcher.io.in.valid := reset.asBool === 0.B
     IDRegen := EXRegen
-    EXReg.valid := 1.B
+    EXReg.valid := 1.B  // 这个修改有一个周期的延迟，
+    // 但 IDReg 和 EXReg 在当前周期就会被更新（因为 IDRegen 是组合信号
+    // 这导致了原先在 EXReg 里的数据会被覆盖
+    // 此处应该直接将 EXReg 里的数据传给 LSReg() 和 ALU？很难处理
     when (Decoder.io.inst === ECALL) {
       printf("wb ecall; mtvec = %x\n", mtvec)
     }

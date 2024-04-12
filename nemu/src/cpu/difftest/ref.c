@@ -21,12 +21,14 @@
 __EXPORT void difftest_memcpy(paddr_t addr, void *buf, size_t n, bool direction) {
   uint8_t *dest = buf;
   if (direction == DIFFTEST_TO_DUT) {
-    for (int i = 0; i < n; i++) {
-      dest[i] = paddr_read(addr+i, 1);
+    for (int i = 0; i < n; i += 8) {
+      dest[i] = paddr_read(addr+i, 8);
     }
   } else if (direction == DIFFTEST_TO_REF) {
-    for (int i = 0; i < n; i++) {
-      paddr_write(addr+i, 1, dest[i]);
+    for (int i = 0; i < n; i += 8) {
+      word_t data_ = (word_t)dest[i] + ((word_t)dest[i+1] << 8ull)  + ((word_t)dest[i+2] << 16ull) + ((word_t)dest[i+3] << 24ull);
+      data_ += ((word_t)dest[i+4] << 32ull) + ((word_t)dest[i+5]<<40ull) + ((word_t)dest[i+6]<<48ull) + ((word_t)dest[i+7]<<56ull);
+      paddr_write(addr+i, 8, data_);
     }
   }
   // assert(0);

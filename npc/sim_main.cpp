@@ -255,7 +255,7 @@ extern "C" void mrom_read(int addr, int *data) {
   }
    
   *data = res;
-  Log("npc mrom read addr = %x res64 = %lx\n res32 = %08x res16 = %08x res8 = %08x", addr, res, res & 0xFFFFFFFF, res & 0xFFFF, res & 0xFF);
+  Log("npc mrom read addr = %x res64 = %016lx\n res32 = %08x res16 = %08x res8 = %08x", addr, res, res & 0xFFFFFFFF, res & 0xFFFF, res & 0xFF);
   Assert(addr >= MROM_BASE && addr < MROM_BASE + MROM_SIZE, "addr = %x out of mrom", addr);
 }
 
