@@ -1,8 +1,20 @@
 #include <am.h>
 #include <klib-macros.h>
+#include <klib.h>
 #include <ysyxsoc.h>
 
 extern char _heap_start;
+extern char data_start [];
+extern char data_size [];
+extern char data_load_start [];
+
+void copy_data(void)
+{
+  if (&data_start[0] != &data_load_start[0])
+    {
+      memcpy(data_start, data_load_start, (size_t) data_size);
+    }
+}
 int main(const char *args);
 
 extern char _pmem_start;
@@ -27,6 +39,7 @@ void halt(int code) {
 }
 
 void _trm_init() {
+  // copy_data();
   int ret = main(mainargs);
   halt(ret);
 }

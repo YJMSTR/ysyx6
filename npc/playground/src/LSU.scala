@@ -11,7 +11,7 @@ class LSUIn extends Bundle {
   // rs2v 即 wdata
   val memvalid = Bool()
   val wen = Bool()
-  val wmask = UInt(XLEN.W)
+  val wmask = UInt(WMASKLEN.W)
   val wsext = UInt(MEM_SEXT_SEL_WIDTH.W)
   val raddr = UInt(32.W)
   val waddr = UInt(32.W)
@@ -144,12 +144,13 @@ class ysyx_23060110_LSU extends Module {
   val writeStrb = RegInit(0.U((XLEN/8).W))
   val writeSize = WireInit(3.U(3.W))
   val writeResp = RegInit(0.U(2.W))
+  val awaddr_unalign_offset = io.in.bits.waddr(2, 0) 
 
   writeSize := MuxLookup(writeStrb, 2.U, Seq(
-    1.U -> 0.U,
-    3.U -> 1.U,
-    15.U -> 2.U,
-    255.U -> 3.U,
+    1.U -> 0.U,   // 0b1        -> 1 byte
+    3.U -> 1.U,   // 0b11       -> 2 bytes
+    15.U -> 2.U,  // 0b1111     -> 4 bytes
+    255.U -> 3.U
   ))
 
   io.axi4_to_arbiter.awaddr := writeAddr
@@ -167,13 +168,24 @@ class ysyx_23060110_LSU extends Module {
       // 由于目前没有同时进行读写，当 valid = 1 且 wen = 1 为写
       io.axi4_to_arbiter.bready := 0.B
       when(io.in.valid && io.in.bits.memvalid && io.in.bits.wen) {
-        writeAddr := io.in.bits.waddr
-        writeData := io.in.bits.wdata 
-        writeStrb := io.in.bits.wmask
-        // printf("wmask = %d\n", io.in.bits.wmask)
+        
+        printf("wmask = %d\n", io.in.bits.wmask)
         w_state := w_wait_wready
         io.axi4_to_arbiter.awvalid := 1.B 
         io.axi4_to_arbiter.wvalid := 1.B
+        when (awaddr_unalign_offset =/= 0.U) { 
+          // 非对齐写入
+          printf("waddr = %x unalign offset = %x wdata = %x\n\n\n\n\n", io.in.bits.waddr, awaddr_unalign_offset, io.in.bits.wdata)
+          writeAddr := io.in.bits.waddr - awaddr_unalign_offset
+          writeData := io.in.bits.wdata << (awaddr_unalign_offset * 8.U)
+          writeStrb := io.in.bits.wmask << (awaddr_unalign_offset) // 举例：wstrb的第n位非0，对应从 0 开始计数的第 n 个字节, 偏移 x 个字节，意味着 wstrb 要整体左移 x
+          printf("after shift, wstrb = %x wdata = %x waddr = %x\n\n\n", io.in.bits.wmask << (awaddr_unalign_offset), io.in.bits.wdata << (awaddr_unalign_offset * 8.U), io.in.bits.waddr - awaddr_unalign_offset)
+        }.otherwise {
+          printf("waddr = %x align  wdata = %x\n\n\n\n\n", io.in.bits.waddr, io.in.bits.wdata)
+          writeAddr := io.in.bits.waddr
+          writeData := io.in.bits.wdata 
+          writeStrb := io.in.bits.wmask
+        }
         reqw := 1.B
       }
     }

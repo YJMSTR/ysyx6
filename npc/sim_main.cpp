@@ -55,7 +55,7 @@ enum NPC_STATES npc_state;
 word_t npc_halt_pc;
 int npc_ret;
 static unsigned long long cycles = 0;
-bool difftest_is_enable = 1;
+bool difftest_is_enable = 0;
 bool is_batch_mode = 0;
 bool is_itrace = 1;
 char logbuf[128];

@@ -54,8 +54,8 @@ void init_mem() {
 
 word_t paddr_read(paddr_t addr, int len) {
   word_t res = 0xdeadbeef;
-  if (addr < CONFIG_MROM_BASE || addr >= CONFIG_MROM_BASE + CONFIG_MROM_SIZE)
-    addr = addr & (~0x7ull); //按 8 字节对齐
+  // if (addr < CONFIG_MROM_BASE || addr >= CONFIG_MROM_BASE + CONFIG_MROM_SIZE)
+  //   addr = addr & (~0x7ull); //按 8 字节对齐
   if (likely(in_pmem(addr))) {
     res = pmem_read(addr, len);
 
@@ -72,7 +72,8 @@ word_t paddr_read(paddr_t addr, int len) {
   return 0;
 }
 void paddr_write(paddr_t addr, int len, word_t data) {
-  addr = addr & (~0x7ull);
+  // word_t offset = addr & 0x7ull;
+  // addr = addr & (~0x7ull);
   IFDEF(CONFIG_MTRACE, Log("paddr write %016lx to 0x%08x", data, addr));
   if (likely(in_pmem(addr))) { pmem_write(addr, len, data); return; }
   IFDEF(CONFIG_DEVICE, mmio_write(addr, len, data); return);

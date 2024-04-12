@@ -282,11 +282,12 @@ class ysyx_23060110 extends Module {
   // val snpc = Decoder.io.pc + 4.U
   // 当 LSRegen 变高，EXReg 应该先把其内容写入 LSReg 再变高
   // 当 LSRegen 变低，EXRegen 应该立刻变低，不然数据会丢失
-  when (LSRegen) {
-    EXRegen := RegNext(LSRegen)
-  } .otherwise {
-    EXRegen := LSRegen
-  }
+  // when (LSRegen) {
+  //   EXRegen := RegNext(LSRegen)
+  // } .otherwise {
+  //   EXRegen := LSRegen
+  // }
+  EXRegen := LSRegen
   printf("exregen %d lsregen %d\n", EXRegen, LSRegen);
   // 流水线阻塞会导致  EXReg.valid 被拉低，但其实拉低后 EXReg 中保存的仍然是有效数据，不应该冲刷掉
   when(EXRegen) { // 如果此时 EXReg.valid ，此时 LSRegen 应该也是 1, 理应让 EXReg 当前的数据进入 LSReg
@@ -581,7 +582,9 @@ class ysyx_23060110 extends Module {
 
   val csr_data_hazard = zicsr_ren && (EX_CSR_Hazard | LS_CSR_Hazard | MEM_CSR_Hazard | WB_CSR_Hazard)
 
-  dataHazard := gpr_data_hazard | csr_data_hazard | !LSRegen
+  val lsu_hazard = Decoder.io.memvalid === 1.U && (Mux(EXReg.valid, EXReg.memvalid, 0.B) | Mux(LSReg.valid, LSReg.memvalid, 0.B) | Mux(NPC_Mem.io.out.valid, NPC_Mem.io.out.bits.memvalid, 0.B) | !LSRegen)
+
+  dataHazard := gpr_data_hazard | csr_data_hazard | lsu_hazard
    
   // ecall: 写入 mepc 和 mcause, 读 mtvec。读写的冒险上面都处理了
 
