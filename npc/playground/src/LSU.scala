@@ -79,6 +79,7 @@ class ysyx_23060110_LSU extends Module {
   io.bus_reqw := reqw
   val readAddr = RegInit(0.U(32.W))
   val readData = RegInit(0.U(XLEN.W))
+  val readSize = RegInit(0.U(3.W))
 
   val r_idle :: r_wait_arready :: r_wait_rvalid :: Nil = Enum(3)
   val r_state = RegInit(r_idle)
@@ -99,22 +100,38 @@ class ysyx_23060110_LSU extends Module {
   io.axi4_to_arbiter.arvalid := r_state === r_wait_arready 
   io.axi4_to_arbiter.araddr := readAddr
   io.axi4_to_arbiter.rready := r_state === r_wait_rvalid & io.out.ready
-  io.axi4_to_arbiter.arsize := MuxLookup(memsextreg, 3.U, Seq(
-    MEM_NSEXT_8 ->  0.U,
-    MEM_NSEXT_16->  1.U,
-    MEM_NSEXT_32->  2.U,
-    MEM_SEXT_8  ->  0.U,
-    MEM_SEXT_16 ->  1.U,
-    MEM_SEXT_32 ->  2.U,
-  ))
+  io.axi4_to_arbiter.arsize := readSize
+  
   // printf("lsu r_state === %d\n", r_state);
+  val araddr_unalign_offset = io.in.bits.raddr(2, 0) 
+  val offsetreg = RegInit(0.U(3.W))
   switch(r_state){
     is(r_idle){
       when(io.in.valid && io.in.bits.memvalid && !io.in.bits.wen){
-        readAddr := io.in.bits.raddr
         r_state := r_wait_arready
-        // printf("io.axi4.arsize=%d\n", io.axi4_to_arbiter.arsize)
         reqr := 1.B
+        when (araddr_unalign_offset =/= 0.U) {
+          offsetreg := araddr_unalign_offset
+          readAddr := io.in.bits.raddr - araddr_unalign_offset
+          readSize := MuxLookup(araddr_unalign_offset, 3.U, Seq(
+            // | 7 | 6 | 5 | 4 | 3 | 2 | 1 | 0
+            // |    3          |     2 |   1
+            3.U -> 2.U,
+            2.U -> 2.U,
+            1.U -> 1.U,
+          ))
+        } .otherwise {
+          offsetreg := 0.U
+          readAddr := io.in.bits.raddr
+          readSize := MuxLookup(memsextreg, 3.U, Seq(
+            MEM_NSEXT_8 ->  0.U,
+            MEM_NSEXT_16->  1.U,
+            MEM_NSEXT_32->  2.U,
+            MEM_SEXT_8  ->  0.U,
+            MEM_SEXT_16 ->  1.U,
+            MEM_SEXT_32 ->  2.U,
+          ))
+        }
       }
     }
     is(r_wait_arready){ // arvalid = 1
@@ -125,7 +142,7 @@ class ysyx_23060110_LSU extends Module {
     }
     is(r_wait_rvalid){ // rready = 1
       when(io.axi4_to_arbiter.rvalid){
-        readData := io.axi4_to_arbiter.rdata
+        readData := io.axi4_to_arbiter.rdata >> (offsetreg * 8.U)
         when(io.axi4_to_arbiter.rresp === 0.U) {
           // printf("lsu rresp == %d\n", io.axi4_to_arbiter.rresp)
           r_state := r_idle
@@ -174,6 +191,7 @@ class ysyx_23060110_LSU extends Module {
         io.axi4_to_arbiter.awvalid := 1.B 
         io.axi4_to_arbiter.wvalid := 1.B
         when (awaddr_unalign_offset =/= 0.U) { 
+
           // 非对齐写入
           printf("waddr = %x unalign offset = %x wdata = %x\n\n\n\n\n", io.in.bits.waddr, awaddr_unalign_offset, io.in.bits.wdata)
           writeAddr := io.in.bits.waddr - awaddr_unalign_offset
@@ -181,6 +199,7 @@ class ysyx_23060110_LSU extends Module {
           writeStrb := io.in.bits.wmask << (awaddr_unalign_offset) // 举例：wstrb的第n位非0，对应从 0 开始计数的第 n 个字节, 偏移 x 个字节，意味着 wstrb 要整体左移 x
           printf("after shift, wstrb = %x wdata = %x waddr = %x\n\n\n", io.in.bits.wmask << (awaddr_unalign_offset), io.in.bits.wdata << (awaddr_unalign_offset * 8.U), io.in.bits.waddr - awaddr_unalign_offset)
         }.otherwise {
+          
           printf("waddr = %x align  wdata = %x\n\n\n\n\n", io.in.bits.waddr, io.in.bits.wdata)
           writeAddr := io.in.bits.waddr
           writeData := io.in.bits.wdata 
