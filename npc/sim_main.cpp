@@ -247,7 +247,7 @@ static void trace_and_difftest(vaddr_t pc, vaddr_t dnpc) {
 
 // 接入 ysyxSoC 所需的代码
 extern "C" void flash_read(int addr, int *data) { assert(0); }
-extern "C" void mrom_read(int addr, int *data) {
+extern "C" void mrom_read(int addr, long long *data) {
   // *data = 0x00100073;	//ebreak
   word_t res = 0;
   for (int i = 0; i < 8; i++) {
@@ -255,7 +255,7 @@ extern "C" void mrom_read(int addr, int *data) {
   }
    
   *data = res;
-  Log("npc mrom read addr = %x res64 = %016lx\n res32 = %08x res16 = %08x res8 = %08x", addr, res, res & 0xFFFFFFFF, res & 0xFFFF, res & 0xFF);
+  // Log("npc mrom read addr = %x res64 = %016lx\n res32 = %08x res16 = %08x res8 = %08x", addr, res, res & 0xFFFFFFFF, res & 0xFFFF, res & 0xFF);
   Assert(addr >= MROM_BASE && addr < MROM_BASE + MROM_SIZE, "addr = %x out of mrom", addr);
 }
 
@@ -487,6 +487,7 @@ void cpu_exec(uint32_t n) {
      cpu.pc);
     Log("npc cycles = %llu\n", cycles);
     print_iringbuf();
+    sleep(1);
   case NPC_QUIT: 
     Log("QUIT!");
     Log("npc cycles = %llu\n", cycles);

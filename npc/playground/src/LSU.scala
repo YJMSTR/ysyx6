@@ -112,13 +112,21 @@ class ysyx_23060110_LSU extends Module {
         reqr := 1.B
         when (araddr_unalign_offset =/= 0.U) {
           offsetreg := araddr_unalign_offset
-          readAddr := io.in.bits.raddr - araddr_unalign_offset
-          readSize := MuxLookup(araddr_unalign_offset, 3.U, Seq(
-            // | 7 | 6 | 5 | 4 | 3 | 2 | 1 | 0
-            // |    3          |     2 |   1
-            3.U -> 2.U,
-            2.U -> 2.U,
-            1.U -> 1.U,
+          readAddr := io.in.bits.raddr
+          // readSize := MuxLookup(araddr_unalign_offset, 3.U, Seq(
+          //   // | 7 | 6 | 5 | 4 | 3 | 2 | 1 | 0
+          //   // |    3          |     2 |   1
+          //   3.U -> 2.U,
+          //   2.U -> 2.U,
+          //   1.U -> 1.U,
+          // ))
+          readSize := MuxLookup(memsextreg, 3.U, Seq(
+            MEM_NSEXT_8 ->  0.U,
+            MEM_NSEXT_16->  1.U,
+            MEM_NSEXT_32->  2.U,
+            MEM_SEXT_8  ->  0.U,
+            MEM_SEXT_16 ->  1.U,
+            MEM_SEXT_32 ->  2.U,
           ))
         } .otherwise {
           offsetreg := 0.U
@@ -142,7 +150,7 @@ class ysyx_23060110_LSU extends Module {
     }
     is(r_wait_rvalid){ // rready = 1
       when(io.axi4_to_arbiter.rvalid){
-        readData := io.axi4_to_arbiter.rdata >> (offsetreg * 8.U)
+        readData := io.axi4_to_arbiter.rdata
         when(io.axi4_to_arbiter.rresp === 0.U) {
           // printf("lsu rresp == %d\n", io.axi4_to_arbiter.rresp)
           r_state := r_idle
@@ -186,35 +194,31 @@ class ysyx_23060110_LSU extends Module {
       io.axi4_to_arbiter.bready := 0.B
       when(io.in.valid && io.in.bits.memvalid && io.in.bits.wen) {
         
-        printf("wmask = %d\n", io.in.bits.wmask)
+        // printf("wmask = %d\n", io.in.bits.wmask)
         w_state := w_wait_wready
         io.axi4_to_arbiter.awvalid := 1.B 
         io.axi4_to_arbiter.wvalid := 1.B
-        when (awaddr_unalign_offset =/= 0.U) { 
+        // when (awaddr_unalign_offset =/= 0.U) { 
 
-          // 非对齐写入
-          printf("waddr = %x unalign offset = %x wdata = %x\n\n\n\n\n", io.in.bits.waddr, awaddr_unalign_offset, io.in.bits.wdata)
-          writeAddr := io.in.bits.waddr - awaddr_unalign_offset
-          writeData := io.in.bits.wdata << (awaddr_unalign_offset * 8.U)
-          writeStrb := io.in.bits.wmask << (awaddr_unalign_offset) // 举例：wstrb的第n位非0，对应从 0 开始计数的第 n 个字节, 偏移 x 个字节，意味着 wstrb 要整体左移 x
-          printf("after shift, wstrb = %x wdata = %x waddr = %x\n\n\n", io.in.bits.wmask << (awaddr_unalign_offset), io.in.bits.wdata << (awaddr_unalign_offset * 8.U), io.in.bits.waddr - awaddr_unalign_offset)
-        }.otherwise {
+        //   // 非对齐写入
+        //   printf("\nwaddr = %x unalign offset = %x wdata = %x\n\n\n\n\n", io.in.bits.waddr, awaddr_unalign_offset, io.in.bits.wdata)
           
-          printf("waddr = %x align  wdata = %x\n\n\n\n\n", io.in.bits.waddr, io.in.bits.wdata)
-          writeAddr := io.in.bits.waddr
-          writeData := io.in.bits.wdata 
-          writeStrb := io.in.bits.wmask
-        }
+        // }
+        writeAddr := io.in.bits.waddr
+        writeData := io.in.bits.wdata 
+        writeStrb := io.in.bits.wmask
         reqw := 1.B
       }
     }
     is(w_wait_wready) {
+      
       io.axi4_to_arbiter.awvalid := 1.B 
       io.axi4_to_arbiter.wvalid := 1.B
       when(io.bus_ac & io.axi4_to_arbiter.awready & io.axi4_to_arbiter.wready) {
         // waddr wdata 传输完成
         // Keep in mind that slaves may do this: awready := wvalid, wready := awvalid 
         // To not cause a loop, we cannot have: wvalid := awready (awvalid := wready)
+        // printf("\n wstrb = %x wdata = %x waddr = %x wsize = %x\n\n\n", writeStrb, writeData, writeAddr, writeSize)
         w_state := w_wait_bvalid 
         //在从设备的AWREADY信号有效后的第一个时钟上升沿，主设备的AWVALID信号必须保持有效
         //因此此处不修改 awvalid 的值

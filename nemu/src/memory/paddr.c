@@ -58,7 +58,6 @@ word_t paddr_read(paddr_t addr, int len) {
   //   addr = addr & (~0x7ull); //按 8 字节对齐
   if (likely(in_pmem(addr))) {
     res = pmem_read(addr, len);
-
   } else {
     IFDEF(CONFIG_DEVICE, res = mmio_read(addr, len));
   }

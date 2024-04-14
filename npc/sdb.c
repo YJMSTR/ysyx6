@@ -158,7 +158,7 @@ void init_monitor() {
     init_difftest(diff_so_file, img_size, difftest_port);
   if (is_itrace)
     init_disasm("riscv64" "-pc-linux-gnu");
-  printf("注意：RTL 中需要添加 AXI4 主设备对非对齐访存的处理，暂未添加\n");
+  printf("注意：RTL 中需要添加 AXI4 主设备对非对齐访存的处理，目前仅支持不跨越 8 字节的非对齐访存，形如 ld a0 addr=0x04的指令还不支持\n");
 }
 
 extern bool is_batch_mode;

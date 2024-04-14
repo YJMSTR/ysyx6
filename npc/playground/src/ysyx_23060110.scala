@@ -288,7 +288,7 @@ class ysyx_23060110 extends Module {
   //   EXRegen := LSRegen
   // }
   EXRegen := LSRegen
-  printf("exregen %d lsregen %d\n", EXRegen, LSRegen);
+  // printf("exregen %d lsregen %d\n", EXRegen, LSRegen);
   // 流水线阻塞会导致  EXReg.valid 被拉低，但其实拉低后 EXReg 中保存的仍然是有效数据，不应该冲刷掉
   when(EXRegen) { // 如果此时 EXReg.valid ，此时 LSRegen 应该也是 1, 理应让 EXReg 当前的数据进入 LSReg
     EXReg.inst := Mux(IDReg.valid, IDReg.inst, 0.U)
