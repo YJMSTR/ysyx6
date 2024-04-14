@@ -106,8 +106,9 @@ void *memmove(void *dst, const void *src, size_t n) {
 }
 
 void *memcpy(void *out, const void *in, size_t n) {
-  char *srct = (char *)in;
-  char *dstt = (char *)out;
+  n = n / 8;
+  uint64_t *srct = (uint64_t *)in;
+  uint64_t *dstt = (uint64_t *)out;
   for (size_t i = 0; i < n; i++) dstt[i] = srct[i];
   return out;
 }
