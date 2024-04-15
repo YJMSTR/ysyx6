@@ -37,6 +37,8 @@
 
 #define MROM_BASE 0x20000000
 #define MROM_SIZE 0x1000
+#define FLASH_BASE 0x30000000
+#define FLASH_SIZE 0x10000000
 
 #define ysyxSoC
 
@@ -55,7 +57,7 @@ enum NPC_STATES npc_state;
 word_t npc_halt_pc;
 int npc_ret;
 static unsigned long long cycles = 0;
-bool difftest_is_enable = 1;
+bool difftest_is_enable = 0;
 bool is_batch_mode = 0;
 bool is_itrace = 1;
 char logbuf[128];
@@ -105,6 +107,9 @@ static uint8_t mrom[MROM_SIZE*10] = {
   // 如果改了这里，记得把默认的 img_size 也改了
 }; 
 
+static uint8_t flash[FLASH_SIZE] = {
+  0x00, 0x01, 0x02, 0x03
+};
 
 static uint8_t mem[MEM_SIZE] = {
   0x93, 0x02, 0x00, 0x08, //addi	t0, zero, 128
@@ -246,7 +251,14 @@ static void trace_and_difftest(vaddr_t pc, vaddr_t dnpc) {
 
 
 // 接入 ysyxSoC 所需的代码
-extern "C" void flash_read(int addr, int *data) { assert(0); }
+extern "C" void flash_read(int addr, int *data) {
+  assert(addr >= 0 && addr < FLASH_SIZE);
+  word_t res = 0;
+  for (int i = 0; i < 4; i++) {
+    res = res + ((word_t)flash[addr + i] << (i * 8));
+  }
+  *data = res;
+}
 extern "C" void mrom_read(int addr, long long *data) {
   // *data = 0x00100073;	//ebreak
   word_t res = 0;
