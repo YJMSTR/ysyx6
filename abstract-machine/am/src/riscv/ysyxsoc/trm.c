@@ -42,6 +42,7 @@ void uart_16550_init() {
 void putch(char ch) {
   if (!serial_initted) {
     uart_16550_init();
+    serial_initted = 1;
   }
   while ((inb(UART_16550_LSR) & 0b1000000) == 0) {
     outb(UART_16550_FCR, inb(UART_16550_FCR) | 0b110);

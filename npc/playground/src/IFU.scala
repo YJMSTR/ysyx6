@@ -93,19 +93,43 @@ class ysyx_23060110_IFU extends Module {
   }
   
 
-  when(dnpc_valid) {
-    when (io.in.bits.isdnpc & io.in.valid) {
-      dnpc_valid := 0.B // 这个修改要延迟一个周期才会生效，但此时可能已经有指令被取出准备输出了
-      // 可以给 io.out.valid 加一个条件，如果当前 in.isdnpc = 1,那么这个周期要把 valid 置为 0
-      // 这样就解决了寄存器要延迟一个周期写入的问题
-      dnpc_reg := io.in.bits.dnpc
+  // when(dnpc_valid) {
+  //   when (io.in.bits.isdnpc & io.in.valid) {
+  //     dnpc_valid := 0.B // 这个修改要延迟一个周期才会生效，
+  //     // 但此时可能已经有指令被取出准备输出了(指被放进 readAddr)
+  //     // 此时 readAddr 里的指令直到下一次更新之前都不应该被输出
+      
+  //     dnpc_reg := io.in.bits.dnpc
+  //     // readAddr := io.in.bits.dnpc
+  //   }
+  // } .otherwise {
+  //   dnpc_valid := dnpc_reg === outAddr
+  // }
+
+  switch(dnpc_state) {
+    is(dnpc_idle) {
+      when(io.in.bits.isdnpc & io.in.valid) {
+        dnpc_state := dnpc_wait_ready
+        dnpc_reg := io.in.bits.dnpc
+        dnpc_valid := 0.B
+        outAddr := 0.U
+      }
     }
-  } .otherwise {
-    dnpc_valid := dnpc_reg === outAddr
+    is(dnpc_wait_ready) {
+      when(PC === dnpc_reg && outAddr === dnpc_reg) {
+        dnpc_state := dnpc_wait
+        dnpc_valid := 1.B
+      }
+    }
+    is (dnpc_wait) {
+      when (io.out.bits.pc === dnpc_reg) {
+        dnpc_state := dnpc_idle
+      }
+    }
   }
 
-  io.out.valid := state === s_idle && dnpc_valid && !io.in.bits.isdnpc
-  io.out.bits.pc := readAddr
+  io.out.valid := state === s_idle && dnpc_state === dnpc_idle
+  io.out.bits.pc := outAddr
   io.out.bits.inst := outData
   io.in.ready := io.axi4_to_arbiter.arready & io.out.ready
 }

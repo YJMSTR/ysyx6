@@ -108,7 +108,7 @@ static uint8_t mrom[MROM_SIZE*10] = {
 }; 
 
 static uint8_t flash[FLASH_SIZE] = {
-  0x00, 0x01, 0x02, 0x03
+  0x00, 0x01, 0x02, 0x03, 0x04,
 };
 
 static uint8_t mem[MEM_SIZE] = {

@@ -133,20 +133,20 @@ class ysyx_23060110_LSU extends Module {
           offsetreg := 0.U
           readAddr := io.in.bits.raddr
         }
-        printf("araddr = %x\n", io.in.bits.raddr)
+        // printf("araddr = %x\n", io.in.bits.raddr)
       }
     }
     is(r_wait_arready){ // arvalid = 1
       when(io.bus_ac & io.axi4_to_arbiter.arready){
         //此时把要读取的地址传给 mem，等待其读取完成
         r_state := r_wait_rvalid
-        printf("arsize = %x\n", readSize)
+        // printf("arsize = %x\n", readSize)
       }
     }
     is(r_wait_rvalid){ // rready = 1
       when(io.axi4_to_arbiter.rvalid){
         readData := io.axi4_to_arbiter.rdata >> (8.U * araddr_unalign_offset)
-        printf("lsu rdata = %x rresp == %d\n", io.axi4_to_arbiter.rdata >> (8.U * araddr_unalign_offset), io.axi4_to_arbiter.rresp)
+        // printf("lsu unaligned rdata = %x rresp == %d\n", io.axi4_to_arbiter.rdata, io.axi4_to_arbiter.rresp)
         when(io.axi4_to_arbiter.rresp === 0.U) {
           
           r_state := r_idle
