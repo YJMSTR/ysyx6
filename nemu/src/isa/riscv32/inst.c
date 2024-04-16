@@ -169,11 +169,11 @@ static int decode_exec(Decode *s) {
 }
 
 int isa_exec_once(Decode *s) {
-  Log("s->snpc = %lx", s->snpc);
+  // Log("s->snpc = %lx", s->snpc);
   s->isa.inst.val = inst_fetch(&s->snpc, 4);
   if (s->isa.inst.val == 0x302000073) {
     Log("inst === mret");
   }
-  Log("NEMU pc = %lx, inst = %x", s->pc, s->isa.inst.val);
+  // Log("NEMU pc = %lx, inst = %x", s->pc, s->isa.inst.val);
   return decode_exec(s);
 }

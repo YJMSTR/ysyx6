@@ -57,7 +57,7 @@ enum NPC_STATES npc_state;
 word_t npc_halt_pc;
 int npc_ret;
 static unsigned long long cycles = 0;
-bool difftest_is_enable = 0;
+bool difftest_is_enable = 1;
 bool is_batch_mode = 0;
 bool is_itrace = 1;
 char logbuf[128];
@@ -225,7 +225,7 @@ void difftest_step(vaddr_t pc, vaddr_t npc) {
 
   if (is_skip_ref) {
     // to skip the checking of an instruction, just copy the reg state to reference design
-    Log("skip ref pc=0x%08x, npc=0x%08x", pc, npc);
+    // Log("skip ref pc=0x%08x, npc=0x%08x", pc, npc);
     ref_difftest_regcpy(&cpu, DIFFTEST_TO_REF);
     is_skip_ref = false;
     return;
@@ -261,6 +261,7 @@ extern "C" void flash_read(int addr, int *data) {
 }
 extern "C" void mrom_read(int addr, long long *data) {
   // *data = 0x00100073;	//ebreak
+  addr &= (~0x3ull);  // mrom 按三字节对齐
   word_t res = 0;
   for (int i = 0; i < 8; i++) {
     res = res + ((word_t)mrom[addr-MROM_BASE+i] << (i*8));

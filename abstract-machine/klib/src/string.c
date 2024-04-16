@@ -106,9 +106,11 @@ void *memmove(void *dst, const void *src, size_t n) {
 }
 
 void *memcpy(void *out, const void *in, size_t n) {
-  n = n / 8;
-  uint64_t *srct = (uint64_t *)in;
-  uint64_t *dstt = (uint64_t *)out;
+  // n = n / 8;
+  // uint64_t *srct = (uint64_t *)in;
+  // uint64_t *dstt = (uint64_t *)out;
+  uint8_t *srct = (uint8_t *)in;
+  uint8_t *dstt = (uint8_t *)out;
   for (size_t i = 0; i < n; i++) dstt[i] = srct[i];
   return out;
 }
