@@ -19,7 +19,6 @@
 #include <sys/time.h>
 
 
-
 #define MEM_BASE 0x80000000u
 #define MEM_SIZE 0x8000000
 #define DEVICE_BASE 0xa0000000
@@ -41,6 +40,8 @@
 #define FLASH_SIZE 0x10000000
 
 #define ysyxSoC
+
+#define FLASH_READ 1
 
 #ifndef CONFIG_ITRACE_RINGBUFFER_SIZE
   #define CONFIG_ITRACE_RINGBUFFER_SIZE 16
@@ -431,6 +432,18 @@ static char *img_file = NULL;
 
 
 long load_img() {
+  #ifdef FLASH_READ
+    char *char_test_img = "/home/yjmstr/ysyx-workbench/npc/char-test/char-test.bin";
+    FILE *fpf = fopen(char_test_img, "rb");
+    assert(fpf);
+    fseek(fpf, 0, SEEK_END);
+    long sizef = ftell(fpf);
+    printf("flash char-test size = %d\n", sizef);
+    fseek(fpf, 0, SEEK_SET);
+    int retf = fread(flash, 1, sizef, fpf);
+    fclose(fpf);
+    assert(retf == sizef);
+  #endif
   if (img_file == NULL) {
     Log("no image found, use default img");
     //记得改了 默认 img 之后，默认的 img size 也要改
@@ -463,6 +476,7 @@ long load_img() {
 	int ret = fread(mrom, 1, size, fp);
   fclose(fp);
   assert(ret == size);
+
   return size;
 #endif
 }
