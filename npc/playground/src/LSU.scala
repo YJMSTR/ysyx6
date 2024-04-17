@@ -149,7 +149,7 @@ class ysyx_23060110_LSU extends Module {
     is(r_wait_rvalid){ // rready = 1
       when(io.axi4_to_arbiter.rvalid){
         readData := io.axi4_to_arbiter.rdata >> (8.U * offsetreg)
-        printf("lsu unaligned raddr = %x rdata = %x  aligned rdata = %x rresp == %d\n" , readAddr, io.axi4_to_arbiter.rdata, io.axi4_to_arbiter.rdata >> (8.U * offsetreg), io.axi4_to_arbiter.rresp)
+        // printf("lsu unaligned raddr = %x rdata = %x  aligned rdata = %x rresp == %d\n" , readAddr, io.axi4_to_arbiter.rdata, io.axi4_to_arbiter.rdata >> (8.U * offsetreg), io.axi4_to_arbiter.rresp)
         when(io.axi4_to_arbiter.rresp === 0.U) {
           r_state := r_idle
           reqr := 0.B
@@ -199,7 +199,7 @@ class ysyx_23060110_LSU extends Module {
         // when (awaddr_unalign_offset =/= 0.U) { 
 
         //   // 非对齐写入
-        printf("\nwaddr = %x unalign offset = %x wdata = %x\n\n\n\n\n", io.in.bits.waddr, awaddr_unalign_offset, io.in.bits.wdata)
+        // printf("\nwaddr = %x unalign offset = %x wdata = %x\n\n\n\n\n", io.in.bits.waddr, awaddr_unalign_offset, io.in.bits.wdata)
         // }
         writeAddr := io.in.bits.waddr
         writeData := io.in.bits.wdata << (awaddr_unalign_offset * 8.U)
@@ -216,7 +216,7 @@ class ysyx_23060110_LSU extends Module {
         // waddr wdata 传输完成
         // Keep in mind that slaves may do this: awready := wvalid, wready := awvalid 
         // To not cause a loop, we cannot have: wvalid := awready (awvalid := wready)
-        printf("\n wstrb(shifted) = %x wdata(shifted) = %x waddr(unaligned) = %x wsize = %x\n\n\n", writeStrb, writeData, writeAddr, writeSize)
+        // printf("\n wstrb(shifted) = %x wdata(shifted) = %x waddr(unaligned) = %x wsize = %x\n\n\n", writeStrb, writeData, writeAddr, writeSize)
         w_state := w_wait_bvalid 
         //在从设备的AWREADY信号有效后的第一个时钟上升沿，主设备的AWVALID信号必须保持有效
         //因此此处不修改 awvalid 的值
@@ -235,7 +235,7 @@ class ysyx_23060110_LSU extends Module {
           io.axi4_to_arbiter.wvalid := 0.B
           reqw := 0.B
         }.otherwise {
-          printf("lsu bresp == %d waddr=%x wready = %d wvalid = %d awready = %d awvalid = %d\n", io.axi4_to_arbiter.bresp, writeAddr, io.axi4_to_arbiter.wready, io.axi4_to_arbiter.wvalid, io.axi4_to_arbiter.awready, io.axi4_to_arbiter.awvalid)
+          // printf("lsu bresp == %d waddr=%x wready = %d wvalid = %d awready = %d awvalid = %d\n", io.axi4_to_arbiter.bresp, writeAddr, io.axi4_to_arbiter.wready, io.axi4_to_arbiter.wvalid, io.axi4_to_arbiter.awready, io.axi4_to_arbiter.awvalid)
           
         }
       }
