@@ -35,16 +35,19 @@ class ysyx_23060110_IFU extends Module {
 
   val PC = RegInit("x20000000".U(XLEN.W))
   val readAddr = RegInit(0.U(32.W))
+  val readSize = RegInit(2.U(MEM_SEXT_SEL_WIDTH.W))
   val outAddr = RegInit(0.U(32.W))
   val outData = RegInit(0.U(32.W))
 
   val s_idle :: s_wait_arready :: s_wait_rvalid :: Nil = Enum(3)
   val state = RegInit(s_idle)
 
+
+
   io.axi4_to_arbiter.arvalid := state === s_wait_arready && reset.asBool === 0.B
   io.axi4_to_arbiter.rready := state === s_wait_rvalid && reset.asBool === 0.B
   io.axi4_to_arbiter.araddr := readAddr
-  io.axi4_to_arbiter.arsize := 2.U // 32 bit inst
+  io.axi4_to_arbiter.arsize := readSize
   io.axi4_to_arbiter.awaddr := 0.U
   io.axi4_to_arbiter.awvalid := 0.B
   io.axi4_to_arbiter.wdata := 0.U
@@ -57,6 +60,11 @@ class ysyx_23060110_IFU extends Module {
   val dnpc_reg = RegInit(0.U(XLEN.W))
   val dnpc_valid = RegInit(1.B)
 
+  val is_mrom = WireInit(0.B)
+  is_mrom := PC >= MROM_BASE.U && PC < (MROM_BASE + MROM_SIZE).U
+
+  val araddr_unalign_offset = Mux(is_mrom, PC(1, 0), PC(2, 0))
+  val offsetreg = RegInit(0.U(3.W))
   //注意：当 arvalid 为 1 后， araddr 就不能变了，直到握手成功，因此需要用寄存器存一下
   switch(state){
     is(s_idle){ 
@@ -67,6 +75,17 @@ class ysyx_23060110_IFU extends Module {
           readAddr := PC
           state := s_wait_arready
           reqr := 1.B
+          when(araddr_unalign_offset =/= 0.U) {
+            readSize := MuxLookup(araddr_unalign_offset, 3.U, Seq(
+              3.U -> 2.U,
+              2.U -> 2.U,
+              1.U -> 1.U,
+            ))
+            offsetreg := araddr_unalign_offset
+          }.otherwise {
+            offsetreg := 0.U
+            readSize := 2.U
+          }
         }
       }
     }
@@ -76,13 +95,19 @@ class ysyx_23060110_IFU extends Module {
         PC := Mux(dnpc_valid, PC + 4.U, dnpc_reg)
         // 切换到 wait_rvalid 状态，即将 rready 置为 1 
         state := s_wait_rvalid
+        // when (is_mrom === 0.B) {
+        //   printf("ifu araddr=%x arsize=%x ismrom=%x offset=%x\n", readAddr, readSize, is_mrom, araddr_unalign_offset)
+        // }
       }
     }
     is(s_wait_rvalid){  // 等待 rvalid
       when(io.axi4_to_arbiter.rvalid){
         state := s_idle
-        outData := io.axi4_to_arbiter.rdata
+        outData := io.axi4_to_arbiter.rdata >> (8.U * offsetreg)
         outAddr := readAddr
+        // when(!is_mrom) {
+        //   printf("rdata=%x\n", io.axi4_to_arbiter.rdata >> (8.U * offsetreg))
+        // }
         reqr := 0.B
         when (io.axi4_to_arbiter.rresp =/= 0.U) {
           printf("r resp = %x\n", io.axi4_to_arbiter.rresp)

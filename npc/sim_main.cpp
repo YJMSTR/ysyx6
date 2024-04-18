@@ -254,11 +254,13 @@ static void trace_and_difftest(vaddr_t pc, vaddr_t dnpc) {
 // 接入 ysyxSoC 所需的代码
 extern "C" void flash_read(int addr, int *data) {
   assert(addr >= 0 && addr < FLASH_SIZE);
+  
   word_t res = 0;
   for (int i = 0; i < 4; i++) {
     res = res + ((word_t)flash[addr + i] << (i * 8));
   }
   *data = res;
+  // printf ("dpic flash read addr =%08x data=%08x\n", addr, res);
 }
 extern "C" void mrom_read(int addr, long long *data) {
   // *data = 0x00100073;	//ebreak
