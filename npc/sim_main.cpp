@@ -42,7 +42,7 @@
 #define ysyxSoC
 // #define MROM_LOAD
 #define FLASH_LOAD
-#define FLASH_CHAR_TEST 1
+// #define FLASH_CHAR_TEST 1
 
 #ifndef CONFIG_ITRACE_RINGBUFFER_SIZE
   #define CONFIG_ITRACE_RINGBUFFER_SIZE 16
@@ -61,7 +61,7 @@ int npc_ret;
 static unsigned long long cycles = 0;
 bool difftest_is_enable = 0;
 bool is_batch_mode = 0;
-bool is_itrace = 1;
+bool is_itrace = 0;
 char logbuf[128];
 static uint64_t boot_time = 0;
 static uint64_t rtc_us = 0;

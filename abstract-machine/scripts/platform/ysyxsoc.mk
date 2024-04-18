@@ -12,6 +12,8 @@
 
 AM_SRCS := riscv/ysyxsoc/trm.c \
 					 riscv/ysyxsoc/start.S \
+					 riscv/ysyxsoc/ioe.c \
+					 riscv/ysyxsoc/timer.c 
 
 CFLAGS    += -fdata-sections -ffunction-sections
 LDFLAGS   += -T $(AM_HOME)/scripts/ysyxsoc-linker.ld \
