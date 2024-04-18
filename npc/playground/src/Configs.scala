@@ -11,6 +11,8 @@ object Configs {
   val CLINT_SIZE            = 0x0001_0000L
   val MROM_BASE             = 0x2000_0000L
   val MROM_SIZE             = 0x0000_1000L
+  val SRAM_BASE             = 0x0f00_0000L
+  val SRAM_SIZE             = 0x0000_2000L
   val MEM_BASE              = 0x80000000L
   val MEM_SIZE              = 0x8000000L
   val FLASH_BASE            = 0x30000000L

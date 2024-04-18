@@ -4,6 +4,8 @@ import chisel3.util._
 import Configs._
 import Configs.MROM_BASE
 import Configs.MROM_SIZE
+import Configs.FLASH_BASE
+import Configs.FLASH_SIZE
 
 
 class LSUIn extends Bundle {
@@ -73,6 +75,8 @@ class ysyx_23060110_LSU extends Module {
   })
   val is_mrom = WireInit(0.B)
   is_mrom := io.in.bits.raddr >= MROM_BASE.U && io.in.bits.raddr < (MROM_BASE + MROM_SIZE).U
+  val is_flash = WireInit(0.B)
+  is_flash := io.in.bits.raddr >= FLASH_BASE.U && io.in.bits.raddr < (FLASH_BASE + FLASH_SIZE).U
   val empty_master = Module(new ysyx_23060110_empty_axi4_master)
   io.axi4_to_arbiter <> empty_master.io.axi4
   //val fake_sram = Module(new FAKE_SRAM_LSU())
@@ -107,7 +111,7 @@ class ysyx_23060110_LSU extends Module {
   
   // printf("lsu r_state === %d\n", r_state);
   
-  val araddr_unalign_offset = Mux(is_mrom, io.in.bits.raddr(1, 0), io.in.bits.raddr(2, 0))
+  val araddr_unalign_offset = Mux(is_mrom | is_flash, io.in.bits.raddr(1, 0), io.in.bits.raddr(2, 0))
   readSize := MuxLookup(memsextreg, 3.U, Seq(
             MEM_NSEXT_8 ->  0.U,
             MEM_NSEXT_16->  1.U,
@@ -167,7 +171,9 @@ class ysyx_23060110_LSU extends Module {
   val writeStrb = RegInit(0.U((XLEN/8).W))
   val writeSize = WireInit(3.U(3.W))
   val writeResp = RegInit(0.U(2.W))
-  val awaddr_unalign_offset = io.in.bits.waddr(2, 0) 
+  val is_sram = WireInit(0.B)
+  is_sram := io.in.bits.waddr >= SRAM_BASE.U && io.in.bits.waddr < (SRAM_BASE + SRAM_SIZE).U
+  val awaddr_unalign_offset = Mux(is_sram, 0.U, io.in.bits.waddr(2, 0))
 
   writeSize := MuxLookup(writeStrb, 2.U, Seq(
     1.U -> 0.U,   // 0b1        -> 1 byte
