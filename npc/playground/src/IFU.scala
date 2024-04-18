@@ -33,7 +33,7 @@ class ysyx_23060110_IFU extends Module {
   val reqr = RegInit(0.B)
   io.bus_reqr := reqr
 
-  val PC = RegInit("x20000000".U(XLEN.W))
+  val PC = RegInit("x30000000".U(XLEN.W))
   val readAddr = RegInit(0.U(32.W))
   val readSize = RegInit(2.U(MEM_SEXT_SEL_WIDTH.W))
   val outAddr = RegInit(0.U(32.W))
@@ -61,9 +61,10 @@ class ysyx_23060110_IFU extends Module {
   val dnpc_valid = RegInit(1.B)
 
   val is_mrom = WireInit(0.B)
+  val is_flash = WireInit(0.B)
   is_mrom := PC >= MROM_BASE.U && PC < (MROM_BASE + MROM_SIZE).U
-
-  val araddr_unalign_offset = Mux(is_mrom, PC(1, 0), PC(2, 0))
+  is_flash := PC >= FLASH_BASE.U && PC < (FLASH_BASE + FLASH_SIZE).U
+  val araddr_unalign_offset = Mux(is_mrom | is_flash, PC(1, 0), PC(2, 0))
   val offsetreg = RegInit(0.U(3.W))
   //注意：当 arvalid 为 1 后， araddr 就不能变了，直到握手成功，因此需要用寄存器存一下
   switch(state){

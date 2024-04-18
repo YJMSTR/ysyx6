@@ -13,6 +13,8 @@ object Configs {
   val MROM_SIZE             = 0x0000_1000L
   val MEM_BASE              = 0x80000000L
   val MEM_SIZE              = 0x8000000L
+  val FLASH_BASE            = 0x30000000L
+  val FLASH_SIZE            = 0x10000000L
   val DEVICE_BASE           = 0xa0000000L
   val SERIAL_PORT           = DEVICE_BASE + (0x000003f8L)
   val RTC_ADDR              = DEVICE_BASE + (0x00000048L) 

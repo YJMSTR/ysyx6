@@ -40,8 +40,9 @@
 #define FLASH_SIZE 0x10000000
 
 #define ysyxSoC
-
-#define FLASH_READ 1
+// #define MROM_LOAD
+#define FLASH_LOAD
+#define FLASH_CHAR_TEST 1
 
 #ifndef CONFIG_ITRACE_RINGBUFFER_SIZE
   #define CONFIG_ITRACE_RINGBUFFER_SIZE 16
@@ -416,16 +417,20 @@ static bool resetted = false;
 static void reset(int n) {  
   npc_state = NPC_RUN;
   topp->reset = 1;
-  while (n-- > 0) {
-    puts("Resetting");
-    single_cycle();
-  }
-  for (int i = 0; i < 1; i++) {
-    printf("sleep %ds\n", i);
-    sleep(1);
-  }
+  for (int i = 0; i < n; i++)
+    single_cycle();           // 此时我的 single_cycle 已经不是 single_cycle,而是执行一条指令了，所以会有很多个周期？
   topp->reset = 0;
-  topp->eval();
+
+  // // while (n-- > 0) {
+  // puts("Resetting");
+  // single_cycle();
+  // // }
+  // // for (int i = 0; i < 1; i++) {
+  // //   printf("sleep %ds\n", i);
+  // //   sleep(1);
+  // // }
+  // topp->reset = 0;
+  // topp->eval();
 }
 
 static char *elf_file = NULL;
@@ -434,7 +439,7 @@ static char *img_file = NULL;
 
 
 long load_img() {
-  #ifdef FLASH_READ
+  #ifdef FLASH_CHAR_TEST
     char *char_test_img = "/home/yjmstr/ysyx-workbench/npc/char-test/char-test.bin";
     FILE *fpf = fopen(char_test_img, "rb");
     assert(fpf);
@@ -452,7 +457,7 @@ long load_img() {
     return 32;
   }
 #ifndef ysyxSoC
-  // load 到 sram 中
+  // load 到 dpic 模拟的 sram 中
   memset(mem, 0, sizeof(mem));
 	printf("img == %s\n", img_file);
 	FILE *fp = fopen(img_file, "rb");
@@ -465,7 +470,7 @@ long load_img() {
   assert(ret == size);
 	return size;
 #endif
-#ifdef ysyxSoC
+#ifdef MROM_LOAD
   // load 到 mrom 中
   memset(mrom, 0, sizeof(mrom));
   printf("mrom img == %s\n", img_file);
@@ -479,6 +484,20 @@ long load_img() {
   fclose(fp);
   assert(ret == size);
 
+  return size;
+#endif
+#ifdef FLASH_LOAD
+  memset(flash, 0, sizeof(flash));
+  printf("flash img == %s\n", img_file);
+  FILE *fp = fopen(img_file, "rb");
+	assert(fp);
+	fseek(fp, 0, SEEK_END);
+	long size = ftell(fp);
+  printf("flash fp size = %d\n", size);
+	fseek(fp, 0, SEEK_SET);
+	int ret = fread(flash, 1, size, fp);
+  fclose(fp);
+  assert(ret == size);
   return size;
 #endif
 }
@@ -498,7 +517,7 @@ void print_iringbuf() {
 void cpu_exec(uint32_t n) {
   if (!resetted) {
     resetted = true;
-    reset(2);
+    reset(20);
   }
   while (n--) {
     if (npc_state != NPC_RUN) break;
