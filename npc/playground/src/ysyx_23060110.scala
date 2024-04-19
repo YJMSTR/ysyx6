@@ -178,7 +178,7 @@ class ysyx_23060110 extends Module {
   val AXI4Arbiter = Module(new ysyx_23060110_MyArbiter)
   // val SRAM = Module(new FAKE_SRAM_ONLY)
 
-  val XBar2 = Module(new ysyx_23060110_XBar)
+  // val XBar2 = Module(new ysyx_23060110_XBar)
   // val MyUart = Module(new MyUART)
   val MyClint = Module(new ysyx_23060110_MyCLINT)
 
@@ -210,23 +210,19 @@ class ysyx_23060110 extends Module {
   AXI4Arbiter.io.ifu_bus.bus_reqr := InstFetcher.io.bus_reqr
   AXI4Arbiter.io.ifu_bus.bus_reqw := InstFetcher.io.bus_reqw
 
-  val empty_master = Module (new ysyx_23060110_empty_axi4_master)
-  empty_master.io.axi4 <> XBar2.io.axi4in
+  // val empty_master = Module (new ysyx_23060110_empty_axi4_master)
+  // empty_master.io.axi4 <> XBar2.io.axi4in
   // 将 Arbiter 连到 顶层模块的 master
   AXI4Arbiter.io.xbar_bus <> io.master
   MyClint.io.axi4 <> io.slave
 
-  // XBar2.io.axi4out1 <> io.empty_sram
-  // XBar2.io.axi4out1 <> SRAM.io.axi4
-  // XBar2.io.axi4out0 <> MyUart.io.axi4
+  // val empty_slave0 = Module(new ysyx_23060110_empty_axi4_slave)
+  // val empty_slave1 = Module(new ysyx_23060110_empty_axi4_slave)
+  // val empty_slave_mrom = Module(new ysyx_23060110_empty_axi4_slave)
+  // XBar2.io.axi4out0 <> empty_slave0.io.axi4
   // XBar2.io.axi4out2 <> MyClint.io.axi4
-  val empty_slave0 = Module(new ysyx_23060110_empty_axi4_slave)
-  val empty_slave1 = Module(new ysyx_23060110_empty_axi4_slave)
-  val empty_slave_mrom = Module(new ysyx_23060110_empty_axi4_slave)
-  XBar2.io.axi4out0 <> empty_slave0.io.axi4
-  XBar2.io.axi4out2 <> MyClint.io.axi4
-  XBar2.io.axi4out1 <> empty_slave1.io.axi4
-  XBar2.io.axi4out_mrom <> empty_slave_mrom.io.axi4
+  // XBar2.io.axi4out1 <> empty_slave1.io.axi4
+  // XBar2.io.axi4out_mrom <> empty_slave_mrom.io.axi4
 
   InstFetcher.io.out.ready := IDRegen && reset.asBool === 0.B
   InstFetcher.io.in.bits.isdnpc := pcsel

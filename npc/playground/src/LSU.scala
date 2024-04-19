@@ -6,6 +6,7 @@ import Configs.MROM_BASE
 import Configs.MROM_SIZE
 import Configs.FLASH_BASE
 import Configs.FLASH_SIZE
+import Configs.UART_BASE
 
 
 class LSUIn extends Bundle {
@@ -77,6 +78,8 @@ class ysyx_23060110_LSU extends Module {
   is_mrom := io.in.bits.raddr >= MROM_BASE.U && io.in.bits.raddr < (MROM_BASE + MROM_SIZE).U
   val is_flash = WireInit(0.B)
   is_flash := io.in.bits.raddr >= FLASH_BASE.U && io.in.bits.raddr < (FLASH_BASE + FLASH_SIZE).U
+  val is_uart = WireInit(0.B)
+  is_uart := io.in.bits.raddr >= UART_BASE.U && io.in.bits.raddr < (UART_BASE + UART_SIZE).U
   val empty_master = Module(new ysyx_23060110_empty_axi4_master)
   io.axi4_to_arbiter <> empty_master.io.axi4
   //val fake_sram = Module(new FAKE_SRAM_LSU())
@@ -111,7 +114,7 @@ class ysyx_23060110_LSU extends Module {
   
   // printf("lsu r_state === %d\n", r_state);
   
-  val araddr_unalign_offset = Mux(is_mrom | is_flash, io.in.bits.raddr(1, 0), io.in.bits.raddr(2, 0))
+  val araddr_unalign_offset = Mux(is_uart | is_flash, 0.U, Mux(is_mrom, io.in.bits.raddr(1, 0), io.in.bits.raddr(2, 0)))
   readSize := MuxLookup(memsextreg, 3.U, Seq(
             MEM_NSEXT_8 ->  0.U,
             MEM_NSEXT_16->  1.U,

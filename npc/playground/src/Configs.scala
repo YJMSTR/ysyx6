@@ -17,9 +17,9 @@ object Configs {
   val MEM_SIZE              = 0x8000000L
   val FLASH_BASE            = 0x30000000L
   val FLASH_SIZE            = 0x10000000L
-  val DEVICE_BASE           = 0xa0000000L
-  val SERIAL_PORT           = DEVICE_BASE + (0x000003f8L)
-  val RTC_ADDR              = DEVICE_BASE + (0x00000048L) 
+  val UART_BASE             = 0x10000000L
+  val UART_SIZE             = 0x7L           // 一共 7 个 8 字节的 UART16550 寄存器
+  val RTC_ADDR              = CLINT_BASE 
 
 // #define CSR_MTVEC   0x305
 // #define CSR_MEPC    0x341
