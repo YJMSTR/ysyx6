@@ -30,7 +30,9 @@ static void *lut[128] = {
   // [AM_AUDIO_CTRL  ] = __am_audio_ctrl,
 };
 
-static void fail(void *buf) { panic("access nonexist register"); }
+static void fail(void *buf) { 
+  panic("access nonexist register");  
+}
 
 bool ioe_init() {
   for (int i = 0; i < LENGTH(lut); i++)
