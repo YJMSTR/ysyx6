@@ -10,10 +10,17 @@
 #            platform/dummy/vme.c \
 #            platform/dummy/mpe.c
 
-AM_SRCS := riscv/ysyxsoc/trm.c \
+AM_SRCS := platform/ysyxsoc/trm.c \
 					 riscv/ysyxsoc/start.S \
-					 riscv/ysyxsoc/ioe.c \
-					 riscv/ysyxsoc/timer.c 
+					 platform/ysyxsoc/ioe/ioe.c \
+					 platform/ysyxsoc/ioe/timer.c \
+           riscv/ysyxsoc/input.c \
+           riscv/ysyxsoc/cte.c \
+           riscv/ysyxsoc/trap.S \
+           riscv/ysyxsoc/audio.c \
+           riscv/ysyxsoc/gpu.c \
+           platform/dummy/vme.c \
+           platform/dummy/mpe.c
 
 CFLAGS    += -fdata-sections -ffunction-sections
 LDFLAGS   += -T $(AM_HOME)/scripts/ysyxsoc-linker.ld \

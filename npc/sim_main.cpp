@@ -567,16 +567,16 @@ int sim_main(int argc, char** argv) {
 	// nvboard_init();
   if (argc > 1) {
     img_file = argv[1];
-    if (ftrace_is_enable()) {
+      
     elf_file = (char *)malloc(strlen(img_file)+1);
-      memset(elf_file, '\0', sizeof(elf_file));
-      memcpy(elf_file, img_file, strlen(img_file)-3);
-      strcat(elf_file, "elf");
-    }
+    memset(elf_file, '\0', sizeof(elf_file));
+    memcpy(elf_file, img_file, strlen(img_file)-3);
+    elf_file[strlen(img_file)-3] = '\0';
+    strcat(elf_file, "elf");
   }
   init_monitor();
   Log("argv[1] = %s", argv[1]);
-  Log("elf_file = %s", elf_file);
+  Log("img_file = %s elf_file = %s", img_file, elf_file);
   if (ftrace_is_enable())
     init_ftrace(elf_file);
 

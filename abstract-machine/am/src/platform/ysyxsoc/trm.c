@@ -63,7 +63,9 @@ void halt(int code) {
 
 void _trm_init() {
   copy_data();
-
+  if(!ioe_init()) {
+    halt(1);
+  }
   int ret = main(mainargs);
   halt(ret);
 }

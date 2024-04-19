@@ -1,18 +1,12 @@
 ENTRY(_start)
-/*
-PHDRS {
-  text PT_LOAD;
-  data PT_LOAD;
-}
-*/
 MEMORY {
 /*  mrom(rx) : ORIGIN = 0x20000000, LENGTH = 4K */
   flash(rx): ORIGIN = 0x30000000, LENGTH = 0x10000000
-  sram(wx) : ORIGIN = 0x0f000000, LENGTH = 8K
+  sram(rwx) : ORIGIN = 0x0f000000, LENGTH = 8K
   
 }
 SECTIONS {
-  . = ORIGIN(flash);
+  . = _pmem_start;
   .text : {
     *(entry)
     *(.text*)
@@ -21,7 +15,7 @@ SECTIONS {
   _etext = .;
   .rodata : {
     *(.rodata*)
-  }
+  } > flash AT> flash
   .data : {
     . = ALIGN(8);
     data_start = .;
