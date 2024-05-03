@@ -46,7 +46,7 @@ bool ioe_init() {
       lut[i] = fail;
       // putstr("no\n");
     } else {
-      putstr("yes\n");
+      // putstr("yes\n");
     }
     // } else {
     //   uint64_t tmp = i;
