@@ -479,7 +479,7 @@ class Top extends Module {
       MEM_SEXT_16 ->  Cat(Fill(XLEN-16, rdata15), rdata(15, 0)),
       MEM_SEXT_32 ->  Cat(Fill(XLEN-32, rdata31), rdata(31, 0)),
     ))
-
+    // printf("WBReg.memsext=%d\n", WBReg.memsext)
     when(WBReg.inst === ECALL) {
       mepc := WBReg.pc 
       mcause := 11.U

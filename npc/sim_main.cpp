@@ -265,13 +265,13 @@ extern "C" void npc_pmem_read(int raddr, long long *rdata) {
     res = res + ((word_t)mem[addr-MEM_BASE+i] << (i*8));
   }
   *rdata = res;
-  //printf("pmem_read: *rdata = 0x%08x\n", *rdata);
+  // printf("pmem_read: addr=0x%08x *rdata = 0x%08x\n", addr, *rdata);
 }
 
 extern "C" void npc_pmem_write(int waddr, long long wdata, char wmask) {
   //int addr = waddr & ~0x3u;
   uint32_t addr = waddr;
-  //printf("pmem_write: waddr = 0x%08llx wdata = 0x%08llx wmask = 0x%x\n", waddr, wdata, 0xff & wmask);
+  // printf("pmem_write: waddr = 0x%08llx wdata = 0x%08llx wmask = 0x%x\n", waddr, wdata, 0xff & wmask);
   if (addr == SERIAL_PORT) {
     difftest_skip_ref();
     //Log("dtrace: pc = 0x%08x serial wdata = %d, wmask = %d", topp->io_pc, wdata, wmask);

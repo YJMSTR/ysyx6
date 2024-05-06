@@ -48,9 +48,6 @@ class IDU() extends Module {
   val List(alu_op, alu_sel_a, alu_sel_b, isdnpc, immsel, rden, memvalid, memwen, memwmask, memsext, isword, rrs1, rrs2) = ListLookup(
     io.inst,
     List(ALU_NONE, ALU_DATA_NONE, ALU_DATA_NONE, 0.B, IMM_NONE, 0.B, 0.B, 0.B, 0.U(WMASKLEN.W), MEM_SEXT_NONE, 0.B, 0.B, 0.B),
-    //List(ALU_OP, ALU_A, ALU_B, isdnpc, IMMSEL, RDWEN, memvalid, memwen, memwmask, memsext&bits, isword, rrs1, rrs2)
-    // NONE 就直接全0
-    // 只用到一个数据就 none + data， op 设为 add
     Array(
       // U-type
       LUI     -> List(ALU_ADD,          ALU_DATA_NONE,  ALU_DATA_IMM,   0.B, IMM_U,    1.B, 0.B, 0.B, 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.B,  0.B, 0.B),
