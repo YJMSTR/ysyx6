@@ -6,7 +6,8 @@
 #if !defined(__ISA_NATIVE__) || defined(__NATIVE_USE_KLIB__)
 
 int printf(const char *fmt, ...) {
-  char buf[1024];
+  // putstr("ptf:");
+  char buf[80];
   va_list args;
   va_start(args, fmt);
   int ret = vsprintf(buf, fmt, args);
@@ -21,6 +22,7 @@ int printf(const char *fmt, ...) {
 int vsprintf(char *out, const char *fmt, va_list ap) {
   uint32_t len = strlen(fmt);
   int cur = 0;
+  // putstr("vsptf");
   for (int i = 0; i < len; i++) {
     if (fmt[i] == '%') {
       if (i + 1 < len) {

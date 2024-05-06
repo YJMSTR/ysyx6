@@ -176,14 +176,9 @@ class ysyx_23060110_LSU extends Module {
   val writeResp = RegInit(0.U(2.W))
   val is_sram = WireInit(0.B)
   is_sram := io.in.bits.waddr >= SRAM_BASE.U && io.in.bits.waddr < (SRAM_BASE + SRAM_SIZE).U
-  val awaddr_unalign_offset = Mux(is_sram, 0.U, io.in.bits.waddr(2, 0))
+  val awaddr_unalign_offset = Mux(!is_sram, 0.U, io.in.bits.waddr(2, 0))
 
-  writeSize := MuxLookup(writeStrb, 2.U, Seq(
-    1.U -> 0.U,   // 0b1        -> 1 byte
-    3.U -> 1.U,   // 0b11       -> 2 bytes
-    15.U -> 2.U,  // 0b1111     -> 4 bytes
-    255.U -> 3.U
-  ))
+  
 
   io.axi4_to_arbiter.awaddr := writeAddr
   io.axi4_to_arbiter.awsize := writeSize
@@ -212,6 +207,12 @@ class ysyx_23060110_LSU extends Module {
         // }
         writeAddr := io.in.bits.waddr
         writeData := io.in.bits.wdata << (awaddr_unalign_offset * 8.U)
+        writeSize := MuxLookup(io.in.bits.wmask, 2.U, Seq(
+          1.U -> 0.U,   // 0b1        -> 1 byte
+          3.U -> 1.U,   // 0b11       -> 2 bytes
+          15.U -> 2.U,  // 0b1111     -> 4 bytes
+          255.U -> 3.U
+        ))
         writeStrb := io.in.bits.wmask << awaddr_unalign_offset
         // writeStrb := io.in.bits.wmask
         reqw := 1.B

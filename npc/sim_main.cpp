@@ -59,9 +59,9 @@ enum NPC_STATES npc_state;
 word_t npc_halt_pc;
 int npc_ret;
 static unsigned long long cycles = 0;
-bool difftest_is_enable = 1;
+bool difftest_is_enable = 0;
 bool is_batch_mode = 1;
-bool is_itrace = 1;
+bool is_itrace = 0;
 char logbuf[128];
 static uint64_t boot_time = 0;
 static uint64_t rtc_us = 0;
@@ -175,7 +175,8 @@ void init_difftest(char *ref_so_file, long img_size, int port) {
       "If it is not necessary, you can turn it off in menuconfig(NPC doesn't have menuconfig now).", ref_so_file);
   ref_difftest_init(port);
   // ref_difftest_memcpy(MEM_BASE, mem, img_size, DIFFTEST_TO_REF);
-  ref_difftest_memcpy(MROM_BASE, mrom, img_size, DIFFTEST_TO_REF);
+  // ref_difftest_memcpy(MROM_BASE, mrom, img_size, DIFFTEST_TO_REF);
+  ref_difftest_memcpy(FLASH_BASE, flash, img_size, DIFFTEST_TO_REF);
   ref_difftest_regcpy(&cpu, DIFFTEST_TO_REF);
 }
 
@@ -400,6 +401,11 @@ static void single_cycle() {
     for (int i = 0; i < 32; i++) {
       cpu.gpr[i] = Rread(i);
     }
+    if (cpu.gpr[2] != 0 && cpu.gpr[2] < 0x0f001000) {
+      printf("stack overflow at pc = 0x%x\n", pc);
+      npc_state = NPC_ABORT;
+      npc_ret = 1;
+    }
     trace_and_difftest(nz_pc, nz_npc);
   }
   //sleep(1);
@@ -535,6 +541,7 @@ void cpu_exec(uint32_t n) {
      cpu.pc);
     Log("npc cycles = %llu\n", cycles);
     print_iringbuf();
+    npc_reg_display();
     sleep(1);
   case NPC_QUIT: 
     Log("QUIT!");

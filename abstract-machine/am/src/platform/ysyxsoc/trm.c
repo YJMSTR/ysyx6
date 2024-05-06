@@ -12,13 +12,13 @@ void copy_data(void)
 {
   if (&data_start[0] != &data_load_start[0])
     {
-      memcpy(data_start, data_load_start, (size_t) data_size);
+      // memcpy(data_start, data_load_start, (size_t) data_size);
 
-      // unsigned long long *srct = (unsigned long long *)data_load_start;
-      // unsigned long long *dstt = (unsigned long long *)data_start;
-      // for (int i = 0; i < (size_t)data_size / 8; i++) {
-      //   dstt[i] = srct[i];
-      // }
+      unsigned char *srct = (unsigned char *)data_load_start;
+      unsigned char *dstt = (unsigned char *)data_start;
+      for (int i = 0; i < (size_t)data_size; i++) {
+        dstt[i] = srct[i];
+      }
     }
 }
 int main(const char *args);
