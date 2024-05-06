@@ -28,6 +28,8 @@ object Configs {
   val CSR_MEPC              = 0x341
   val CSR_MCAUSE            = 0x342
   val CSR_MSTATUS           = 0x300
+  val CSR_MVENDORID         = 0xF11
+  val CSR_MARCHID           = 0xF12
 
   val ALU_DATASEL_WIDTH     = 3
   val IMM_SEL_WIDTH         = 3

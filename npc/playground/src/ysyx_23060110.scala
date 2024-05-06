@@ -197,6 +197,8 @@ class ysyx_23060110 extends Module {
   val mtvec   = RegInit(0.U(XLEN.W))
   val mepc    = RegInit(0.U(XLEN.W))
   val mcause  = RegInit(0.U(XLEN.W))
+  val mvendorid = RegInit("x79737978".U(XLEN.W))
+  val marchid = RegInit(23060110.U(XLEN.W))
 
   
 
@@ -265,7 +267,9 @@ class ysyx_23060110 extends Module {
     CSR_MCAUSE.U  -> mcause,
     CSR_MSTATUS.U -> mstatus,
     CSR_MEPC.U    -> mepc,
-    CSR_MTVEC.U   -> mtvec
+    CSR_MTVEC.U   -> mtvec,
+    CSR_MVENDORID.U -> mvendorid,
+    CSR_MARCHID.U -> marchid
   ))
 
   // csrwv 是要写回 csridx 对应的 csr 的值，当 csr_en 为真时写回

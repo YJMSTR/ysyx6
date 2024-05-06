@@ -66,6 +66,16 @@ void _trm_init() {
   if(!ioe_init()) {
     halt(1);
   }
+  unsigned long long ysyx, ysyx_no; 
+  asm volatile(
+      "csrr %[dest1], mvendorid;\
+       csrr %[dest2], marchid;"
+      :[dest1]"=r"(ysyx),[dest2]"=r"(ysyx_no)
+  );
+  for (int i = 7; i >= 0; i--) {
+    putch((ysyx>>(i*8ll))&0xff);
+  }
+  printf("%d\n", (int)ysyx_no);
   int ret = main(mainargs);
   halt(ret);
 }
