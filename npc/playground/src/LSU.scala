@@ -174,9 +174,11 @@ class ysyx_23060110_LSU extends Module {
   val writeStrb = RegInit(0.U((XLEN/8).W))
   val writeSize = WireInit(3.U(3.W))
   val writeResp = RegInit(0.U(2.W))
-  val is_sram = WireInit(0.B)
-  is_sram := io.in.bits.waddr >= SRAM_BASE.U && io.in.bits.waddr < (SRAM_BASE + SRAM_SIZE).U
-  val awaddr_unalign_offset = Mux(!is_sram, 0.U, io.in.bits.waddr(2, 0))
+  val w_is_sram = WireInit(0.B)
+  val w_is_psram = WireInit(0.B)
+  w_is_sram := io.in.bits.waddr >= SRAM_BASE.U && io.in.bits.waddr < (SRAM_BASE + SRAM_SIZE).U
+  w_is_psram := io.in.bits.waddr >= PSRAM_BASE.U && io.in.bits.waddr < (PSRAM_BASE + PSRAM_SIZE).U
+  val awaddr_unalign_offset = Mux(w_is_sram | w_is_psram, io.in.bits.waddr(2, 0), 0.U)
 
   
 

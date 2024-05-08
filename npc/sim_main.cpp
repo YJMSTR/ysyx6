@@ -38,6 +38,8 @@
 #define MROM_SIZE 0x1000
 #define FLASH_BASE 0x30000000
 #define FLASH_SIZE 0x10000000
+#define PSRAM_BASE 0x80000000
+#define PSRAM_SIZE 0x20000000
 
 #define ysyxSoC
 // #define MROM_LOAD
@@ -58,10 +60,10 @@ VysyxSoCFull* topp = new VysyxSoCFull{contextp};
 enum NPC_STATES npc_state;
 word_t npc_halt_pc;
 int npc_ret;
-static unsigned long long cycles = 0;
+static unsigned long long cycles = 0, insts = 0;
 bool difftest_is_enable = 0;
 bool is_batch_mode = 1;
-bool is_itrace = 0;
+bool is_itrace = 1;
 char logbuf[128];
 static uint64_t boot_time = 0;
 static uint64_t rtc_us = 0;
@@ -110,7 +112,15 @@ static uint8_t mrom[MROM_SIZE*10] = {
 }; 
 
 static uint8_t flash[FLASH_SIZE] = {
-  0x00, 0x01, 0x02, 0x03, 0x04,
+  0x93, 0x02, 0x00, 0x08, //addi	t0, zero, 128
+  0xef, 0x00, 0xc0, 0x00, //jal ra, 80000010
+  0x13, 0x03, 0x10, 0x08, //addi	t1, zero, 129
+  0x13, 0x05, 0x10, 0x00, //li a0, 1
+  0x13, 0x07, 0xb0, 0x00, //li a4, 11 
+  0x13, 0x06, 0x10, 0x3a, //li a2, 929
+  0x93, 0x05, 0x10, 0x3a, //li a1, 929
+  0x73, 0x00, 0x10, 0x00  //ebreak
+  // 如果改了这里，记得把默认的 img_size 也改了
 };
 
 static uint8_t mem[MEM_SIZE] = {
@@ -124,6 +134,8 @@ static uint8_t mem[MEM_SIZE] = {
   0x73, 0x00, 0x10, 0x00  //ebreak
   // 如果改了这里，记得把默认的 img_size 也改了
 }; 
+
+static uint8_t psram[PSRAM_SIZE];
 
 void (*ref_difftest_memcpy)(paddr_t addr, void *buf, size_t n, bool direction) = NULL;
 void (*ref_difftest_regcpy)(void *dut, bool direction) = NULL;
@@ -266,7 +278,7 @@ extern "C" void flash_read(int addr, int *data) {
 }
 extern "C" void mrom_read(int addr, long long *data) {
   // *data = 0x00100073;	//ebreak
-  addr &= (~0x3ull);  // mrom 按三字节对齐
+  addr &= (~0x3ull);  // mrom 按4字节对齐
   word_t res = 0;
   for (int i = 0; i < 8; i++) {
     res = res + ((word_t)mrom[addr-MROM_BASE+i] << (i*8));
@@ -275,6 +287,26 @@ extern "C" void mrom_read(int addr, long long *data) {
   *data = res;
   // Log("npc mrom read addr = %x res64 = %016lx\n res32 = %08x res16 = %08x res8 = %08x", addr, res, res & 0xFFFFFFFF, res & 0xFFFF, res & 0xFF);
   Assert(addr >= MROM_BASE && addr < MROM_BASE + MROM_SIZE, "addr = %x out of mrom", addr);
+}
+
+extern "C" void psram_read(int addr, int *odata) {
+  assert(addr >= 0 && addr < PSRAM_SIZE);
+
+  word_t res = 0;
+  for (int i = 0; i < 4; i++) {
+    res = res + ((word_t)psram[addr+i]<<(i*8));
+  }
+  Log("---psram read addr=%x data=%x---\n", addr, res);
+  *odata = res;
+}
+
+extern "C" void psram_write(int addr, int idata) {
+  assert(addr >= 0 && addr < PSRAM_SIZE);
+  Log("psram write addr=%x data=%x\n", addr, idata);
+  for (int i = 0; i < 4; i++) {
+    psram[addr + i] = (idata >> (i * 8)) & 0xff;
+  }
+  Log("after write, psram[%x] = %x %x %x %x \n", addr, psram[addr + 3], psram[addr + 2], psram[addr + 1], psram[addr]);
 }
 
 extern "C" void npc_pmem_read(int raddr, long long *rdata) {
@@ -381,32 +413,36 @@ static void single_cycle() {
 // #ifndef ysyxSoC
   if (topp->reset == 0 && is_itrace) {
     //printf("[itrace] inst = 0x%08x\n", topp->io_inst);
-    p += snprintf(p, sizeof(logbuf), "0x%08lx :", pc);
-    int ilen = 4;
-    uint8_t *inst = (uint8_t *)&instval;
-    for (int i = ilen - 1; i >= 0; i--) {
-      p += snprintf(p, 4, " %02x", inst[i]);
+    if (instval != 0) {
+      insts++;
+      p += snprintf(p, sizeof(logbuf), "0x%08lx :", pc);
+      int ilen = 4;
+      uint8_t *inst = (uint8_t *)&instval;
+      for (int i = ilen - 1; i >= 0; i--) {
+        p += snprintf(p, 4, " %02x", inst[i]);
+      }
+      iringbuf.cur = (iringbuf.cur + 1) % CONFIG_ITRACE_RINGBUFFER_SIZE;
+      iringbuf.pc[iringbuf.cur] = pc;
+      iringbuf.inst[iringbuf.cur] = instval;
+      int space_len = 4 * 3 + 1;
+      memset(p, ' ', space_len);
+      p += space_len;
+      disassemble(p, logbuf + sizeof(logbuf) - p, pc, inst, ilen);
+      if (ftrace_is_enable()) {
+        word_t reg_val = Rread(1);
+        ftrace(pc, npc, iringbuf.inst[iringbuf.cur], reg_val);
+      }
+      for (int i = 0; i < 32; i++) {
+        cpu.gpr[i] = Rread(i);
+      }
+    
+      if (cpu.gpr[2] != 0 && cpu.gpr[2] < 0x0f001000) {
+        printf("stack overflow at pc = 0x%x\n", pc);
+        npc_state = NPC_ABORT;
+        npc_ret = 1;
+      }
+      trace_and_difftest(nz_pc, nz_npc);
     }
-    iringbuf.cur = (iringbuf.cur + 1) % CONFIG_ITRACE_RINGBUFFER_SIZE;
-    iringbuf.pc[iringbuf.cur] = pc;
-    iringbuf.inst[iringbuf.cur] = instval;
-    int space_len = 4 * 3 + 1;
-    memset(p, ' ', space_len);
-    p += space_len;
-    disassemble(p, logbuf + sizeof(logbuf) - p, pc, inst, ilen);
-    if (ftrace_is_enable()) {
-      word_t reg_val = Rread(1);
-      ftrace(pc, npc, iringbuf.inst[iringbuf.cur], reg_val);
-    }
-    for (int i = 0; i < 32; i++) {
-      cpu.gpr[i] = Rread(i);
-    }
-    if (cpu.gpr[2] != 0 && cpu.gpr[2] < 0x0f001000) {
-      printf("stack overflow at pc = 0x%x\n", pc);
-      npc_state = NPC_ABORT;
-      npc_ret = 1;
-    }
-    trace_and_difftest(nz_pc, nz_npc);
   }
   //sleep(1);
 // #endif
@@ -545,7 +581,7 @@ void cpu_exec(uint32_t n) {
     sleep(1);
   case NPC_QUIT: 
     Log("QUIT!");
-    Log("npc cycles = %llu\n", cycles);
+    Log("npc cycles = %llu insts = %llu\n", cycles, insts);
   default:
     break;
   }

@@ -7,7 +7,7 @@
 
 int printf(const char *fmt, ...) {
   // putstr("ptf:");
-  char buf[80];
+  char buf[160];
   va_list args;
   va_start(args, fmt);
   int ret = vsprintf(buf, fmt, args);
@@ -32,7 +32,7 @@ int vsprintf(char *out, const char *fmt, va_list ap) {
             char stk[100];
             int stk_top = 0, f = 1;
             if (tmp == 0) {
-              stk[++stk_top] = '0';
+              out[cur++] = '0';
               i++;
               break;
             }
@@ -65,7 +65,7 @@ int vsprintf(char *out, const char *fmt, va_list ap) {
             char stkx[100];
             unsigned int stkx_top = 0;
             if (tmpx == 0) {
-              stkx[++stkx_top] = '0';
+              out[cur++] = '0';
               i++;
               break;
             }
@@ -99,7 +99,9 @@ int vsprintf(char *out, const char *fmt, va_list ap) {
               stkx[++stkx_top] = res;
               tmpx >>= 4;
             }
-            
+            if (stkx_top == 0) {
+              out[cur++] = '0';
+            }
             while (stkx_top > 0) {
               out[cur++] = stkx[stkx_top];
               stkx_top--; 
