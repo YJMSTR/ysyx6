@@ -1,6 +1,7 @@
 include $(AM_HOME)/scripts/isa/riscv.mk
 include $(AM_HOME)/scripts/platform/npc.mk
 CFLAGS  += -DISA_H=\"riscv/riscv.h\"
+LDFLAGS += --print-map
 
 # AM_SRCS += riscv/npc/start.S \
 #            riscv/npc/trm.c \

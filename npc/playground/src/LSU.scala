@@ -64,12 +64,14 @@ class LSU extends Module {
   val io = IO(new Bundle {
     val in = Flipped(Decoupled(new LSUIn))
     val out = Decoupled(new LSUOut)
-    val axi4lite_to_arbiter = Flipped(new AXI4LiteInterface)
+    val axi4_to_arbiter = Flipped(new AXI4Interface)
     val bus_ac = Input(Bool())
     val bus_reqr = Output(Bool())
     val bus_reqw = Output(Bool())
   })
 
+  val empty_master = Module(new empty_axi4_master)
+  io.axi4_to_arbiter <> empty_master.io.axi4
 
   //val fake_sram = Module(new FAKE_SRAM_LSU())
   val reqr = RegInit(0.B)
@@ -83,9 +85,9 @@ class LSU extends Module {
   val r_state = RegInit(r_idle)
 
   // 由于顺序五级流水不会同时进行读和写， 当 io.in.valid 并且 wen 为 0 即为读
-  io.axi4lite_to_arbiter.arvalid := r_state === r_wait_arready 
-  io.axi4lite_to_arbiter.araddr := readAddr
-  io.axi4lite_to_arbiter.rready := r_state === r_wait_rvalid & io.out.ready
+  io.axi4_to_arbiter.arvalid := r_state === r_wait_arready 
+  io.axi4_to_arbiter.araddr := readAddr
+  io.axi4_to_arbiter.rready := r_state === r_wait_rvalid & io.out.ready
 
   switch(r_state){
     is(r_idle){
@@ -96,14 +98,14 @@ class LSU extends Module {
       }
     }
     is(r_wait_arready){ // arvalid = 1
-      when(io.bus_ac & io.axi4lite_to_arbiter.arready){
+      when(io.bus_ac & io.axi4_to_arbiter.arready){
         //此时把要读取的地址传给 mem，等待其读取完成
         r_state := r_wait_rvalid
       }
     }
     is(r_wait_rvalid){ // rready = 1
-      when(io.axi4lite_to_arbiter.rvalid){
-        readData := io.axi4lite_to_arbiter.rdata
+      when(io.axi4_to_arbiter.rvalid){
+        readData := io.axi4_to_arbiter.rdata
         r_state := r_idle
         reqr := 0.B
       }
@@ -118,12 +120,12 @@ class LSU extends Module {
   val writeData = RegInit(0.U(XLEN.W))
   val writeStrb = RegInit(0.U((XLEN/8).W))
 
-  io.axi4lite_to_arbiter.awaddr := writeAddr
-  io.axi4lite_to_arbiter.awvalid := w_state === w_wait_awready
-  io.axi4lite_to_arbiter.wdata := writeData
-  io.axi4lite_to_arbiter.wvalid := w_state === w_wait_wready
-  io.axi4lite_to_arbiter.wstrb := writeStrb
-  io.axi4lite_to_arbiter.bready := w_state === w_wait_bvalid
+  io.axi4_to_arbiter.awaddr := writeAddr
+  io.axi4_to_arbiter.awvalid := w_state === w_wait_awready
+  io.axi4_to_arbiter.wdata := writeData
+  io.axi4_to_arbiter.wvalid := w_state === w_wait_wready
+  io.axi4_to_arbiter.wstrb := writeStrb
+  io.axi4_to_arbiter.bready := w_state === w_wait_bvalid
 
   switch(w_state) {
     is(w_idle) {
@@ -137,20 +139,20 @@ class LSU extends Module {
       }
     }
     is(w_wait_awready) {
-      when(io.bus_ac & io.axi4lite_to_arbiter.awready) {
+      when(io.bus_ac & io.axi4_to_arbiter.awready) {
         // waddr 传输完成
         w_state := w_wait_wready
         // printf("pc = %x lsu addr = %x\n", io.out.bits.pc, writeAddr)
       }
     }
     is(w_wait_wready) {
-      when(io.axi4lite_to_arbiter.wready) {
+      when(io.axi4_to_arbiter.wready) {
         // wdata 传输完成
         w_state := w_wait_bvalid
       }
     }
     is(w_wait_bvalid) {
-      when(io.axi4lite_to_arbiter.bvalid) {
+      when(io.axi4_to_arbiter.bvalid) {
         w_state := w_idle
         reqw := 0.B
       }

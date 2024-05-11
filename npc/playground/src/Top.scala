@@ -83,7 +83,7 @@ class Top extends Module {
     val inst = Output(UInt(32.W))
     val pc = Output(UInt(XLEN.W))
     val npc = Output(UInt(XLEN.W))
-    // val empty_sram = Flipped(new AXI4LiteInterface)
+    // val empty_sram = Flipped(new AXI4Interface)
     // val isebreak = Output(Bool())
   })
   
@@ -167,7 +167,7 @@ class Top extends Module {
       _.pc -> 0.U
     )
   )
-  val AXI4liteArbiter = Module(new MyArbiter)
+  val AXI4Arbiter = Module(new MyArbiter)
   val SRAM = Module(new FAKE_SRAM_ONLY)
 
   val XBar2 = Module(new XBar)
@@ -195,17 +195,17 @@ class Top extends Module {
   val dataHazard = WireInit(Bool(), 0.B)
   val stall = WireInit(Bool(), 0.B)
 
-  InstFetcher.io.axi4lite_to_arbiter <> AXI4liteArbiter.io.ifu_bus.axi4lite
-  InstFetcher.io.bus_ac := AXI4liteArbiter.io.ifu_bus.bus_ac
+  InstFetcher.io.axi4_to_arbiter <> AXI4Arbiter.io.ifu_bus.axi4
+  InstFetcher.io.bus_ac := AXI4Arbiter.io.ifu_bus.bus_ac
 
-  AXI4liteArbiter.io.ifu_bus.bus_reqr := InstFetcher.io.bus_reqr
-  AXI4liteArbiter.io.ifu_bus.bus_reqw := InstFetcher.io.bus_reqw
-  AXI4liteArbiter.io.xbar_bus <> XBar2.io.axi4litein
+  AXI4Arbiter.io.ifu_bus.bus_reqr := InstFetcher.io.bus_reqr
+  AXI4Arbiter.io.ifu_bus.bus_reqw := InstFetcher.io.bus_reqw
+  AXI4Arbiter.io.xbar_bus <> XBar2.io.axi4in
 
-  // XBar2.io.axi4liteout1 <> io.empty_sram
-  XBar2.io.axi4liteout1 <> SRAM.io.axi4lite
-  XBar2.io.axi4liteout0 <> MyUart.io.axi4lite
-  XBar2.io.axi4liteout2 <> MyClint.io.axi4lite
+  // XBar2.io.axi4out1 <> io.empty_sram
+  XBar2.io.axi4out1 <> SRAM.io.axi4
+  XBar2.io.axi4out0 <> MyUart.io.axi4
+  XBar2.io.axi4out2 <> MyClint.io.axi4
 
   InstFetcher.io.out.ready := IDRegen && reset.asBool === 0.B
   InstFetcher.io.in.bits.isdnpc := pcsel
@@ -371,10 +371,10 @@ class Top extends Module {
   
   val NPC_Mem = Module(new LSU)
   NPC_Mem.io.out.ready := WBRegen
-  NPC_Mem.io.bus_ac := AXI4liteArbiter.io.lsu_bus.bus_ac
-  AXI4liteArbiter.io.lsu_bus.bus_reqr := NPC_Mem.io.bus_reqr
-  AXI4liteArbiter.io.lsu_bus.bus_reqw := NPC_Mem.io.bus_reqw
-  AXI4liteArbiter.io.lsu_bus.axi4lite <> NPC_Mem.io.axi4lite_to_arbiter
+  NPC_Mem.io.bus_ac := AXI4Arbiter.io.lsu_bus.bus_ac
+  AXI4Arbiter.io.lsu_bus.bus_reqr := NPC_Mem.io.bus_reqr
+  AXI4Arbiter.io.lsu_bus.bus_reqw := NPC_Mem.io.bus_reqw
+  AXI4Arbiter.io.lsu_bus.axi4 <> NPC_Mem.io.axi4_to_arbiter
 
   // printf("LSRegen=%d LSReg.pc = %x\n", LSRegen, LSReg.pc)
   LSRegen := NPC_Mem.io.in.ready //| !LSReg.valid

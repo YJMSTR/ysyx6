@@ -4,8 +4,11 @@ import Configs._
 
 class MyCLINT extends Module {
   val io = IO(new Bundle {
-    val axi4lite = new AXI4LiteInterface
+    val axi4 = new AXI4Interface
   })
+
+  val empty_slave = Module(new empty_axi4_slave)
+  io.axi4 <> empty_slave.io.axi4
 
   val r_idle :: r_wait_rready :: Nil = Enum(2)
   val r_state = RegInit(r_idle)
@@ -15,25 +18,25 @@ class MyCLINT extends Module {
   val rdata = RegInit(0.U(32.W))
   val rresp = RegInit(0.U(2.W))
 
-  io.axi4lite.awready := false.B
-  io.axi4lite.wready := false.B
-  io.axi4lite.bvalid := false.B
-  io.axi4lite.bresp := 0.U
+  io.axi4.awready := false.B
+  io.axi4.wready := false.B
+  io.axi4.bvalid := false.B
+  io.axi4.bresp := 0.U
 
-  io.axi4lite.arready := r_state === r_idle
-  io.axi4lite.rvalid := r_state === r_wait_rready
-  io.axi4lite.rdata := rdata
-  io.axi4lite.rresp := rresp
+  io.axi4.arready := r_state === r_idle
+  io.axi4.rvalid := r_state === r_wait_rready
+  io.axi4.rdata := rdata
+  io.axi4.rresp := rresp
 
   switch(r_state) {
     is(r_idle) {
-      when(io.axi4lite.arvalid) {
+      when(io.axi4.arvalid) {
         r_state := r_wait_rready
-        rdata := Mux(io.axi4lite.araddr === RTC_ADDR.U(XLEN.W), mtime_csr(31, 0), mtime_csr(63, 32))
+        rdata := Mux(io.axi4.araddr === RTC_ADDR.U(XLEN.W), mtime_csr(31, 0), mtime_csr(63, 32))
       }
     }
     is(r_wait_rready) {
-      when(io.axi4lite.rready) {
+      when(io.axi4.rready) {
         r_state := r_idle
       }
     }

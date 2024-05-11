@@ -50,6 +50,7 @@ enum NPC_STATES npc_state;
 word_t npc_halt_pc;
 int npc_ret;
 static unsigned long long cycles = 0;
+static unsigned long long insts = 0;
 bool difftest_is_enable = 0;
 bool is_batch_mode = 1;
 bool is_itrace = 0;
@@ -210,6 +211,7 @@ void difftest_step(vaddr_t pc, vaddr_t npc) {
     return;
   }
   if (pc >= 0x80000000) {
+    printf("before ref difftest exec pc=%x\n", pc);
     ref_difftest_exec(1);
     printf("ref pc = %08x done\n", pc);
     ref_difftest_regcpy(&ref_r, DIFFTEST_TO_DUT);
@@ -218,9 +220,10 @@ void difftest_step(vaddr_t pc, vaddr_t npc) {
 }
 
 static void trace_and_difftest(vaddr_t pc, vaddr_t dnpc) {
+  assert(logbuf);
   log_write("%s\n", logbuf);
   static vaddr_t last_pc = 0;
-  //printf("difftest pc == 0x%08x, dnpc == 0x%08x\n", pc, dnpc);
+  // printf("difftest pc == 0x%08x, dnpc == 0x%08x\n", pc, dnpc);
   /**
    * 如何判断 dut 的一条指令已经执行完成了，并让 ref 也执行该指令？
    * 可以比较 WBReg 中读出的 非 0 pc 值进行判断
@@ -231,6 +234,7 @@ static void trace_and_difftest(vaddr_t pc, vaddr_t dnpc) {
   if (difftest_is_enable && pc != last_pc) {  // 传入参数时已经保证非 0
     printf("difftest_step pc = %x dnpc = %x lastpc= %x\n", pc, dnpc, last_pc);
     difftest_step(pc, dnpc);
+    printf("difftest_step down pc = %x dnpc = %x lastpc= %x\n", pc, dnpc, last_pc);
     last_pc = pc;
   }
 }
@@ -313,7 +317,6 @@ extern "C" void disassemble(char *str, int size, uint64_t pc, uint8_t *code, int
 static void single_cycle() {
   if (npc_state != NPC_RUN) return;
   char *p = logbuf;
-  cycles ++;
 	contextp->timeInc(1);
   topp->clock = 0;
   topp->eval();
@@ -333,8 +336,11 @@ static void single_cycle() {
 #ifdef VCD
   tfp->dump(contextp->time());
 #endif
+  if (topp->reset == 0 && instval != 0) insts++;
+  if (topp->reset == 0)
+    cycles ++;
   if (topp->reset == 0 && is_itrace) {
-    //printf("[itrace] inst = 0x%08x\n", topp->io_inst);
+    printf("[itrace] inst = 0x%08x\n", topp->io_inst);
     p += snprintf(p, sizeof(logbuf), "0x%08lx :", pc);
     int ilen = 4;
     uint8_t *inst = (uint8_t *)&instval;
@@ -436,11 +442,11 @@ void cpu_exec(uint32_t n) {
     Log("npc: %s at pc = 0x%08lx", (npc_state == NPC_ABORT ? "abort":
     (npc_ret == 0 ? ANSI_FMT("HIT GOOD TRAP", ANSI_FG_GREEN) : ANSI_FMT("HIT BAD TRAP", ANSI_FG_RED))),
      cpu.pc);
-    Log("npc cycles = %llu\n", cycles);
+    Log("npc cycles = %llu insts = %llu\n", cycles, insts);
     print_iringbuf();
   case NPC_QUIT: 
     Log("QUIT!");
-    Log("npc cycles = %llu\n", cycles);
+    Log("npc cycles = %llu insts = %llu\n", cycles, insts);
   default:
     break;
   }
