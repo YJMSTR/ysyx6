@@ -39,7 +39,7 @@ class IFU extends Module {
   val outAddr = RegInit(0.U(32.W))
   val outData = RegInit(0.U(32.W))
 
-  val icache = Module(new ICache(16, 4))
+  val icache = Module(new ICache(4096, 8, 32))
   icache.io.axi4 <> io.axi4_to_arbiter
   icache.io.bus_ac := io.bus_ac
   icache.io.io.addr_valid := state === s_cache_reqr
