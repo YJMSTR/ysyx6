@@ -27,12 +27,13 @@ class MyCLINT extends Module {
   io.axi4.rvalid := r_state === r_wait_rready
   io.axi4.rdata := rdata
   io.axi4.rresp := rresp
-
+  
   switch(r_state) {
     is(r_idle) {
       when(io.axi4.arvalid) {
+        assert(io.axi4.araddr === RTC_ADDR.U || io.axi4.araddr === (RTC_ADDR+4).U)
         r_state := r_wait_rready
-        rdata := Mux(io.axi4.araddr === RTC_ADDR.U(XLEN.W), mtime_csr(31, 0), mtime_csr(63, 32))
+        rdata := Mux(io.axi4.araddr === RTC_ADDR.U, mtime_csr(31, 0), mtime_csr(63, 32))
       }
     }
     is(r_wait_rready) {

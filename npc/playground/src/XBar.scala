@@ -28,9 +28,7 @@ class XBar extends Module {
 
   val w_idle :: w_sram_wait :: w_uart_wait :: Nil = Enum(3)
   val state_w = RegInit(w_idle)
-
-  
-
+ 
   switch(state_r) {
     is (r_idle) {
       when (io.axi4in.arvalid) {
@@ -72,12 +70,12 @@ class XBar extends Module {
         when (io.axi4in.awaddr >= MEM_BASE.U(XLEN.W) && io.axi4in.awaddr < MEM_BASE.U(XLEN.W) + MEM_SIZE.U(XLEN.W)) {
           state_w := w_sram_wait
         }.elsewhen (io.axi4in.awaddr === SERIAL_PORT.U(XLEN.W)) {
-       
+          // is_device := 1.B
           state_w := w_uart_wait
           // state_w := w_sram_wait
         }.otherwise {
           io.axi4in.bresp := 3.U // decerr
-          printf("decerr w\n")
+          printf("decerr w addr=%x\n", io.axi4in.awaddr)
           io.axi4in.bvalid := true.B
           state_w := w_idle
         }

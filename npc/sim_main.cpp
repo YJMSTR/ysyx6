@@ -51,7 +51,7 @@ word_t npc_halt_pc;
 int npc_ret;
 static unsigned long long cycles = 0;
 static unsigned long long insts = 0;
-bool difftest_is_enable = 1;
+bool difftest_is_enable = 0;
 bool is_batch_mode = 1;
 bool is_itrace = 1;
 char logbuf[128];
@@ -340,7 +340,7 @@ static void single_cycle() {
   if (topp->reset == 0)
     cycles ++;
   if (topp->reset == 0 && is_itrace) {
-    printf("[itrace] inst = 0x%08x\n", topp->io_inst);
+    // printf("[itrace] inst = 0x%08x\n", topp->io_inst);
     p += snprintf(p, sizeof(logbuf), "0x%08lx :", pc);
     int ilen = 4;
     uint8_t *inst = (uint8_t *)&instval;

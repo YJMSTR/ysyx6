@@ -78,6 +78,8 @@ class LSU extends Module {
   val reqw = RegInit(0.B)
   io.bus_reqr := reqr 
   io.bus_reqw := reqw
+  val rready = WireInit(1.B)
+  val wready = WireInit(1.B)
   val readAddr = RegInit(0.U(32.W))
   val readData = RegInit(0.U(XLEN.W))
 
@@ -95,19 +97,23 @@ class LSU extends Module {
         readAddr := io.in.bits.raddr
         r_state := r_wait_arready
         reqr := 1.B
+        rready := 0.B
       }
     }
     is(r_wait_arready){ // arvalid = 1
+      rready := 0.B
       when(io.bus_ac & io.axi4_to_arbiter.arready){
         //此时把要读取的地址传给 mem，等待其读取完成
         r_state := r_wait_rvalid
       }
     }
     is(r_wait_rvalid){ // rready = 1
+      rready := 0.B
       when(io.axi4_to_arbiter.rvalid){
         readData := io.axi4_to_arbiter.rdata
         r_state := r_idle
         reqr := 0.B
+        rready := 1.B
       }
     }
   }
@@ -136,9 +142,11 @@ class LSU extends Module {
         writeStrb := io.in.bits.wmask
         w_state := w_wait_awready
         reqw := 1.B
+        wready := 0.B
       }
     }
     is(w_wait_awready) {
+      wready := 0.B
       when(io.bus_ac & io.axi4_to_arbiter.awready) {
         // waddr 传输完成
         w_state := w_wait_wready
@@ -146,15 +154,18 @@ class LSU extends Module {
       }
     }
     is(w_wait_wready) {
+      wready := 0.B
       when(io.axi4_to_arbiter.wready) {
         // wdata 传输完成
         w_state := w_wait_bvalid
       }
     }
     is(w_wait_bvalid) {
+      wready := 0.B
       when(io.axi4_to_arbiter.bvalid) {
         w_state := w_idle
         reqw := 0.B
+        wready := 1.B
       }
     }
   }
@@ -162,7 +173,8 @@ class LSU extends Module {
   
   //printf("io.out.valid = %d\n", io.out.valid)
   io.out.bits.rdata := readData
-  io.in.ready := r_state === r_idle && w_state === w_idle
+  // io.in.ready := r_state === r_idle && w_state === w_idle
+  io.in.ready := rready & wready
   
   val instreg = RegInit(0.U(32.W))
   val pcreg = RegInit(0.U(XLEN.W))

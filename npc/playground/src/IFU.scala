@@ -45,6 +45,7 @@ class IFU extends Module {
   icache.io.io.addr_valid := state === s_cache_reqr
   icache.io.io.addr := readAddr
   icache.io.io.data_ready := state === s_cache_return
+  icache.io.stall := io.in.bits.stall
   io.bus_reqr := icache.io.bus_reqr
   io.bus_reqw := icache.io.bus_reqw
 
@@ -66,7 +67,7 @@ class IFU extends Module {
   //注意：当 arvalid 为 1 后， araddr 就不能变了，直到握手成功，因此需要用寄存器存一下
   switch(state){
     is(s_idle){ 
-      when (io.in.valid && reset.asBool === 0.B) {
+      when (io.in.valid && reset.asBool === 0.B && !io.in.bits.stall) {
         //printf("reset == 0 PC == %d\n", PC)
         when (io.out.ready) {
           // 如果成功输出了，再转移状态 + 接收输入。
@@ -76,14 +77,15 @@ class IFU extends Module {
       }
     }
     is(s_cache_reqr) {
-      when (icache.io.io.addr_ready) {
-        // 发完地址以后，就可以更新PC了
+      when (icache.io.io.addr_ready && !io.in.bits.stall) {
+        // 发完地址以后，就可以更新PC了。
+        // 根据 cache 命中情况的不同，此处 bus_ac 不一定为 1
         PC := Mux(dnpc_valid, PC + 4.U, dnpc_reg)
         state := s_cache_return
       }
     }
     is(s_cache_return) {
-      when (icache.io.io.data_valid) {
+      when (icache.io.io.data_valid & !io.in.bits.stall) {
         outData := icache.io.io.data
         outAddr := readAddr
         state := s_idle
@@ -109,7 +111,7 @@ class IFU extends Module {
   
 
   when(dnpc_valid) {
-    when (io.in.bits.isdnpc & io.in.valid) {
+    when (io.in.bits.isdnpc & io.in.valid & !io.in.bits.stall) {
       dnpc_valid := 0.B // 这个修改要延迟一个周期才会生效，但此时可能已经有指令被取出准备输出了
       // 可以给 io.out.valid 加一个条件，如果当前 in.isdnpc = 1,那么这个周期要把 valid 置为 0
       // 这样就解决了寄存器要延迟一个周期写入的问题

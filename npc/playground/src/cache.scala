@@ -25,6 +25,7 @@ class Cache(CacheSize: Int, CacheLineSize : Int, DataWidth : Int) extends Module
     val bus_reqr = Output(Bool())
     val bus_reqw = Output(Bool())
     val bus_ac = Input(Bool())
+    val stall = Input(Bool())
   })
   val empty_axi4_master = Module(new empty_axi4_master)
   io.axi4 <> empty_axi4_master.io.axi4
@@ -127,18 +128,21 @@ class ICache(CacheSize : Int, CacheLineSize : Int, DataWidth : Int) extends Cach
   // 目前仅 8B 大小的 CacheLine，易于实现
   switch(r_state) {
     is(r_idle) {  // addr_ready
-      when (/*io.io.cache_reqr && */io.io.addr_valid) {
-        printf("cache_offset = %d\n", cache_offset)
-        printf("addr=%x valid=%x index=%x input_tag=%x tag=%x\n", io.io.addr, cache_valid(cache_input_index), cache_input_index, cache_input_tag, cache_tag(cache_input_index))
+      when (/*io.io.cache_reqr && */io.io.addr_valid && !io.stall) {
+        // printf("cache_offset = %d\n", cache_offset)
+        // printf("addr=%x valid=%x index=%x input_tag=%x tag=%x\n", io.io.addr, cache_valid(cache_input_index), cache_input_index, cache_input_tag, cache_tag(cache_input_index))
         when (cache_valid(cache_input_index) && cache_tag(cache_input_index) === cache_input_tag) { 
           // hit
+          
           r_state := r_return_data
           data_cacheline_reg := cache_data(cache_input_index)
+          
+          
         }.otherwise {
           // 未命中，需要通过 AXI4 去取出数据
-          
+          // 注意：由于跳转指令的存在，此处的 addr 可能是未按照 cachelinesize 对齐的 addr,应按照 cachelinesize 进行对齐
           r_state := axi_s_wait_arready
-          axi_reg_readAddr := io.io.addr
+          axi_reg_readAddr := (io.io.addr >> CacheLineSizeBits.U) << (CacheLineSizeBits.U)
           reqr_reg := 1.B
         }
       }
@@ -164,7 +168,7 @@ class ICache(CacheSize : Int, CacheLineSize : Int, DataWidth : Int) extends Cach
     //   }
     // }
     is(r_return_data) {
-      when (io.io.data_ready) {
+      when (io.io.data_ready && !io.stall) {
         r_state := r_idle
       }
     }
@@ -177,7 +181,7 @@ class ICache(CacheSize : Int, CacheLineSize : Int, DataWidth : Int) extends Cach
       }
     }
     is(axi_s_wait_rvalid) {
-      when(io.axi4.rvalid) {
+      when(io.bus_ac & io.axi4.rvalid) {
         r_state := r_return_data
         data_cacheline_reg := io.axi4.rdata
         cache_data(cache_input_index) := io.axi4.rdata

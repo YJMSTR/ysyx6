@@ -311,33 +311,33 @@ class Top extends Module {
 
   val ALU = Module(new EXU)
   when(EXReg.valid) {
-    ALU.io.inst := EXReg.inst
-    ALU.io.pc := EXReg.pc
+    ALU.io.inst   := EXReg.inst
+    ALU.io.pc     := EXReg.pc
     ALU.io.alu_op := EXReg.aluop
-    ALU.io.asel := EXReg.dataAsel
-    ALU.io.bsel := EXReg.dataBsel
-    ALU.io.imm := EXReg.imm
-    ALU.io.rs1v := EXReg.rs1v
-    ALU.io.rs2v := EXReg.rs2v
+    ALU.io.asel   := EXReg.dataAsel
+    ALU.io.bsel   := EXReg.dataBsel
+    ALU.io.imm    := EXReg.imm
+    ALU.io.rs1v   := EXReg.rs1v
+    ALU.io.rs2v   := EXReg.rs2v
     ALU.io.isword := EXReg.isword
     ALU.io.csridx := EXReg.csridx
     ALU.io.csrrv  := EXReg.csrrv
     when (LSRegen) {
-      LSReg.valid := EXReg.valid
-      LSReg.inst := EXReg.inst
-      LSReg.pc := EXReg.pc
-      LSReg.rs2v := EXReg.rs2v
-      LSReg.memvalid := EXReg.memvalid
-      LSReg.memwen := EXReg.memwen
-      LSReg.memwmask := EXReg.memwmask
-      LSReg.memsext := EXReg.memsext 
-      LSReg.rden := EXReg.rden
-      LSReg.rd := EXReg.rd
-      LSReg.alures := ALU.io.res
-      LSReg.csridx := ALU.io.csridx
-      LSReg.csrrv := ALU.io.csrrv
-      LSReg.csrwv := EXReg.csrwv
-      LSReg.csr_en := EXReg.csr_en
+      LSReg.valid     := EXReg.valid
+      LSReg.inst      := EXReg.inst
+      LSReg.pc        := EXReg.pc
+      LSReg.rs2v      := EXReg.rs2v
+      LSReg.memvalid  := EXReg.memvalid
+      LSReg.memwen    := EXReg.memwen
+      LSReg.memwmask  := EXReg.memwmask
+      LSReg.memsext   := EXReg.memsext 
+      LSReg.rden      := EXReg.rden
+      LSReg.rd        := EXReg.rd
+      LSReg.alures    := ALU.io.res
+      LSReg.csridx    := ALU.io.csridx
+      LSReg.csrrv     := ALU.io.csrrv
+      LSReg.csrwv     := EXReg.csrwv
+      LSReg.csr_en    := EXReg.csr_en
     }
   } .otherwise {
     ALU.io.inst := 0.U 
@@ -377,7 +377,7 @@ class Top extends Module {
   AXI4Arbiter.io.lsu_bus.axi4 <> NPC_Mem.io.axi4_to_arbiter
 
   // printf("LSRegen=%d LSReg.pc = %x\n", LSRegen, LSReg.pc)
-  LSRegen := NPC_Mem.io.in.ready //| !LSReg.valid
+  LSRegen := NPC_Mem.io.in.ready
 
   val rdata = WBReg.rdata
   val rdata7 = rdata(7)
