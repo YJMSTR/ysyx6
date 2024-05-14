@@ -53,7 +53,7 @@ static unsigned long long cycles = 0;
 static unsigned long long insts = 0;
 bool difftest_is_enable = 0;
 bool is_batch_mode = 0;
-bool is_itrace = 1;
+bool is_itrace = 0;
 char logbuf[128];
 static uint64_t boot_time = 0;
 static uint64_t rtc_us = 0;

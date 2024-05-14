@@ -14,7 +14,7 @@ class FAKE_SRAM_ONLY extends Module {
   val r_idle :: r_read :: r_wait_ready :: Nil = Enum(3)
   val r_state = RegInit(r_idle)
   // val delaygen = LFSR(4, 1.B, Some(1))
-  val delaygen = 15.U
+  val delaygen = 100.U
   val delay = RegInit(1.U(8.W))
   val delayCounter = RegInit(0.U(8.W))
   val delayDone = delayCounter === delay 

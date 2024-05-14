@@ -49,10 +49,13 @@ class Cache(CacheSize: Int, CacheLineSize : Int, DataWidth : Int) extends Module
   val cache_input_tag = (io.io.addr >> CacheLineSizeBits.U)
   // Rule! Use Reg of Vec not Vec of Reg!
   // val cache_tag = Vec(CacheLineNum, RegInit(0.U((XLEN-CacheLineSizeBits).W)))
-  val cache_tag = Reg(Vec(CacheLineNum, UInt((XLEN-CacheLineSizeBits).W)))
+  // val cache_tag = Reg(Vec(CacheLineNum, UInt((XLEN-CacheLineSizeBits).W)))
+  // val cache_valid = Reg(Vec(CacheLineNum, Bool()))
+  // 上面是原先的 Reg 实现，下面是对应的 SRAM 实现
+  val cache_tag = SyncReadMem(CacheLineNum, UInt((XLEN-CacheLineSizeBits).W))
+  val cache_valid = SyncReadMem(CacheLineNum, Bool())
 
-  val cache_valid = Reg(Vec(CacheLineNum, Bool()))
-  // val cache_valid = RegInit(0.U(CacheLineNum.W))  // 用 1 bit 标识某个 CacheLine 是否有数据
+
   
   val data_cacheline_reg = RegInit(0.U((CacheLineSize*8).W))  // 用于存放要返回的数据对应的 Cache 块
   
@@ -70,7 +73,7 @@ class ICache(CacheSize : Int, CacheLineSize : Int, DataWidth : Int) extends Cach
   
   
   // assert(CacheLineSize >= 4, "CacheLineSize should >= 4B")
-  val r_idle :: r_return_data :: axi_s_wait_arready :: axi_s_wait_rvalid :: Nil = Enum(4) 
+  val r_idle :: r_read_cache :: r_return_data :: axi_s_wait_arready :: axi_s_wait_rvalid :: Nil = Enum(5) 
   val r_state = RegInit(r_idle)
 
   val axi_reg_readAddr = RegInit(0.U(XLEN.W))
@@ -114,34 +117,35 @@ class ICache(CacheSize : Int, CacheLineSize : Int, DataWidth : Int) extends Cach
   io.axi4.bready := 0.U
 
   val hit = cache_valid(cache_input_index) && cache_tag(cache_input_index) === cache_input_tag
-  val read_res = cache_data.read(cache_input_index)
+  val cache_data_at_index = cache_data.read(cache_input_index)
   switch(r_state) {
-    is(r_idle) {  // addr_ready
+    is(r_idle) {  // 新增这个状态，是因为 SyncReadMem 的读写均有一个周期延迟
       when (/*io.io.cache_reqr && */io.io.addr_valid && !io.stall) {
-        
-        when (hit) { 
-          // hit
-          
-          // data_cacheline_reg := cache_data(cache_input_index)
-          // 从 SyncReadMem 读数据会有一个周期的延迟，即本周期发起读请求，下一个周期才能拿到数据
-          // 这种情况直接把 io.data 连到 mem
-          r_state := r_return_data
-          // printf("res = %x\n", res_tmp)
-        }.otherwise {
-          // 未命中，需要通过 AXI4 去取出数据
-          // 注意：由于跳转指令的存在，此处的 addr 可能是未按照 cachelinesize 对齐的 addr,应按照 cachelinesize 进行对齐
-          r_state := axi_s_wait_arready
-          axi_reg_readAddr := (io.io.addr >> CacheLineSizeBits.U) << (CacheLineSizeBits.U)
-          reqr_reg := 1.B
-        }
+        r_state := r_read_cache
       }
+    }
+    is(r_read_cache) {  // addr_ready
+       
+      when (hit) { 
+        // hit
+        
+        // data_cacheline_reg := cache_data(cache_input_index)
+        // 从 SyncReadMem 读数据会有一个周期的延迟，即本周期发起读请求，下一个周期才能拿到数据
+        data_cacheline_reg := cache_data_at_index
+        r_state := r_return_data
+        // printf("res = %x\n", res_tmp)
+      }.otherwise {
+        // 未命中，需要通过 AXI4 去取出数据
+        // 注意：由于跳转指令的存在，此处的 addr 可能是未按照 cachelinesize 对齐的 addr,应按照 cachelinesize 进行对齐
+        r_state := axi_s_wait_arready
+        axi_reg_readAddr := (io.io.addr >> CacheLineSizeBits.U) << (CacheLineSizeBits.U)
+        reqr_reg := 1.B
+      }
+      
     }
 
     is(r_return_data) {
-      when (!hit) {
-        read_res := data_cacheline_reg
-      }
-      io.io.data := Mux(cache_offset === 0.U, read_res(31, 0),  read_res(63, 32))
+      io.io.data := Mux(cache_offset === 0.U, data_cacheline_reg(31, 0),  data_cacheline_reg(63, 32))
       when (io.io.data_ready && !io.stall) {
         r_state := r_idle
       }
