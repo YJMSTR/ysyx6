@@ -35,8 +35,14 @@ class Cache(CacheSize: Int, CacheLineSize : Int, DataWidth : Int) extends Module
   
   // Rule! Use Reg of Vec not Vec of Reg!
   // val cache_data = Vec(CacheLineNum, RegInit(0.U((CacheLineSize * 8).W)))  
-  val cache_data = Reg(Vec(CacheLineNum, UInt((CacheLineSize * 8).W)))
+  // val cache_data = Reg(Vec(CacheLineNum, UInt((CacheLineSize * 8).W)))
+  // 上面是用 Reg 实现的，下面尝试用 SRAM
+  
+  val cache_data = SyncReadMem(CacheLineNum, UInt((CacheLineSize * 8).W))
+
   val CacheLineSizeBits = log2Ceil(CacheLineSize)
+  val CacheLineBeats   = CacheLineSize * 8 / XLEN // 每次传输 XLEN bit, 传输完一个 Cacheline 所需的次数
+  assert(CacheLineBeats > 0, "Cache Beats should > 0")
   val CacheLineNumBits = log2Ceil(CacheLineNum)
   // cache_tag : 数据块的唯一编号
   
@@ -54,7 +60,7 @@ class Cache(CacheSize: Int, CacheLineSize : Int, DataWidth : Int) extends Module
 
 // DataWidth: 数据块的位数
 class ICache(CacheSize : Int, CacheLineSize : Int, DataWidth : Int) extends Cache(CacheSize, CacheLineSize, DataWidth) {
-  // 4kKiB 的 icache, 若 CacheLineSize = 8B,则有 512 个 cacheline
+  // 4KiB 的 icache, 若 CacheLineSize = 8B,则有 512 个 cacheline
   assert(CacheLineSize == 8, "ICache only support CacheLineSize = 8B now")  // 暂时仅支持 Cache 块大小为 8B 的访存
   assert(DataWidth == 32, "ICache only support 32bit IO now")
   
@@ -107,37 +113,20 @@ class ICache(CacheSize : Int, CacheLineSize : Int, DataWidth : Int) extends Cach
   io.axi4.wvalid := 0.U
   io.axi4.bready := 0.U
 
-  // axi4full burst (暂未实现)
-
-  // 突发传输：主设备向从设备传输事务的控制信息和第一个字节的地址，然后从设备必须在此后的每次传输中计算数据地址
-  // burst length：突发传输中包含了几次小传输，axi4 的 incr 类型 burst 支持 1 到 256 次传输，其它的 burst 类型支持 1 到 16 次
-  // burst length = AxLEN[7:0] + 1
-  
-  // // 对于 wrap 方式的突发传输，其只支持 2 4 8 16 的突发长度(传输的次数)
-  // // 所以 cacheline 的大小应该满足 cachelinesize = (arlen+1)*64
-  // // io.axi4.arlen := (CacheLineSize * 8 / 64).U 
-  // // burstlength = arlen + 1
-  // io.axi4.arlen := (CacheLineSize / 8 - 1).U   // 如果一次传输 64 位，要传输 arlen + 1 = CacheLineSize * 8 / 64 次
-  // // 总线数据宽度 64 位，可以以 64 为单位，这样传输次数最小
-  // // arsize : burst size (bytes in a transfer)
-  // io.axi4.arsize := "b011".U  // 2^arsize  = 8 个 bytes in transfer
-
-  // // a burst must not cross a 4kb address boundary
-  // io.axi4.arburst := "b10".B  // 支持 wrap 类型的突发传输
-
-  // 目前仅 8B 大小的 CacheLine，易于实现
+  val hit = cache_valid(cache_input_index) && cache_tag(cache_input_index) === cache_input_tag
+  val read_res = cache_data.read(cache_input_index)
   switch(r_state) {
     is(r_idle) {  // addr_ready
       when (/*io.io.cache_reqr && */io.io.addr_valid && !io.stall) {
-        // printf("cache_offset = %d\n", cache_offset)
-        // printf("addr=%x valid=%x index=%x input_tag=%x tag=%x\n", io.io.addr, cache_valid(cache_input_index), cache_input_index, cache_input_tag, cache_tag(cache_input_index))
-        when (cache_valid(cache_input_index) && cache_tag(cache_input_index) === cache_input_tag) { 
+        
+        when (hit) { 
           // hit
           
+          // data_cacheline_reg := cache_data(cache_input_index)
+          // 从 SyncReadMem 读数据会有一个周期的延迟，即本周期发起读请求，下一个周期才能拿到数据
+          // 这种情况直接把 io.data 连到 mem
           r_state := r_return_data
-          data_cacheline_reg := cache_data(cache_input_index)
-          
-          
+          // printf("res = %x\n", res_tmp)
         }.otherwise {
           // 未命中，需要通过 AXI4 去取出数据
           // 注意：由于跳转指令的存在，此处的 addr 可能是未按照 cachelinesize 对齐的 addr,应按照 cachelinesize 进行对齐
@@ -147,27 +136,12 @@ class ICache(CacheSize : Int, CacheLineSize : Int, DataWidth : Int) extends Cach
         }
       }
     }
-    // is(r_transfer_data) {
 
-    //   // 把之前读出的数据写回 Cache 的对应位置. 
-    //   // 每次读出 DataWidth 位的话，就将 cache_data(cache_input_index)的第(counter*DataWidth-1, (counter-1)*DataWidth) 更新为读出的数据
-    //   // 但 counter 是 UInt，无法转为字面量
-    //   cache_data(cache_input_index) := (cache_data(cache_input_index) )
-
-
-    //   when(counter === counter_max) {
-    //     io.data := data_cacheline_reg
-    //     r_state := r_return_data
-    //   }.otherwise {
-    //     // 对 counter 的自增应该放在 axi_s_wait_rvalid 状态中进行。。？
-    //     // counter := counter + 1.U
-
-    //     // 准备发起一次新的读事务
-    //     axi_reg_readAddr := Mux(counter === 0.U, io.io.addr, io.io.addr + 4.U)
-    //     reqr_reg := 1.B
-    //   }
-    // }
     is(r_return_data) {
+      when (!hit) {
+        read_res := data_cacheline_reg
+      }
+      io.io.data := Mux(cache_offset === 0.U, read_res(31, 0),  read_res(63, 32))
       when (io.io.data_ready && !io.stall) {
         r_state := r_idle
       }
@@ -184,10 +158,12 @@ class ICache(CacheSize : Int, CacheLineSize : Int, DataWidth : Int) extends Cach
       when(io.bus_ac & io.axi4.rvalid) {
         r_state := r_return_data
         data_cacheline_reg := io.axi4.rdata
-        cache_data(cache_input_index) := io.axi4.rdata
+        // cache_data(cache_input_index) := io.axi4.rdata
+        cache_data.write(cache_input_index, io.axi4.rdata)
         cache_valid(cache_input_index) := 1.B
         cache_tag(cache_input_index) := cache_input_tag
         reqr_reg := 0.B
+        // printf("cache index=%x new rdata=%x\n", cache_input_index, io.axi4.rdata)
         when (io.axi4.rresp =/= 0.U) {
           printf("icache rresp = %x\n", io.axi4.rresp)
         }
