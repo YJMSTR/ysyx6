@@ -6,7 +6,8 @@
 !/nanos-lite/*
 !/navy-apps/*
 !/npc/*
-!/npc/build/*
+!/npc/build/*.v
+!/npc/build/*.sv
 !Makefile
 !README.md
 !record.md
