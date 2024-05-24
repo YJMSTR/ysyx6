@@ -15,7 +15,7 @@
 !.scalafmt.conf
 !build.sc
 !README.md
-build/
+!build/*
 
 # mill
 out/
