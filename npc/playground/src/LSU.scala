@@ -251,8 +251,8 @@ class LSU extends Module {
         w_align_offset := Mux(w_is_sram, io.in.bits.waddr(2, 0), 0.U)
         w_offset_reg := Mux(w_is_sram, io.in.bits.waddr(2, 0), 0.U)
         writeAddr := Mux(w_is_sram, Cat(io.in.bits.waddr(31, 3), 0.U(3.W)), io.in.bits.waddr)
-        writeData := io.in.bits.wdata << (io.in.bits.waddr(2,0) * 8.U)
-        writeStrb := io.in.bits.wmask << (io.in.bits.waddr(2,0))
+        writeData := Mux(w_is_sram, io.in.bits.wdata << (io.in.bits.waddr(2,0) * 8.U), io.in.bits.wdata)
+        writeStrb := Mux(w_is_sram, io.in.bits.wmask << (io.in.bits.waddr(2,0)), io.in.bits.wmask)
         w_state   := w_cache_reqw
         wready    := 0.B
       }
