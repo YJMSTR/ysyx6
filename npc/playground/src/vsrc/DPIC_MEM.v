@@ -41,7 +41,7 @@ module DPIC_MEM(valid, wen, raddr, rdata, waddr, wdata, wmask, clk);
   //   input int raddr, output longint rdata);
   // import "DPI-C" function void npc_pmem_write(
   // input int waddr, input longint wdata, input byte wmask);
-  reg [7:0] mem [0:255]
+  reg [7:0] mem[0:255]
   always @(posedge clk) begin
     if (valid) begin // 有读写请求时
       if (~wen) begin // 读
