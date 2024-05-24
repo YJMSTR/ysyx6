@@ -13,7 +13,7 @@ class MyCLINT extends Module {
   val r_idle :: r_wait_rready :: Nil = Enum(2)
   val r_state = RegInit(r_idle)
 
-  val mtime_csr = RegInit(0.U(64.W))
+  val mtime_csr = RegInit(0.U((64).W))
   mtime_csr := mtime_csr + 1.U
   val rdata = RegInit(0.U(32.W))
   val rresp = RegInit(0.U(2.W))

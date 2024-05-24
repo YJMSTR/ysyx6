@@ -263,6 +263,7 @@ class DCache(CacheSize :Int, CacheLineSize : Int, DataWidth : Int) extends Cache
   val uncached_r = io.io.raddr < SRAM_BASE.U || io.io.raddr > (SRAM_BASE + SRAM_SIZE).U
   val uncached_w = io.io.waddr < SRAM_BASE.U || io.io.waddr > (SRAM_BASE + SRAM_SIZE).U
   val uncached = uncached_r | uncached_w
+  val axi4_readData = RegInit(0.U(XLEN.W))
   switch(s_state) {
     // 读部分基于 icache 的状态机，采用 writethrough 策略。即只要有对 Cache 的修改就将其写回内存。
     is(s_idle) {
@@ -275,7 +276,7 @@ class DCache(CacheSize :Int, CacheLineSize : Int, DataWidth : Int) extends Cache
 
     is(s_return_data) {
       // 由于 datawidth 是 64 位，这里就不用再 Mux 了
-      io.io.rdata := data_cacheline_reg
+      io.io.rdata := Mux(!uncached_r, data_cacheline_reg, axi4_readData)
       // LSU 在流水线 stall 时也应该继续执行，故此处判断条件比 ICache 少一个 !stall
       when (io.io.rdata_ready /*&& !io.stall*/ | io.io.bready) {
         s_state := s_idle
@@ -315,6 +316,8 @@ class DCache(CacheSize :Int, CacheLineSize : Int, DataWidth : Int) extends Cache
           cache_data(r_cache_input_index)   := io.axi4.rdata
           cache_valid(r_cache_input_index)  := 1.B
           cache_tag(r_cache_input_index)    := r_cache_input_tag
+        }.otherwise {
+          axi4_readData := io.axi4.rdata
         }
         reqr_reg := 0.B
         when (io.axi4.rresp =/= 0.U) {
