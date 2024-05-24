@@ -23,7 +23,7 @@ class MyUART extends Module {
   io.axi4.rvalid := 0.B 
   io.axi4.rdata := 0.U
   io.axi4.rresp := 0.U
-  io.axi4.awready := w_state === w_idle
+  io.axi4.awready := w_state === w_idle || w_state === w_wait_wvalid
   io.axi4.wready := w_state === w_wait_wvalid
   io.axi4.bvalid := w_state === w_wait_bready
   io.axi4.bresp := bresp

@@ -14,7 +14,7 @@ class FAKE_SRAM_ONLY extends Module {
   val r_idle :: r_read :: r_wait_ready :: Nil = Enum(3)
   val r_state = RegInit(r_idle)
   // val delaygen = LFSR(4, 1.B, Some(1))
-  val delaygen = 100.U
+  val delaygen = 5.U
   val delay = RegInit(1.U(8.W))
   val delayCounter = RegInit(0.U(8.W))
   val delayDone = delayCounter === delay 
@@ -74,7 +74,7 @@ class FAKE_SRAM_ONLY extends Module {
   val writeStrb = RegInit(0.U((XLEN/8).W))
   val bresp = RegInit(0.U(2.W)) //default 0b00 === OKAY
 
-  io.axi4.awready := w_state === w_idle
+  io.axi4.awready := w_state === w_idle || w_state === w_wait_wvalid
   io.axi4.wready := w_state === w_wait_wvalid
   io.axi4.bvalid := w_state === w_wait_bready
   io.axi4.bresp := bresp

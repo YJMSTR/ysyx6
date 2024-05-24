@@ -211,9 +211,9 @@ void difftest_step(vaddr_t pc, vaddr_t npc) {
     return;
   }
   if (pc >= 0x80000000) {
-    printf("before ref difftest exec pc=%x\n", pc);
+    // printf("before ref difftest exec pc=%x\n", pc);
     ref_difftest_exec(1);
-    printf("ref pc = %08x done\n", pc);
+    // printf("ref pc = %08x done\n", pc);
     ref_difftest_regcpy(&ref_r, DIFFTEST_TO_DUT);
     checkregs(&ref_r, pc);
   }
@@ -232,9 +232,9 @@ static void trace_and_difftest(vaddr_t pc, vaddr_t dnpc) {
    * 此时应该让 ref 执行相应的操作
    */
   if (difftest_is_enable && pc != last_pc) {  // 传入参数时已经保证非 0
-    printf("difftest_step pc = %x dnpc = %x lastpc= %x\n", pc, dnpc, last_pc);
+    // printf("difftest_step pc = %x dnpc = %x lastpc= %x\n", pc, dnpc, last_pc);
     difftest_step(pc, dnpc);
-    printf("difftest_step down pc = %x dnpc = %x lastpc= %x\n", pc, dnpc, last_pc);
+    // printf("difftest_step down pc = %x dnpc = %x lastpc= %x\n", pc, dnpc, last_pc);
     last_pc = pc;
   }
 }
@@ -273,7 +273,7 @@ extern "C" void npc_pmem_read(int raddr, long long *rdata) {
 }
 
 extern "C" void npc_pmem_write(int waddr, long long wdata, char wmask) {
-  //int addr = waddr & ~0x3u;
+  // int addr = waddr & ~0x7u;
   uint32_t addr = waddr;
   // printf("pmem_write: waddr = 0x%08llx wdata = 0x%08llx wmask = 0x%x\n", waddr, wdata, 0xff & wmask);
   if (addr == SERIAL_PORT) {
@@ -341,27 +341,30 @@ static void single_cycle() {
     cycles ++;
   if (topp->reset == 0 && is_itrace) {
     // printf("[itrace] inst = 0x%08x\n", topp->io_inst);
-    p += snprintf(p, sizeof(logbuf), "0x%08lx :", pc);
-    int ilen = 4;
-    uint8_t *inst = (uint8_t *)&instval;
-    for (int i = ilen - 1; i >= 0; i--) {
-      p += snprintf(p, 4, " %02x", inst[i]);
+    if (instval != 0) {
+      p += snprintf(p, sizeof(logbuf), "0x%08lx :", pc);
+      int ilen = 4;
+      uint8_t *inst = (uint8_t *)&instval;
+      for (int i = ilen - 1; i >= 0; i--) {
+        p += snprintf(p, 4, " %02x", inst[i]);
+      }
+      iringbuf.cur = (iringbuf.cur + 1) % CONFIG_ITRACE_RINGBUFFER_SIZE;
+      iringbuf.pc[iringbuf.cur] = pc;
+      iringbuf.inst[iringbuf.cur] = instval;
+      int space_len = 4 * 3 + 1;
+      memset(p, ' ', space_len);
+      p += space_len;
+      disassemble(p, logbuf + sizeof(logbuf) - p, pc, inst, ilen);
+      if (ftrace_is_enable()) {
+        word_t reg_val = Rread(1);
+        ftrace(pc, npc, iringbuf.inst[iringbuf.cur], reg_val);
+      }
+      for (int i = 0; i < 32; i++) {
+        cpu.gpr[i] = Rread(i);
+      }
+      trace_and_difftest(nz_pc, nz_npc);
     }
-    iringbuf.cur = (iringbuf.cur + 1) % CONFIG_ITRACE_RINGBUFFER_SIZE;
-    iringbuf.pc[iringbuf.cur] = pc;
-    iringbuf.inst[iringbuf.cur] = instval;
-    int space_len = 4 * 3 + 1;
-    memset(p, ' ', space_len);
-    p += space_len;
-    disassemble(p, logbuf + sizeof(logbuf) - p, pc, inst, ilen);
-    if (ftrace_is_enable()) {
-      word_t reg_val = Rread(1);
-      ftrace(pc, npc, iringbuf.inst[iringbuf.cur], reg_val);
-    }
-    for (int i = 0; i < 32; i++) {
-      cpu.gpr[i] = Rread(i);
-    }
-    trace_and_difftest(nz_pc, nz_npc);
+
   }
   //sleep(1);
 }
@@ -444,9 +447,11 @@ void cpu_exec(uint32_t n) {
      cpu.pc);
     Log("npc cycles = %llu insts = %llu\n", cycles, insts);
     print_iringbuf();
+    sleep(1);
   case NPC_QUIT: 
     Log("QUIT!");
     Log("npc cycles = %llu insts = %llu\n", cycles, insts);
+    sleep(1);
   default:
     break;
   }

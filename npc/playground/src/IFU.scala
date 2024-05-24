@@ -42,10 +42,18 @@ class IFU extends Module {
   val icache = Module(new ICache(4096, 8, 32))
   icache.io.axi4 <> io.axi4_to_arbiter
   icache.io.bus_ac := io.bus_ac
-  icache.io.io.addr_valid := state === s_cache_reqr
-  icache.io.io.addr := readAddr
-  icache.io.io.data_ready := state === s_cache_return
+  icache.io.io.raddr_valid := state === s_cache_reqr
+  icache.io.io.raddr := readAddr
+  icache.io.io.rdata_ready := state === s_cache_return
+  icache.io.io.rsize := 2.U
   icache.io.stall := io.in.bits.stall
+  icache.io.io.waddr_valid := 0.B
+  icache.io.io.waddr := 0.U
+  icache.io.io.wdata_valid := 0.B
+  icache.io.io.wdata := 0.U
+  icache.io.io.wstrb := 0.U
+  icache.io.io.bready := 0.B
+
   io.bus_reqr := icache.io.bus_reqr
   io.bus_reqw := icache.io.bus_reqw
 
@@ -77,7 +85,7 @@ class IFU extends Module {
       }
     }
     is(s_cache_reqr) {
-      when (icache.io.io.addr_ready && !io.in.bits.stall) {
+      when (icache.io.io.raddr_ready && !io.in.bits.stall) {
         // 发完地址以后，就可以更新PC了。
         // 根据 cache 命中情况的不同，此处 bus_ac 不一定为 1
         PC := Mux(dnpc_valid, PC + 4.U, dnpc_reg)
@@ -85,8 +93,8 @@ class IFU extends Module {
       }
     }
     is(s_cache_return) {
-      when (icache.io.io.data_valid & !io.in.bits.stall) {
-        outData := icache.io.io.data
+      when (icache.io.io.rdata_valid & !io.in.bits.stall) {
+        outData := icache.io.io.rdata
         outAddr := readAddr
         state := s_idle
       }
