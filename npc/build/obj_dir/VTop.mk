@@ -1,0 +1,95 @@
+# Verilated -*- Makefile -*-
+# DESCRIPTION: Verilator output: Makefile for building Verilated archive or executable
+#
+# Execute this makefile from the object directory:
+#    make -f VTop.mk
+
+default: /home/yjmstr/ysyx-workbench/npc/build/Top
+
+### Constants...
+# Perl executable (from $PERL)
+PERL = perl
+# Path to Verilator kit (from $VERILATOR_ROOT)
+VERILATOR_ROOT = /usr/local/share/verilator
+# SystemC include directory with systemc.h (from $SYSTEMC_INCLUDE)
+SYSTEMC_INCLUDE ?= 
+# SystemC library directory with libsystemc.a (from $SYSTEMC_LIBDIR)
+SYSTEMC_LIBDIR ?= 
+
+### Switches...
+# C++ code coverage  0/1 (from --prof-c)
+VM_PROFC = 0
+# SystemC output mode?  0/1 (from --sc)
+VM_SC = 0
+# Legacy or SystemC output mode?  0/1 (from --sc)
+VM_SP_OR_SC = $(VM_SC)
+# Deprecated
+VM_PCLI = 1
+# Deprecated: SystemC architecture to find link library path (from $SYSTEMC_ARCH)
+VM_SC_TARGET_ARCH = linux
+
+### Vars...
+# Design prefix (from --prefix)
+VM_PREFIX = VTop
+# Module prefix (from --prefix)
+VM_MODPREFIX = VTop
+# User CFLAGS (from -CFLAGS on Verilator command line)
+VM_USER_CFLAGS = \
+	-I/home/yjmstr/ysyx-workbench/npc/include \
+	-DTOP_NAME="VTop" \
+	-I/usr/lib/llvm-16/include \
+	-std=c++17 \
+	-fno-exceptions \
+	-D_GNU_SOURCE \
+	-D__STDC_CONSTANT_MACROS \
+	-D__STDC_FORMAT_MACROS \
+	-D__STDC_LIMIT_MACROS \
+	-fPIE \
+
+# User LDLIBS (from -LDFLAGS on Verilator command line)
+VM_USER_LDLIBS = \
+	-lreadline \
+	-lLLVM-16 \
+
+# User .cpp files (from .cpp's on Verilator command line)
+VM_USER_CLASSES = \
+	disasm \
+	ftrace \
+	log \
+	main \
+	sdb \
+	sim_main \
+
+# User .cpp directories (from .cpp's on Verilator command line)
+VM_USER_DIR = \
+	/home/yjmstr/ysyx-workbench/npc \
+
+
+### Default rules...
+# Include list of all generated classes
+include VTop_classes.mk
+# Include global rules
+include $(VERILATOR_ROOT)/include/verilated.mk
+
+### Executable rules... (from --exe)
+VPATH += $(VM_USER_DIR)
+
+disasm.o: /home/yjmstr/ysyx-workbench/npc/disasm.cc
+	$(OBJCACHE) $(CXX) $(CXXFLAGS) $(CPPFLAGS) $(OPT_FAST) -c -o $@ $<
+ftrace.o: /home/yjmstr/ysyx-workbench/npc/ftrace.c
+	$(OBJCACHE) $(CXX) $(CXXFLAGS) $(CPPFLAGS) $(OPT_FAST) -c -o $@ $<
+log.o: /home/yjmstr/ysyx-workbench/npc/log.c
+	$(OBJCACHE) $(CXX) $(CXXFLAGS) $(CPPFLAGS) $(OPT_FAST) -c -o $@ $<
+main.o: /home/yjmstr/ysyx-workbench/npc/main.cpp
+	$(OBJCACHE) $(CXX) $(CXXFLAGS) $(CPPFLAGS) $(OPT_FAST) -c -o $@ $<
+sdb.o: /home/yjmstr/ysyx-workbench/npc/sdb.c
+	$(OBJCACHE) $(CXX) $(CXXFLAGS) $(CPPFLAGS) $(OPT_FAST) -c -o $@ $<
+sim_main.o: /home/yjmstr/ysyx-workbench/npc/sim_main.cpp
+	$(OBJCACHE) $(CXX) $(CXXFLAGS) $(CPPFLAGS) $(OPT_FAST) -c -o $@ $<
+
+### Link rules... (from --exe)
+/home/yjmstr/ysyx-workbench/npc/build/Top: $(VK_USER_OBJS) $(VK_GLOBAL_OBJS) $(VM_PREFIX)__ALL.a $(VM_HIER_LIBS)
+	$(LINK) $(LDFLAGS) $^ $(LOADLIBES) $(LDLIBS) $(LIBS) $(SC_LIBS) -o $@
+
+
+# Verilated -*- Makefile -*-
