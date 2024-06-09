@@ -152,7 +152,7 @@ extern bool difftest_is_enable;
 extern bool is_itrace;
 void init_monitor() {
   init_log(log_file);
-  //set_ftrace_enable();
+  // set_ftrace_enable();
   long img_size = load_img();
   if (difftest_is_enable)
     init_difftest(diff_so_file, img_size, difftest_port);
