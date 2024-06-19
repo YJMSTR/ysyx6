@@ -39,7 +39,7 @@ endif
 
 INC_PATH := /home/yjmstr/ysyx-workbench/npc/include
 INCFLAGS = $(addprefix -I, $(INC_PATH))
-CXXFLAGS += $(INCFLAGS) -DTOP_NAME="\"V$(TOPNAME)\"" -I/usr/lib/llvm-16/include -std=c++17   -fno-exceptions -fPIE
+CXXFLAGS += $(INCFLAGS) -DTOP_NAME="\"V$(TOPNAME)\"" -I/usr/lib/llvm-18/include -std=c++17   -fno-exceptions -fPIE
 
 test:
 	mill -i __.test
