@@ -37,9 +37,10 @@ VM_MODPREFIX = VTop
 VM_USER_CFLAGS = \
 	-I/home/yjmstr/ysyx-workbench/npc/include \
 	-DTOP_NAME="VTop" \
-	-I/usr/lib/llvm-16/include \
+	-I/usr/lib/llvm-18/include \
 	-std=c++17 \
 	-fno-exceptions \
+	-funwind-tables \
 	-D_GNU_SOURCE \
 	-D__STDC_CONSTANT_MACROS \
 	-D__STDC_FORMAT_MACROS \
@@ -49,7 +50,7 @@ VM_USER_CFLAGS = \
 # User LDLIBS (from -LDFLAGS on Verilator command line)
 VM_USER_LDLIBS = \
 	-lreadline \
-	-lLLVM-16 \
+	-lLLVM-18 \
 
 # User .cpp files (from .cpp's on Verilator command line)
 VM_USER_CLASSES = \
