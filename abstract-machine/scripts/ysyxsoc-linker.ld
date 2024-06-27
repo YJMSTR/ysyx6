@@ -21,7 +21,7 @@ SECTIONS {
     data_start = .;
     *(.data)
     . = ALIGN(8);
-  } > sram AT> flash
+  } > psram AT> flash
   edata = .;
   _data = .;
   .bss : {
@@ -30,7 +30,7 @@ SECTIONS {
     *(.bss*)
     *(.sbss*)
     *(.scommon)
-  } > sram AT> flash
+  } > psram AT> flash
   . = ALIGN(8);
   data_end = .;
   data_size = data_end - data_start;

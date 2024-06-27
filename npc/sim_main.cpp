@@ -63,7 +63,7 @@ int npc_ret;
 static unsigned long long cycles = 0, insts = 0;
 bool difftest_is_enable = 0;
 bool is_batch_mode = 1;
-bool is_itrace = 1;
+bool is_itrace = 0;
 char logbuf[128];
 static uint64_t boot_time = 0;
 static uint64_t rtc_us = 0;
@@ -274,7 +274,7 @@ extern "C" void flash_read(int addr, int *data) {
     res = res + ((word_t)flash[addr + i] << (i * 8));
   }
   *data = res;
-  // printf ("dpic flash read addr =%08x data=%08x\n", addr, res);
+  //Log("dpic flash read addr =%08x data=%08x\n", addr, res);
 }
 extern "C" void mrom_read(int addr, long long *data) {
   // *data = 0x00100073;	//ebreak

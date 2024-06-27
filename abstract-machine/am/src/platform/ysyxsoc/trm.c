@@ -76,6 +76,7 @@ void _trm_init() {
     putch((ysyx>>(i*8ll))&0xff);
   }
   printf("%d\n", (int)ysyx_no);
+  printf("mainargs= %s\n", mainargs);
   int ret = main(mainargs);
   halt(ret);
 }
