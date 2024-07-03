@@ -3,7 +3,7 @@ import chisel3._
 object Configs {
   val XLEN                  = 64
   val WMASKLEN              = 8
-  val RESET_VECTOR          = "x80000000"
+  val RESET_VECTOR          = "x30000000"
   val RIDXLEN               = 5
   val CSRIDXLEN             = 12
 

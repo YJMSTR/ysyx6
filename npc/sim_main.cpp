@@ -62,8 +62,8 @@ word_t npc_halt_pc;
 int npc_ret;
 static unsigned long long cycles = 0, insts = 0;
 bool difftest_is_enable = 0;
-bool is_batch_mode = 1;
-bool is_itrace = 0;
+bool is_batch_mode = 0;
+bool is_itrace = 1;
 char logbuf[128];
 static uint64_t boot_time = 0;
 static uint64_t rtc_us = 0;
@@ -266,11 +266,11 @@ static void trace_and_difftest(vaddr_t pc, vaddr_t dnpc) {
 
 
 // 接入 ysyxSoC 所需的代码
-extern "C" void flash_read(int addr, int *data) {
+extern "C" void flash_read(int addr, long long *data) {
   assert(addr >= 0 && addr < FLASH_SIZE);
   
   word_t res = 0;
-  for (int i = 0; i < 4; i++) {
+  for (int i = 0; i < 8; i++) {
     res = res + ((word_t)flash[addr + i] << (i * 8));
   }
   *data = res;
@@ -289,24 +289,24 @@ extern "C" void mrom_read(int addr, long long *data) {
   Assert(addr >= MROM_BASE && addr < MROM_BASE + MROM_SIZE, "addr = %x out of mrom", addr);
 }
 
-extern "C" void psram_read(int addr, int *odata) {
+extern "C" void psram_read(int addr, long long *odata) {
   assert(addr >= 0 && addr < PSRAM_SIZE);
 
   word_t res = 0;
-  for (int i = 0; i < 4; i++) {
+  for (int i = 0; i < 8; i++) {
     res = res + ((word_t)psram[addr+i]<<(i*8));
   }
-  // Log("---psram read addr=%x data=%x---\n", addr, res);
+  Log("---psram read addr=%x data=%lx---\n", addr, res);
   *odata = res;
 }
 
-extern "C" void psram_write(int addr, int idata) {
+extern "C" void psram_write(int addr, long long idata) {
   assert(addr >= 0 && addr < PSRAM_SIZE);
-  // Log("psram write addr=%x data=%x\n", addr, idata);
-  for (int i = 0; i < 4; i++) {
+  Log("psram write addr=%x data=%lx\n", addr, idata);
+  for (int i = 0; i < 8; i++) {
     psram[addr + i] = (idata >> (i * 8)) & 0xff;
   }
-  // Log("after write, psram[%x] = %x %x %x %x \n", addr, psram[addr + 3], psram[addr + 2], psram[addr + 1], psram[addr]);
+  Log("after write, psram[%x] = %x %x %x %x %x %x %x %x \n", addr, psram[addr + 7], psram[addr + 6], psram[addr + 5], psram[addr + 4], psram[addr + 3], psram[addr + 2], psram[addr + 1], psram[addr]);
 }
 
 extern "C" void npc_pmem_read(int raddr, long long *rdata) {

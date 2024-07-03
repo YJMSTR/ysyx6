@@ -66,6 +66,7 @@ void _trm_init() {
   if(!ioe_init()) {
     halt(1);
   }
+  printf("copy_data done\n");
   unsigned long long ysyx, ysyx_no; 
   asm volatile(
       "csrr %[dest1], mvendorid;\
