@@ -24,8 +24,24 @@ const char *regs[] = {
 };
 
 void isa_reg_display() {
+    for (int i = 0; i < MUXDEF(CONFIG_RVE, 16, 32); i++) {
+      printf("%s: "FMT_WORD"\n", regs[i], cpu.gpr[i]);
+    }
 }
 
 word_t isa_reg_str2val(const char *s, bool *success) {
-  return 0;
+    for (int i = 0; i < MUXDEF(CONFIG_RVE, 16, 32); i++) {
+        if (strcmp(regs[i], s+1) == 0 || (i == 0 && strcmp(regs[i], s) == 0)) {
+            //Log("isa_reg_str2val %s = %lu 0x%lx", s, cpu.gpr[i], cpu.gpr[i]);
+            *success = true;
+            //Log("in isa_reg_str2val, success == %d", *success);
+            return cpu.gpr[i];
+        }
+    }
+    if (strcmp(s, "$pc") == 0) {
+        //Log("isa_reg_str2val %s = %u 0x%x", s, cpu.pc, cpu.pc);
+        *success = true;
+        return cpu.pc;
+    }
+    return 0;
 }
