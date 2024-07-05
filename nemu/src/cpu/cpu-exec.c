@@ -26,11 +26,13 @@
  */
 #define MAX_INST_TO_PRINT 10
 
+#ifdef CONFIG_ITRACE 
 struct Iringbuf {
   word_t pc[CONFIG_ITRACE_RINGBUFFER_SIZE];
   word_t inst[CONFIG_ITRACE_RINGBUFFER_SIZE];
   int cur;
 } iringbuf;
+#endif
 
 CPU_state cpu = {};
 uint64_t g_nr_guest_inst = 0;
@@ -115,6 +117,7 @@ void assert_fail_msg() {
 
 
 void print_iringbuf() {
+#ifdef CONFIG_ITRACE
   for (int i = 1; i <= CONFIG_ITRACE_RINGBUFFER_SIZE; i++) {
     if (i == CONFIG_ITRACE_RINGBUFFER_SIZE) {
       int pos = (iringbuf.cur + i) % CONFIG_ITRACE_RINGBUFFER_SIZE;
@@ -124,6 +127,7 @@ void print_iringbuf() {
       Log("\t "FMT_WORD" : "FMT_WORD" ", iringbuf.pc[pos], iringbuf.inst[pos]);
     }   
   }
+#endif
 }
 
 /* Simulate how the CPU works. */

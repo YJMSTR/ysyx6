@@ -134,6 +134,6 @@ bool ftrace_is_enable(){
 }
 
 void set_ftrace_enable(){
-    printf("Ftrace on\n");
-    ftrace_enable = true;
+    //printf("Ftrace on\n");
+    //ftrace_enable = true;
 }
