@@ -157,6 +157,11 @@ config ITRACE_COND
   default "true"
 
 
+config MTRACE
+  depends on TRACE
+  bool "Enable mtrace"
+  default y
+
 config DIFFTEST
   depends on TARGET_NATIVE_ELF
   bool "Enable differential testing"
