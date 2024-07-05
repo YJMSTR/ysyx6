@@ -146,6 +146,11 @@ config ITRACE
   bool "Enable instruction tracer"
   default y
 
+config ITRACE_RINGBUFFER_SIZE
+  depends on ITRACE
+  int "Size of instruction Ringbuffer"
+  default 16
+
 config ITRACE_COND
   depends on ITRACE
   string "Only trace instructions when the condition is true"

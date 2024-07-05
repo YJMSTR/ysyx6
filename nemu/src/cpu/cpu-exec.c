@@ -25,6 +25,12 @@
  */
 #define MAX_INST_TO_PRINT 10
 
+struct Iringbuf {
+  word_t pc[CONFIG_ITRACE_RINGBUFFER_SIZE];
+  word_t inst[CONFIG_ITRACE_RINGBUFFER_SIZE];
+  int cur;
+} iringbuf;
+
 CPU_state cpu = {};
 uint64_t g_nr_guest_inst = 0;
 static uint64_t g_timer = 0; // unit: us
@@ -52,6 +58,11 @@ static void exec_once(Decode *s, vaddr_t pc) {
   int ilen = s->snpc - s->pc;
   int i;
   uint8_t *inst = (uint8_t *)&s->isa.inst.val;
+
+  iringbuf.cur = (iringbuf.cur + 1) % CONFIG_ITRACE_RINGBUFFER_SIZE;
+  iringbuf.pc[iringbuf.cur] = s->pc;
+  iringbuf.inst[iringbuf.cur] = s->isa.inst.val;
+
   for (i = ilen - 1; i >= 0; i --) {
     p += snprintf(p, 4, " %02x", inst[i]);
   }
@@ -97,6 +108,19 @@ void assert_fail_msg() {
   statistic();
 }
 
+
+void print_iringbuf() {
+  for (int i = 1; i <= CONFIG_ITRACE_RINGBUFFER_SIZE; i++) {
+    if (i == CONFIG_ITRACE_RINGBUFFER_SIZE) {
+      int pos = (iringbuf.cur + i) % CONFIG_ITRACE_RINGBUFFER_SIZE;
+      Log("     --> "FMT_WORD" : "FMT_WORD" ", iringbuf.pc[pos], iringbuf.inst[pos]);
+    } else {
+      int pos = (iringbuf.cur + i) % CONFIG_ITRACE_RINGBUFFER_SIZE;
+      Log("\t "FMT_WORD" : "FMT_WORD" ", iringbuf.pc[pos], iringbuf.inst[pos]);
+    }   
+  }
+}
+
 /* Simulate how the CPU works. */
 void cpu_exec(uint64_t n) {
   g_print_step = (n < MAX_INST_TO_PRINT);
@@ -123,7 +147,11 @@ void cpu_exec(uint64_t n) {
            (nemu_state.halt_ret == 0 ? ANSI_FMT("HIT GOOD TRAP", ANSI_FG_GREEN) :
             ANSI_FMT("HIT BAD TRAP", ANSI_FG_RED))),
           nemu_state.halt_pc);
+#ifdef CONFIG_ITRACE
+      print_iringbuf();
+#endif
       // fall through
+
     case NEMU_QUIT: statistic();
   }
 }
