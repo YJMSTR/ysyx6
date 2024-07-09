@@ -19,6 +19,7 @@
 #include <cpu/decode.h>
 
 #define R(i) gpr(i)
+#define CSR(i) CPU_CSR(i)
 // #define Mr(_ADDR, _LEN) vaddr_read((_ADDR)&(~0x3u),_LEN)
 // #define Mw(_ADDR, _LEN, _DATA) vaddr_write((_ADDR)&(~0x3u), _LEN, _DATA)
 
@@ -26,9 +27,14 @@
 #define Mw vaddr_write
 
 enum {
-  TYPE_I, TYPE_U, TYPE_S, TYPE_J, TYPE_R, TYPE_B, 
+  TYPE_I, TYPE_U, TYPE_S, TYPE_J, TYPE_R, TYPE_B, TYPE_ZICSR, 
   TYPE_N, // none
 };
+
+#define CSR_MTVEC   0x305
+#define CSR_MEPC    0x341
+#define CSR_MCAUSE  0x342
+#define CSR_MSTATUS 0x300
 
 #define src1R() do { *src1 = R(rs1); } while (0)
 #define src2R() do { *src2 = R(rs2); } while (0)
@@ -55,6 +61,12 @@ static void decode_operand(Decode *s, int *rd, word_t *src1, word_t *src2, word_
       src1R(); src2R();
       immB();
       break;
+ 
+    case TYPE_ZICSR:
+      idxCSR();
+      src1R();
+      break;
+      
   }
 }
 
