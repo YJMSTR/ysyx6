@@ -162,6 +162,12 @@ config MTRACE
   bool "Enable mtrace"
   default y
 
+config WATCHPOINT
+  depends on ITRACE
+  bool "Enable WATCHPOINT"
+  default false 
+
+
 config DIFFTEST
   depends on TARGET_NATIVE_ELF
   bool "Enable differential testing"
@@ -169,11 +175,6 @@ config DIFFTEST
   help
     Enable differential testing with a reference design.
     Note that this will significantly reduce the performance of NEMU.
-config WATCHPOINT
-  depends on ITRACE
-  bool "Enable WATCHPOINT"
-  default false 
-
 
 choice
   prompt "Reference design"
