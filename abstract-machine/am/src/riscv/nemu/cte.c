@@ -54,7 +54,7 @@ Context *kcontext(Area kstack, void (*entry)(void *), void *arg) {
   
   // 恢复上下文的通用寄存器时候并不会恢复 sp 寄存器，sp 寄存器是在出栈后手动 addi 加回去的 
   // 在 trap.S 中，通过 mv sp, a0; 把 ctx 指向的地址作为栈顶。ctx 存在 a0 寄存器里
-  ctx->mstatus = 0xa00001800;
+  ctx->mstatus = 0x1800;//32bit
 
   return ctx;
 }
