@@ -42,12 +42,12 @@ static void restart() {
   cpu.pc = CONFIG_FLASH_BASE;
   #else
   cpu.pc = RESET_VECTOR;
-  Log("nemu pc = %lx", cpu.pc);
+  Log("nemu pc =  "FMT_WORD " " , cpu.pc);
   #endif
 
   /* The zero register is always 0. */
   cpu.gpr[0] = 0;
-  cpu.csrs[0x300] = 0xa00001800;
+  cpu.csrs[0x300] = 0x1800;
 }
 
 void init_isa() {

@@ -53,7 +53,7 @@ void init_mem() {
 }
 
 word_t paddr_read(paddr_t addr, int len) {
-  word_t res = 0xdeadbeef;
+  word_t res = 0x0d000721;
   // if (addr < CONFIG_MROM_BASE || addr >= CONFIG_MROM_BASE + CONFIG_MROM_SIZE)
   //   addr = addr & (~0x7ull); //按 8 字节对齐
   if (likely(in_pmem(addr))) {
@@ -61,11 +61,11 @@ word_t paddr_read(paddr_t addr, int len) {
   } else {
     IFDEF(CONFIG_DEVICE, res = mmio_read(addr, len));
   }
-  IFDEF(CONFIG_MTRACE, Log("paddr read 0x%08x res = %016lx", addr, res));
+  IFDEF(CONFIG_MTRACE, Log("paddr read 0x%08x res = "FMT_WORD" ", addr, res));
   if (res != 0xdeadbeef)
     return res;
   else {
-    IFDEF(CONFIG_MTRACE, Log("warning:paddr read 0x%08x res = %016lx", addr, res));
+    IFDEF(CONFIG_MTRACE, Log("warning:paddr read 0x%08x res = "FMT_WORD" ", addr, res));
   }
   out_of_bound(addr);
   return 0;
@@ -73,7 +73,7 @@ word_t paddr_read(paddr_t addr, int len) {
 void paddr_write(paddr_t addr, int len, word_t data) {
   // word_t offset = addr & 0x7ull;
   // addr = addr & (~0x7ull);
-  IFDEF(CONFIG_MTRACE, Log("paddr write %016lx to 0x%08x", data, addr));
+  IFDEF(CONFIG_MTRACE, Log("paddr write "FMT_WORD" to 0x%08x", data, addr));
   if (likely(in_pmem(addr))) { pmem_write(addr, len, data); return; }
   IFDEF(CONFIG_DEVICE, mmio_write(addr, len, data); return);
   out_of_bound(addr);

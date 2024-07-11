@@ -88,9 +88,9 @@ static int cmd_x(char *args) {
   char *arg2 = arg + strlen(arg) + 1;
   sscanf(arg2, "%x", &addr);
   for (uint32_t i = 0; i < count; i++) {
-    printf("0x%08x: 0x%016lx , ", addr + i * 4, vaddr_read(addr+i*4, 4));
+    printf("0x%08x: 0x"FMT_WORD" , ", addr + i * 4, vaddr_read(addr+i*4, 4));
     for (uint32_t j = 0; j < 4; j++) {
-      printf("%02lx ", vaddr_read(addr + i*4+j, 1));
+      printf("0x "FMT_WORD" ", vaddr_read(addr + i*4+j, 1));
     }
     printf("\n");
   }

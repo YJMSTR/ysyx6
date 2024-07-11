@@ -85,7 +85,7 @@ void free_wp(int num) {
 void wp_print() {
   printf("Num\t\tWhat\t\tVal\n");
   for (WP* cur = head; cur != NULL; cur = cur->next) {
-    printf("%d\t\t%s\t\t%lu=0x%016lx\n", cur->NO, cur->str, cur->val, cur->val);
+    printf("%d\t\t%s\t\t 0x"FMT_WORD" \n", cur->NO, cur->str, cur->val);
   }
 }
 
@@ -94,7 +94,7 @@ void check_wp() {
     bool suc = false;
     word_t curval = expr(cur->str, &suc);
     if (cur->val != curval) {
-      printf("wp %d lastval = %lu=0x%016lx, curval = %lu=0x%016lx\n", cur->NO, cur->val, cur->val, curval, curval);
+      printf("wp %d lastval =0x"FMT_WORD", curval = 0x"FMT_WORD"\n", cur->NO, cur->val, curval);
       cur->val = curval;
       nemu_state.state = NEMU_STOP;
     }

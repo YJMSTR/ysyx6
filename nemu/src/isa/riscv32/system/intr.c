@@ -20,7 +20,7 @@ word_t isa_raise_intr(word_t NO, vaddr_t epc) {
    * Then return the address of the interrupt/exception vector.
    */
 #ifdef CONFIG_ETRACE
-  Log("[ETRACE] isa_raise_intr NO = %lx epc = %lx", NO, epc);
+  Log("[ETRACE] isa_raise_intr NO = "FMT_WORD" epc = "FMT_WORD"  ", NO, epc);
   // sleep(1);
 #endif
   if (NO == 1) {
@@ -28,7 +28,7 @@ word_t isa_raise_intr(word_t NO, vaddr_t epc) {
     cpu.csrs[CSR_MEPC] = epc;
 
     #ifdef CONFIG_ETRACE
-      Log("isa_raise_intr csr_mtvec: %lx csr_mepc: %lx", cpu.csrs[CSR_MTVEC], cpu.csrs[CSR_MEPC]);
+      Log("isa_raise_intr csr_mtvec: "FMT_WORD" csr_mepc: "FMT_WORD" ", cpu.csrs[CSR_MTVEC], cpu.csrs[CSR_MEPC]);
     #endif
     
     return cpu.csrs[CSR_MTVEC];

@@ -32,7 +32,7 @@ const char *regs[] = {
 
 void isa_reg_display() {
   for (int i = 0; i < MUXDEF(CONFIG_RVE, 16, 32); i++) {
-    printf("%s: %lx\n", regs[i], cpu.gpr[i]);
+    printf("%s: "FMT_WORD"\n", regs[i], cpu.gpr[i]);
   }
 }
 
