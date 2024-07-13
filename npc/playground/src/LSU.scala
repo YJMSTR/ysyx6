@@ -80,6 +80,8 @@ class ysyx_23060110_LSU extends Module {
   is_flash := io.in.bits.raddr >= FLASH_BASE.U && io.in.bits.raddr < (FLASH_BASE + FLASH_SIZE).U
   val is_uart = WireInit(0.B)
   is_uart := io.in.bits.raddr >= UART_BASE.U && io.in.bits.raddr < (UART_BASE + UART_SIZE).U
+  val is_sram = WireInit(0.B)
+  is_sram := io.in.bits.raddr >= SRAM_BASE.U && io.in.bits.raddr < (SRAM_BASE + SRAM_SIZE).U
   val empty_master = Module(new ysyx_23060110_empty_axi4_master)
   io.axi4_to_arbiter <> empty_master.io.axi4
   //val fake_sram = Module(new FAKE_SRAM_LSU())
@@ -114,7 +116,7 @@ class ysyx_23060110_LSU extends Module {
   
   // printf("lsu r_state === %d\n", r_state);
   
-  val araddr_unalign_offset = Mux(is_uart | is_flash, 0.U, Mux(is_mrom, io.in.bits.raddr(1, 0), io.in.bits.raddr(2, 0)))
+  val araddr_unalign_offset = Mux(is_uart | is_flash, 0.U, Mux(is_sram, io.in.bits.raddr(2, 0), Mux(is_mrom, io.in.bits.raddr(1, 0), io.in.bits.raddr(2, 0))))
   readSize := MuxLookup(memsextreg, 2.U, Seq(
             MEM_NSEXT_8 ->  0.U,
             MEM_NSEXT_16->  1.U,
@@ -132,7 +134,7 @@ class ysyx_23060110_LSU extends Module {
         when (araddr_unalign_offset =/= 0.U) {
           offsetreg := araddr_unalign_offset
           readAddr := io.in.bits.raddr
-          readSize := MuxLookup(araddr_unalign_offset, 2.U, Seq(
+          readSize := MuxLookup(araddr_unalign_offset, 3.U, Seq(
             // | 7 | 6 | 5 | 4 | 3 | 2 | 1 | 0
             // |    3          |     2 | 1 | 0 
             3.U -> 2.U,
@@ -156,7 +158,7 @@ class ysyx_23060110_LSU extends Module {
     is(r_wait_rvalid){ // rready = 1
       when(io.axi4_to_arbiter.rvalid){
         readData := io.axi4_to_arbiter.rdata >> (8.U * offsetreg)
-        // printf("lsu unaligned raddr = %x rdata = %x  aligned rdata = %x rresp == %d\n" , readAddr, io.axi4_to_arbiter.rdata, io.axi4_to_arbiter.rdata >> (8.U * offsetreg), io.axi4_to_arbiter.rresp)
+        printf("lsu unaligned raddr = %x rdata = %x  aligned rdata = %x rresp == %d\n" , readAddr, io.axi4_to_arbiter.rdata, io.axi4_to_arbiter.rdata >> (8.U * offsetreg), io.axi4_to_arbiter.rresp)
         when(io.axi4_to_arbiter.rresp === 0.U) {
           r_state := r_idle
           reqr := 0.B

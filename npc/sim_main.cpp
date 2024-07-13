@@ -296,17 +296,17 @@ extern "C" void psram_read(int addr, int *odata) {
   for (int i = 0; i < 4; i++) {
     res = res + ((word_t)psram[addr+i]<<(i*8));
   }
-  Log("---psram read addr=%x data=%x---\n", addr, res);
+  //Log("---psram read addr=%x data=%x---\n", addr, res);
   *odata = res;
 }
 
 extern "C" void psram_write(int addr, int idata) {
   assert(addr >= 0 && addr < PSRAM_SIZE);
-  Log("psram write addr=%x data=%lx\n", addr, idata);
+  //Log("psram write addr=%x data=%lx\n", addr, idata);
   for (int i = 0; i < 4; i++) {
     psram[addr + i] = (idata >> (i * 8)) & 0xff;
   }
-  Log("after write, psram[%x] = %x %x %x %x \n", addr, psram[addr + 3], psram[addr + 2], psram[addr + 1], psram[addr]);
+  //Log("after write, psram[%x] = %x %x %x %x \n", addr, psram[addr + 3], psram[addr + 2], psram[addr + 1], psram[addr]);
 }
 
 extern "C" void npc_pmem_read(int raddr, int *rdata) {
