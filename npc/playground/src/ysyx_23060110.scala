@@ -81,8 +81,8 @@ class ISRegBundle extends Bundle {
 class ysyx_23060110 extends Module {
   val io = IO(new Bundle {
     val inst = Output(UInt(32.W))
-    val pc = Output(UInt(XLEN.W))
-    val npc = Output(UInt(XLEN.W))
+    val pc = Output(UInt(64.W))
+    val npc = Output(UInt(64.W))
     val interrupt = Input(Bool())
     val master = Flipped(new AXI4Interface)
     val slave = new AXI4Interface
@@ -193,7 +193,8 @@ class ysyx_23060110 extends Module {
   val PC = RegInit(UInt(XLEN.W), RESET_VECTOR.U)
   val R = Mem(32, UInt(XLEN.W))
   
-  val mstatus = RegInit("xa00001800".U(XLEN.W))
+  // val mstatus = RegInit("xa00001800".U(XLEN.W))
+  val mstatus = RegInit("x1800".U(XLEN.W))
   val mtvec   = RegInit(0.U(XLEN.W))
   val mepc    = RegInit(0.U(XLEN.W))
   val mcause  = RegInit(0.U(XLEN.W))
@@ -511,10 +512,10 @@ class ysyx_23060110 extends Module {
     wbsextrdata := MuxLookup(WBReg.memsext, rdata)(Seq(
       MEM_NSEXT_8 ->  Cat(Fill(XLEN-8, 0.U), rdata(7, 0)),
       MEM_NSEXT_16->  Cat(Fill(XLEN-16, 0.U), rdata(15, 0)),
-      MEM_NSEXT_32->  Cat(Fill(XLEN-32, 0.U), rdata(31, 0)),
+      //MEM_NSEXT_32->  Cat(Fill(XLEN-32, 0.U), rdata(31, 0)),
       MEM_SEXT_8  ->  Cat(Fill(XLEN-8, rdata7), rdata(7, 0)),
       MEM_SEXT_16 ->  Cat(Fill(XLEN-16, rdata15), rdata(15, 0)),
-      MEM_SEXT_32 ->  Cat(Fill(XLEN-32, rdata31), rdata(31, 0)),
+      //MEM_SEXT_32 ->  Cat(Fill(XLEN-32, rdata31), rdata(31, 0)),
     ))
 
     when(WBReg.inst === ECALL) {

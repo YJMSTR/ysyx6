@@ -115,7 +115,7 @@ class ysyx_23060110_LSU extends Module {
   // printf("lsu r_state === %d\n", r_state);
   
   val araddr_unalign_offset = Mux(is_uart | is_flash, 0.U, Mux(is_mrom, io.in.bits.raddr(1, 0), io.in.bits.raddr(2, 0)))
-  readSize := MuxLookup(memsextreg, 3.U, Seq(
+  readSize := MuxLookup(memsextreg, 2.U, Seq(
             MEM_NSEXT_8 ->  0.U,
             MEM_NSEXT_16->  1.U,
             MEM_NSEXT_32->  2.U,
@@ -132,7 +132,7 @@ class ysyx_23060110_LSU extends Module {
         when (araddr_unalign_offset =/= 0.U) {
           offsetreg := araddr_unalign_offset
           readAddr := io.in.bits.raddr
-          readSize := MuxLookup(araddr_unalign_offset, 3.U, Seq(
+          readSize := MuxLookup(araddr_unalign_offset, 2.U, Seq(
             // | 7 | 6 | 5 | 4 | 3 | 2 | 1 | 0
             // |    3          |     2 | 1 | 0 
             3.U -> 2.U,
@@ -172,7 +172,7 @@ class ysyx_23060110_LSU extends Module {
   val writeAddr = RegInit(0.U(32.W))
   val writeData = RegInit(0.U(XLEN.W))
   val writeStrb = RegInit(0.U((XLEN/8).W))
-  val writeSize = WireInit(3.U(3.W))
+  val writeSize = WireInit(2.U(3.W))
   val writeResp = RegInit(0.U(2.W))
   val w_is_sram = WireInit(0.B)
   val w_is_psram = WireInit(0.B)

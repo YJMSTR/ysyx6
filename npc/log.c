@@ -14,6 +14,7 @@
 ***************************************************************************************/
 #include <debug.h>
 #include <utils.h>
+#include <stdio.h>
 
 
 FILE *log_fp = NULL;

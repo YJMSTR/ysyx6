@@ -87,7 +87,7 @@ class ysyx_23060110_IDU() extends Module {
       SB      -> List(ALU_ADD,          ALU_DATA_RS1,   ALU_DATA_IMM,   0.B, IMM_S,    0.B, 1.B, 1.B, 1.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.B, 1.B, 1.B),
       SH      -> List(ALU_ADD,          ALU_DATA_RS1,   ALU_DATA_IMM,   0.B, IMM_S,    0.B, 1.B, 1.B, 3.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.B, 1.B, 1.B),
       SW      -> List(ALU_ADD,          ALU_DATA_RS1,   ALU_DATA_IMM,   0.B, IMM_S,    0.B, 1.B, 1.B, 15.U(WMASKLEN.W), MEM_SEXT_NONE, 0.B, 1.B, 1.B),
-      SD      -> List(ALU_ADD,          ALU_DATA_RS1,   ALU_DATA_IMM,   0.B, IMM_S,    0.B, 1.B, 1.B, 255.U(WMASKLEN.W),MEM_SEXT_NONE, 0.B, 1.B, 1.B),
+      //SD      -> List(ALU_ADD,          ALU_DATA_RS1,   ALU_DATA_IMM,   0.B, IMM_S,    0.B, 1.B, 1.B, 255.U(WMASKLEN.W),MEM_SEXT_NONE, 0.B, 1.B, 1.B),
       // R-type
       ADD     -> List(ALU_ADD,          ALU_DATA_RS1,   ALU_DATA_RS2,   0.B, IMM_NONE, 1.B, 0.B, 0.B, 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.B, 1.B, 1.B),
       SUB     -> List(ALU_SUB,          ALU_DATA_RS1,   ALU_DATA_RS2,   0.B, IMM_NONE, 1.B, 0.B, 0.B, 0.U(WMASKLEN.W),  MEM_SEXT_NONE, 0.B, 1.B, 1.B),
@@ -141,7 +141,8 @@ class ysyx_23060110_IDU() extends Module {
   val immj_tmp = Cat(io.inst(31), io.inst(19, 12), io.inst(20), io.inst(30,21), 0.B)
   val immj = Cat(Fill(XLEN-21, immj_tmp(20)), immj_tmp)
   //printf("immj = %x\n", immj)
-  val immu = Cat(Fill(XLEN-32, io.inst(31)), io.inst(31, 12), 0.U(12.W))
+  //val immu = Cat(Fill(XLEN-32, io.inst(31)), io.inst(31, 12), 0.U(12.W))
+  val immu = Cat(io.inst(31, 12), 0.U(12.W))
   val imms_tmp = Cat(io.inst(31, 25), io.inst(11, 7))
   val imms = Cat(Fill(XLEN-12, imms_tmp(11)), imms_tmp)
   val immb_tmp = Cat(io.inst(31), io.inst(7), io.inst(30, 25), io.inst(11, 8), 0.B)

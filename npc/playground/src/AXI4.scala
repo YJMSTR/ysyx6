@@ -10,7 +10,7 @@ class AXI4LiteInterface extends Bundle {
   val arvalid = Input(Bool())
   val arready = Output(Bool())
   // R 读数据
-  val rdata = Output(UInt(XLEN.W))
+  val rdata = Output(UInt(64.W))
   val rresp = Output(UInt(2.W))
   val rvalid = Output(Bool())
   val rready = Input(Bool())
@@ -19,8 +19,8 @@ class AXI4LiteInterface extends Bundle {
   val awvalid = Input(Bool())
   val awready = Output(Bool())
   // W 写数据
-  val wdata = Input(UInt(XLEN.W))
-  val wstrb = Input(UInt((XLEN/8).W))
+  val wdata = Input(UInt(64.W))
+  val wstrb = Input(UInt((64/8).W))
   val wvalid = Input(Bool())
   val wready = Output(Bool())
   // B 写回复
@@ -39,7 +39,7 @@ class AXI4Interface extends Bundle {
   val arsize = Input(UInt(3.W))
   val arburst = Input(UInt(2.W))
   // R 读数据
-  val rdata = Output(UInt(XLEN.W))
+  val rdata = Output(UInt(64.W))
   val rresp = Output(UInt(2.W))
   val rvalid = Output(Bool())
   val rready = Input(Bool())
@@ -54,8 +54,8 @@ class AXI4Interface extends Bundle {
   val awsize = Input(UInt(3.W))
   val awburst = Input(UInt(2.W))
   // W 写数据
-  val wdata = Input(UInt(XLEN.W))
-  val wstrb = Input(UInt((XLEN/8).W))
+  val wdata = Input(UInt(64.W))
+  val wstrb = Input(UInt((64/8).W))
   val wvalid = Input(Bool())
   val wready = Output(Bool())
   val wlast = Input(Bool())

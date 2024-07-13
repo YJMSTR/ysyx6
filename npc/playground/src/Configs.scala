@@ -1,8 +1,8 @@
 import chisel3._ 
 
 object Configs {
-  val XLEN                  = 64
-  val WMASKLEN              = 8
+  val XLEN                  = 32
+  val WMASKLEN              = 4
   val RESET_VECTOR          = "x30000000"
   val RIDXLEN               = 5
   val CSRIDXLEN             = 12
@@ -34,7 +34,7 @@ object Configs {
   val CSR_MARCHID           = 0xF12
 
   val ALU_DATASEL_WIDTH     = 3
-  val IMM_SEL_WIDTH         = 3
+  val IMM_SEL_WIDTH         = 6
   // none 8 16 32 一共四种
   val MEM_SEXT_SEL_WIDTH    = 3
   

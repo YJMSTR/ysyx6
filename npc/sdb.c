@@ -26,8 +26,8 @@
 extern "C" void init_disasm(const char *triple);
 void init_difftest(char *ref_so_file, long img_size, int port);
 extern NPC_STATES npc_state;
-// static char *diff_so_file = "/home/yjmstr/ysyx-workbench/nemu/build/riscv32-nemu-interpreter-so";
-static char *diff_so_file = "/home/yjmstr/ysyx-workbench/nemu/build/riscv64-nemu-interpreter-so";
+static char *diff_so_file = "/home/yjmstr/ysyx-workbench/nemu/build/riscv32-nemu-interpreter-so";
+// static char *diff_so_file = "/home/yjmstr/ysyx-workbench/nemu/build/riscv64-nemu-interpreter-so";
 static int difftest_port = 1234;
 const char *log_file = "/home/yjmstr/ysyx-workbench/npc/logs/log.txt";
 
@@ -91,11 +91,11 @@ static int cmd_x(char *args) {
   assert(arg);
   int count = atoi(arg);
   char *arg2 = arg + strlen(arg) + 1;
-  sscanf(arg2, "%lx", &addr);
+  sscanf(arg2, "%x", &addr);
   for (word_t i = 0; i < count; i++) {
-    printf("0x%016lx: 0x%016lx , ", addr + i * 8, npc_vaddr_read(addr+i*8, 8));
-    for (word_t j = 0; j < 8; j++) {
-      printf("%02lx ", npc_vaddr_read(addr + i*8+j, 1));
+    printf("0x%08x: 0x%08x , ", addr + i * 8, npc_vaddr_read(addr+i*8, 4));
+    for (word_t j = 0; j < 4; j++) {
+      printf("%02x ", npc_vaddr_read(addr + i*8+j, 1));
     }
     printf("\n");
   }

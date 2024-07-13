@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <typeinfo>
 #include <debug.h>
+#include <stdio.h>
 #include <macro.h>
 #include <dlfcn.h>
 #include <sys/time.h>
@@ -202,14 +203,14 @@ bool isa_difftest_checkregs(CPU_state *ref_r, vaddr_t pc) {
   for (int i = 0; i < 32; i++) {
     assert(typeid(ref_r->gpr[i]) == typeid(cpu.gpr[i]));
     if (ref_r->gpr[i] != cpu.gpr[i]) {
-      printf("difftest: reg #%d = %s err at pc: 0x%016lx\n", i, regs[i], pc);
-      printf("difftest: ref_r->gpr[%d] == 0x%016lx cpu.gpr[%d] == 0x%016lx\n", i, ref_r->gpr[i], i, cpu.gpr[i]);
+      printf("difftest: reg #%d = %s err at pc: 0x%08x\n", i, regs[i], pc);
+      printf("difftest: ref_r->gpr[%d] == 0x%08x cpu.gpr[%d] == 0x%08x\n", i, ref_r->gpr[i], i, cpu.gpr[i]);
       ret = false;
     }
   }
   if (!ret) {
     for (int i = 0; i < 32; i++) {
-      printf("%s: ref = %lx cur = %lx\n", regs[i], ref_r->gpr[i], cpu.gpr[i]);
+      printf("%s: ref = %x cur = %x\n", regs[i], ref_r->gpr[i], cpu.gpr[i]);
     }
   }
   return ret;
@@ -266,50 +267,49 @@ static void trace_and_difftest(vaddr_t pc, vaddr_t dnpc) {
 
 
 // 接入 ysyxSoC 所需的代码
-extern "C" void flash_read(int addr, long long *data) {
+extern "C" void flash_read(int addr, int *data) {
   assert(addr >= 0 && addr < FLASH_SIZE);
   
   word_t res = 0;
-  for (int i = 0; i < 8; i++) {
+  for (int i = 0; i < 4; i++) {
     res = res + ((word_t)flash[addr + i] << (i * 8));
   }
   *data = res;
   //Log("dpic flash read addr =%08x data=%08x\n", addr, res);
 }
-extern "C" void mrom_read(int addr, long long *data) {
+extern "C" void mrom_read(int addr, int *data) {
   // *data = 0x00100073;	//ebreak
-  addr &= (~0x3ull);  // mrom 按4字节对齐
+  addr &= (~0x2ull);  // mrom 按4字节对齐
   word_t res = 0;
-  for (int i = 0; i < 8; i++) {
+  for (int i = 0; i < 4; i++) {
     res = res + ((word_t)mrom[addr-MROM_BASE+i] << (i*8));
   }
    
   *data = res;
-  // Log("npc mrom read addr = %x res64 = %016lx\n res32 = %08x res16 = %08x res8 = %08x", addr, res, res & 0xFFFFFFFF, res & 0xFFFF, res & 0xFF);
   Assert(addr >= MROM_BASE && addr < MROM_BASE + MROM_SIZE, "addr = %x out of mrom", addr);
 }
 
-extern "C" void psram_read(int addr, long long *odata) {
+extern "C" void psram_read(int addr, int *odata) {
   assert(addr >= 0 && addr < PSRAM_SIZE);
 
   word_t res = 0;
-  for (int i = 0; i < 8; i++) {
+  for (int i = 0; i < 4; i++) {
     res = res + ((word_t)psram[addr+i]<<(i*8));
   }
-  Log("---psram read addr=%x data=%lx---\n", addr, res);
+  Log("---psram read addr=%x data=%x---\n", addr, res);
   *odata = res;
 }
 
-extern "C" void psram_write(int addr, long long idata) {
+extern "C" void psram_write(int addr, int idata) {
   assert(addr >= 0 && addr < PSRAM_SIZE);
   Log("psram write addr=%x data=%lx\n", addr, idata);
-  for (int i = 0; i < 8; i++) {
+  for (int i = 0; i < 4; i++) {
     psram[addr + i] = (idata >> (i * 8)) & 0xff;
   }
-  Log("after write, psram[%x] = %x %x %x %x %x %x %x %x \n", addr, psram[addr + 7], psram[addr + 6], psram[addr + 5], psram[addr + 4], psram[addr + 3], psram[addr + 2], psram[addr + 1], psram[addr]);
+  Log("after write, psram[%x] = %x %x %x %x \n", addr, psram[addr + 3], psram[addr + 2], psram[addr + 1], psram[addr]);
 }
 
-extern "C" void npc_pmem_read(int raddr, long long *rdata) {
+extern "C" void npc_pmem_read(int raddr, int *rdata) {
   uint32_t addr = raddr;
   //addr = addr & ~0x3u;
   if (addr == RTC_ADDR + 4) {
@@ -329,20 +329,20 @@ extern "C" void npc_pmem_read(int raddr, long long *rdata) {
     *rdata = (uint32_t)rtc_us;
     return;
   }
-  if (!((word_t)raddr >= (word_t)MEM_BASE && ((word_t)(raddr - MEM_BASE + 7)) < (word_t)MEM_SIZE)) {
-    printf("pmem_read: raddr = %lld = 0x%016llx raddr-MEM_BASE = %lld MEM_SIZE-addr+MEM_BASE-7=%ld\n", raddr, raddr, raddr-MEM_BASE, MEM_SIZE-addr+MEM_BASE-7);
+  if (!((word_t)raddr >= (word_t)MEM_BASE && ((word_t)(raddr - MEM_BASE + 3)) < (word_t)MEM_SIZE)) {
+    printf("pmem_read: raddr = %d = 0x%08x raddr-MEM_BASE = %d MEM_SIZE-addr+MEM_BASE-3=%d\n", raddr, raddr, raddr-MEM_BASE, MEM_SIZE-addr+MEM_BASE-3);
     npc_reg_display();
   }
-  assert((word_t)raddr >= (word_t)MEM_BASE && ((word_t)(raddr - MEM_BASE + 7)) < (word_t)MEM_SIZE);
+  assert((word_t)raddr >= (word_t)MEM_BASE && ((word_t)(raddr - MEM_BASE + 3)) < (word_t)MEM_SIZE);
   word_t res = 0;
-  for (int i = 0; i < 8; i++) {
+  for (int i = 0; i < 4; i++) {
     res = res + ((word_t)mem[addr-MEM_BASE+i] << (i*8));
   }
   *rdata = res;
   //printf("pmem_read: *rdata = 0x%08x\n", *rdata);
 }
 
-extern "C" void npc_pmem_write(int waddr, long long wdata, char wmask) {
+extern "C" void npc_pmem_write(int waddr, int wdata, char wmask) {
   //int addr = waddr & ~0x3u;
   uint32_t addr = waddr;
   //printf("pmem_write: waddr = 0x%08llx wdata = 0x%08llx wmask = 0x%x\n", waddr, wdata, 0xff & wmask);
@@ -356,8 +356,8 @@ extern "C" void npc_pmem_write(int waddr, long long wdata, char wmask) {
   //   }
   //   return;
   // }
-  assert((word_t)addr >= MEM_BASE && ((word_t)(addr - MEM_BASE + 7)) < MEM_SIZE);
-  for (int i = 0; i < 8; i++) {
+  assert((word_t)addr >= MEM_BASE && ((word_t)(addr - MEM_BASE + 4)) < MEM_SIZE);
+  for (int i = 0; i < 4; i++) {
     if (wmask & (1 << i)) {
       mem[addr-MEM_BASE+i] = (wdata >> (i * 8)) & 0xff;
     }
@@ -369,7 +369,7 @@ word_t npc_paddr_read(word_t addr, int len) {
     case 1: return mem[addr-MEM_BASE];
     case 2: return (mem[addr-MEM_BASE+1] << 8ull) + mem[addr-MEM_BASE];
     case 4: return (npc_paddr_read(addr+2, 2) << 16ull) + npc_paddr_read(addr, 2);
-    case 8: return ((uint64_t)npc_paddr_read(addr+4, 4) << 32ull) + npc_paddr_read(addr, 4);
+    // case 8: return ((uint64_t)npc_paddr_read(addr+4, 4) << 32ull) + npc_paddr_read(addr, 4);
     default:
       Log("unsupport paddr read len, exit"); 
       return 0;

@@ -11,6 +11,7 @@
 #include <string.h>
 #include <readline/readline.h>
 #include <readline/history.h>
+#include <stdio.h>
 
 typedef uint64_t word_t;
 typedef word_t vaddr_t;
