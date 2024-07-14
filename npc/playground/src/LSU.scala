@@ -20,7 +20,7 @@ class LSUIn extends Bundle {
   val wsext = UInt(MEM_SEXT_SEL_WIDTH.W)
   val raddr = UInt(32.W)
   val waddr = UInt(32.W)
-  val wdata = UInt(XLEN.W)
+  val wdata = UInt(64.W)
   val rden = Bool()
   val rd = UInt(RIDXLEN.W)
   val csridx = UInt(12.W)
@@ -82,6 +82,8 @@ class ysyx_23060110_LSU extends Module {
   is_uart := io.in.bits.raddr >= UART_BASE.U && io.in.bits.raddr < (UART_BASE + UART_SIZE).U
   val is_sram = WireInit(0.B)
   is_sram := io.in.bits.raddr >= SRAM_BASE.U && io.in.bits.raddr < (SRAM_BASE + SRAM_SIZE).U
+  val is_psram = WireInit(0.B)
+  is_psram := io.in.bits.raddr >= PSRAM_BASE.U && io.in.bits.raddr < (PSRAM_BASE + PSRAM_SIZE).U
   val empty_master = Module(new ysyx_23060110_empty_axi4_master)
   io.axi4_to_arbiter <> empty_master.io.axi4
   //val fake_sram = Module(new FAKE_SRAM_LSU())
@@ -90,7 +92,7 @@ class ysyx_23060110_LSU extends Module {
   io.bus_reqr := reqr 
   io.bus_reqw := reqw
   val readAddr = RegInit(0.U(32.W))
-  val readData = RegInit(0.U(XLEN.W))
+  val readData = RegInit(0.U(64.W))
   val readSize = RegInit(0.U(3.W))
 
   val r_idle :: r_wait_arready :: r_wait_rvalid :: Nil = Enum(3)
@@ -115,9 +117,18 @@ class ysyx_23060110_LSU extends Module {
   io.axi4_to_arbiter.arsize := readSize
   
   // printf("lsu r_state === %d\n", r_state);
-  
-  val araddr_unalign_offset = Mux(is_uart | is_flash, 0.U, Mux(is_sram, io.in.bits.raddr(2, 0), Mux(is_mrom, io.in.bits.raddr(1, 0), io.in.bits.raddr(2, 0))))
-  readSize := MuxLookup(memsextreg, 2.U, Seq(
+  // current device : uart, flash, psram, sdram, sram. 
+  //val araddr_unalign_offset = Mux(is_uart | is_flash, 0.U, Mux(is_sram, io.in.bits.raddr(2, 0), Mux(is_mrom, io.in.bits.raddr(1, 0), io.in.bits.raddr(2, 0))))
+
+  val araddr_unalign_offset = MuxCase(0.U, Array(
+    is_sram   -> io.in.bits.raddr(2, 0),
+    (is_mrom | is_psram) -> io.in.bits.raddr(1, 0)
+  ))
+
+  val offsetreg = RegInit(0.U(3.W))
+  switch(r_state){
+    is(r_idle){
+      readSize := MuxLookup(memsextreg, 2.U, Seq(
             MEM_NSEXT_8 ->  0.U,
             MEM_NSEXT_16->  1.U,
             MEM_NSEXT_32->  2.U,
@@ -125,18 +136,16 @@ class ysyx_23060110_LSU extends Module {
             MEM_SEXT_16 ->  1.U,
             MEM_SEXT_32 ->  2.U,
           ))
-  val offsetreg = RegInit(0.U(3.W))
-  switch(r_state){
-    is(r_idle){
+
       when(io.in.valid && io.in.bits.memvalid && !io.in.bits.wen){
         r_state := r_wait_arready
         reqr := 1.B
         when (araddr_unalign_offset =/= 0.U) {
           offsetreg := araddr_unalign_offset
           readAddr := io.in.bits.raddr
-          readSize := MuxLookup(araddr_unalign_offset, 3.U, Seq(
+          readSize := MuxLookup(araddr_unalign_offset + readSize - 1.U, 3.U, Seq(
             // | 7 | 6 | 5 | 4 | 3 | 2 | 1 | 0
-            // |    3          |     2 | 1 | 0 
+            // |    3          |     2 | 1 | 0
             3.U -> 2.U,
             2.U -> 2.U,
             1.U -> 1.U,
@@ -158,7 +167,7 @@ class ysyx_23060110_LSU extends Module {
     is(r_wait_rvalid){ // rready = 1
       when(io.axi4_to_arbiter.rvalid){
         readData := io.axi4_to_arbiter.rdata >> (8.U * offsetreg)
-        printf("lsu unaligned raddr = %x rdata = %x  aligned rdata = %x rresp == %d\n" , readAddr, io.axi4_to_arbiter.rdata, io.axi4_to_arbiter.rdata >> (8.U * offsetreg), io.axi4_to_arbiter.rresp)
+        //printf("lsu unaligned raddr = %x rdata = %x  aligned rdata = %x rresp == %d\n" , readAddr, io.axi4_to_arbiter.rdata, io.axi4_to_arbiter.rdata >> (8.U * offsetreg), io.axi4_to_arbiter.rresp)
         when(io.axi4_to_arbiter.rresp === 0.U) {
           r_state := r_idle
           reqr := 0.B
@@ -172,15 +181,16 @@ class ysyx_23060110_LSU extends Module {
   val w_state = RegInit(w_idle)
 
   val writeAddr = RegInit(0.U(32.W))
-  val writeData = RegInit(0.U(XLEN.W))
-  val writeStrb = RegInit(0.U((XLEN/8).W))
-  val writeSize = WireInit(2.U(3.W))
+  val writeData = RegInit(0.U(64.W))
+  val writeStrb = RegInit(0.U((64/8).W))
+  val writeSize = RegInit(2.U(3.W))
   val writeResp = RegInit(0.U(2.W))
   val w_is_sram = WireInit(0.B)
   val w_is_psram = WireInit(0.B)
   w_is_sram := io.in.bits.waddr >= SRAM_BASE.U && io.in.bits.waddr < (SRAM_BASE + SRAM_SIZE).U
   w_is_psram := io.in.bits.waddr >= PSRAM_BASE.U && io.in.bits.waddr < (PSRAM_BASE + PSRAM_SIZE).U
-  val awaddr_unalign_offset = Mux(w_is_sram | w_is_psram, io.in.bits.waddr(2, 0), 0.U)
+  // 目前只有 sram 和 psram 可以写入，因此不考虑其它设备
+  val awaddr_unalign_offset = Mux(w_is_sram, io.in.bits.waddr(2, 0), Mux(w_is_psram, io.in.bits.waddr(1, 0), 0.U))
 
   
 
@@ -202,13 +212,14 @@ class ysyx_23060110_LSU extends Module {
         
         // printf("wmask = %d\n", io.in.bits.wmask)
         w_state := w_wait_wready
-        io.axi4_to_arbiter.awvalid := 1.B 
+        io.axi4_to_arbiter.awvalid := 1.B
         io.axi4_to_arbiter.wvalid := 1.B
         // when (awaddr_unalign_offset =/= 0.U) { 
 
         //   // 非对齐写入
-        // printf("\nwaddr = %x unalign offset = %x wdata = %x\n\n\n\n\n", io.in.bits.waddr, awaddr_unalign_offset, io.in.bits.wdata)
-        // }
+        when (w_is_sram) {
+          printf("\nwaddr = %x unalign offset = %x wdata = %x pc = %x\n\n\n\n\n", io.in.bits.waddr, awaddr_unalign_offset, io.in.bits.wdata, io.in.bits.pc)
+        }
         writeAddr := io.in.bits.waddr
         writeData := io.in.bits.wdata << (awaddr_unalign_offset * 8.U)
         writeSize := MuxLookup(io.in.bits.wmask, 2.U, Seq(
@@ -263,13 +274,13 @@ class ysyx_23060110_LSU extends Module {
   
 
 
-  io.out.bits.inst := instreg 
+  io.out.bits.inst := instreg
   io.out.bits.pc := pcreg 
   io.out.bits.memvalid := memvalidreg
   io.out.bits.alures := aluresreg
-  io.out.bits.rden := rdenreg 
-  io.out.bits.rd := rdreg 
-  io.out.bits.memsext := memsextreg 
+  io.out.bits.rden := rdenreg
+  io.out.bits.rd := rdreg
+  io.out.bits.memsext := memsextreg
   io.out.bits.csridx := csridxreg
   io.out.bits.csr_en := csrenreg
   io.out.bits.csrrv := csrrvreg
@@ -287,7 +298,7 @@ class ysyx_23060110_LSU extends Module {
   // }
 
   when (io.in.valid && r_state === r_idle && w_state === w_idle) {
-    instreg := io.in.bits.inst 
+    instreg := io.in.bits.inst
     pcreg := io.in.bits.pc
     memvalidreg := io.in.bits.memvalid
     aluresreg := io.in.bits.alures
