@@ -143,7 +143,7 @@ class ysyx_23060110_LSU extends Module {
         when (araddr_unalign_offset =/= 0.U) {
           offsetreg := araddr_unalign_offset
           readAddr := io.in.bits.raddr
-          readSize := MuxLookup(araddr_unalign_offset + readSize - 1.U, 3.U, Seq(
+          readSize := MuxLookup(araddr_unalign_offset, 3.U, Seq(
             // | 7 | 6 | 5 | 4 | 3 | 2 | 1 | 0
             // |    3          |     2 | 1 | 0
             3.U -> 2.U,
@@ -190,7 +190,7 @@ class ysyx_23060110_LSU extends Module {
   w_is_sram := io.in.bits.waddr >= SRAM_BASE.U && io.in.bits.waddr < (SRAM_BASE + SRAM_SIZE).U
   w_is_psram := io.in.bits.waddr >= PSRAM_BASE.U && io.in.bits.waddr < (PSRAM_BASE + PSRAM_SIZE).U
   // 目前只有 sram 和 psram 可以写入，因此不考虑其它设备
-  val awaddr_unalign_offset = Mux(w_is_sram, io.in.bits.waddr(2, 0), Mux(w_is_psram, io.in.bits.waddr(1, 0), 0.U))
+  val awaddr_unalign_offset = Mux(w_is_sram | w_is_psram, io.in.bits.waddr(2, 0),  0.U)
 
   
 
@@ -218,7 +218,7 @@ class ysyx_23060110_LSU extends Module {
 
         //   // 非对齐写入
         when (w_is_sram) {
-          printf("\nwaddr = %x unalign offset = %x wdata = %x pc = %x\n\n\n\n\n", io.in.bits.waddr, awaddr_unalign_offset, io.in.bits.wdata, io.in.bits.pc)
+          // printf("\nwaddr = %x unalign offset = %x wdata = %x pc = %x\n\n\n\n\n", io.in.bits.waddr, awaddr_unalign_offset, io.in.bits.wdata, io.in.bits.pc)
         }
         writeAddr := io.in.bits.waddr
         writeData := io.in.bits.wdata << (awaddr_unalign_offset * 8.U)
