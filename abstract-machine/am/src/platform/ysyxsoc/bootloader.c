@@ -11,25 +11,32 @@ extern char __app_text_and_rodata_load_start__ [];
 extern char data_start [];
 extern char data_end [];
 extern char data_load_start [];
+extern char _bss_start [];
 extern void _trm_init();
 
 
 void __attribute__((section(".text_bootloader"))) copy_data(void) {
   unsigned char *src = (unsigned char*) __app_text_and_rodata_load_start__;
-  unsigned char *dst = (unsigned char*) __sram_start__;
-  uint32_t size =  __text_and_rodata_end__ - __text_and_rodata_start__;
-  // memcpy(dst, src, size);
-  for (int i = 0; i < size; i++) {
-    dst[i] = src[i];
+  unsigned char *dst = (unsigned char*) __text_and_rodata_start__;
+  if (&__app_text_and_rodata_load_start__[0] != &__text_and_rodata_start__[0]) {
+    uint32_t size =  __text_and_rodata_end__ - __text_and_rodata_start__;
+    // memcpy(dst, src, size);
+    for (int i = 0; i < size; i++) {
+      dst[i] = src[i];
+    }
   }
 
   if (&data_start[0] != &data_load_start[0]) {
     unsigned char *srct = (unsigned char *)data_load_start;
     unsigned char *dstt = (unsigned char *)data_start;
-    //  memcpy(dstt, srct, data_end - data_start);
-    for (int i = 0; i < data_end - data_start; i++) {
+    uint32_t sizet = data_end - data_start;
+    for (int i = 0; i < sizet; i++) {
       dstt[i] = srct[i];
     }
+  }
+  unsigned char *bss = (unsigned char*) _bss_start;
+  for (int i = 0; i < data_end - _bss_start; i++) {
+    bss[i] = 0;
   }
 }
 

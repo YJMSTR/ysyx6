@@ -27,12 +27,13 @@ SECTIONS {
     __text_and_rodata_start__ = .;
     *(.text*)
 /*  } > flash AT> flash */ 
-  } > sram AT> app_flash
+  } > psram AT> app_flash
   etext = .;
   _etext = .;
   .rodata : {
     *(.rodata*)
-  } > sram AT> app_flash
+    *(.srodata*)
+  } > psram AT> app_flash
   . = ALIGN(8);
    __text_and_rodata_end__ = .;
    __app_text_and_rodata_load_start__ = LOADADDR(.text);
@@ -54,7 +55,6 @@ SECTIONS {
   . = ALIGN(8);
   data_end = .;
   data_load_start = LOADADDR(.data);
-  sram_start = 0x0f000000;
   end = .;
   _end = .;
   /* _stack_top and _heap_start are defined in LD_FLAGS */
