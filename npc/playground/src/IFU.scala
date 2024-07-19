@@ -33,7 +33,7 @@ class ysyx_23060110_IFU extends Module {
   val reqr = RegInit(0.B)
   io.bus_reqr := reqr
 
-  val PC = RegInit("x30000000".U(XLEN.W))
+  val PC = RegInit(RESET_VECTOR.U(XLEN.W))
   val readAddr = RegInit(0.U(32.W))
   val readSize = RegInit(2.U(MEM_SEXT_SEL_WIDTH.W))
   val outAddr = RegInit(0.U(32.W))
@@ -111,7 +111,8 @@ class ysyx_23060110_IFU extends Module {
         // }
         reqr := 0.B
         when (io.axi4_to_arbiter.rresp =/= 0.U) {
-          printf("r resp = %x\n", io.axi4_to_arbiter.rresp)
+          printf("r resp = %x raddr = %x\n", io.axi4_to_arbiter.rresp, readAddr)
+
           outAddr := 0.U
           outData := 0.U
         }

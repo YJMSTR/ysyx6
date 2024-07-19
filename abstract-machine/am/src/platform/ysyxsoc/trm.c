@@ -4,30 +4,17 @@
 #include <ysyxsoc.h>
 
 extern char _heap_start;
-extern char data_start [];
-extern char data_size [];
-extern char data_load_start [];
+extern unsigned int _heap_size;
 
-void copy_data(void)
-{
-  if (&data_start[0] != &data_load_start[0])
-    {
-      // memcpy(data_start, data_load_start, (size_t) data_size);
-
-      unsigned char *srct = (unsigned char *)data_load_start;
-      unsigned char *dstt = (unsigned char *)data_start;
-      for (int i = 0; i < (size_t)data_size; i++) {
-        dstt[i] = srct[i];
-      }
-    }
-}
 int main(const char *args);
 
 extern char _pmem_start;
 #define PMEM_SIZE (8 * 1024)
 #define PMEM_END  ((uintptr_t)&_pmem_start + PMEM_SIZE)
-
-Area heap = RANGE(&_heap_start, PMEM_END);
+// warning: 0x300000 is current heap size 
+#define HEAP_SIZE 0x300000
+#define HEAP_END  ((uintptr_t)&_heap_start + HEAP_SIZE)
+Area heap = RANGE(&_heap_start, HEAP_END);
 #ifndef MAINARGS
 #define MAINARGS ""
 #endif
@@ -62,11 +49,9 @@ void halt(int code) {
 }
 
 void _trm_init() {
-  copy_data();
   if(!ioe_init()) {
     halt(1);
   }
-  printf("copy_data done\n");
   unsigned long long ysyx, ysyx_no; 
   asm volatile(
       "csrr %[dest1], mvendorid;\
