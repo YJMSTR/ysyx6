@@ -5,6 +5,9 @@ extern char __sram_start__ [];
 extern char __sram_size__ [];
 extern char __boot_flash_start__ [];
 extern char __boot_flash_size__ [];
+extern char __text_bootloader_start__ [];
+extern char __text_bootloader_end__ [];
+extern char __text_bootloader_load_start__ [];
 extern char __text_and_rodata_start__ [];
 extern char __text_and_rodata_end__ [];
 extern char __app_text_and_rodata_load_start__ [];
@@ -14,6 +17,15 @@ extern char data_load_start [];
 extern char _bss_start [];
 extern void _trm_init();
 
+void __attribute__((section(".fsbl"))) _fsbl(void) {
+
+  extern void _bootloader_start();
+  unsigned char *src = (unsigned char*) __text_bootloader_load_start__;
+  unsigned char *dst = (unsigned char*) __text_bootloader_start__;
+  uint32_t size = __text_bootloader_end__ - __text_bootloader_start__;
+  for (int i = 0; i < size; i++) dst[i] = src[i];
+  _bootloader_start();
+}
 
 void __attribute__((section(".text_bootloader"))) copy_data(void) {
   unsigned char *src = (unsigned char*) __app_text_and_rodata_load_start__;

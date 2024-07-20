@@ -27,7 +27,7 @@ CFLAGS    += -fdata-sections -ffunction-sections
 LDFLAGS   += -T $(AM_HOME)/scripts/ysyxsoc-linker.ld \
 						 --defsym=_pmem_start=0x30000000 --defsym=_entry_offset=0x0 \
 						 --defsym=_stack_top=0x0f001000 --defsym=_stack_pointer=0x0f002000 \
-						 --defsym=_heap_start=0x80100000 --defsym=_heap_size=0x300000
+						 --defsym=_heap_start=0x80300000 --defsym=_heap_size=0x100000
 LDFLAGS   += --gc-sections -e _start
 CFLAGS += -DMAINARGS=\"$(mainargs)\"
 CFLAGS += -I$(AM_HOME)/am/src/platform/ysyxsoc/include
