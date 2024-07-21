@@ -48,10 +48,11 @@ SECTIONS {
   } > psram AT> app_flash
   edata = .;
   _data = .;
-  _bss_start = .;
   .bss : {
+    _bss_start = .;
     *(.bss*)
     *(.sbss*)
+    _bss_end = .;
     *(.scommon)
   } > psram AT> app_flash
   data_end = .;

@@ -15,6 +15,7 @@ extern char data_start [];
 extern char data_end [];
 extern char data_load_start [];
 extern char _bss_start [];
+extern char _bss_end [];
 extern void _trm_init();
 
 void __attribute__((section(".fsbl"))) _fsbl(void) {
@@ -47,7 +48,7 @@ void __attribute__((section(".text_bootloader"))) copy_data(void) {
     }
   }
   unsigned char *bss = (unsigned char*) _bss_start;
-  for (int i = 0; i < data_end - _bss_start; i++) {
+  for (int i = 0; i < _bss_end - _bss_start; i++) {
     bss[i] = 0;
   }
 }

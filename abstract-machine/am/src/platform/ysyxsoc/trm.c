@@ -12,7 +12,7 @@ extern char _pmem_start;
 #define PMEM_SIZE (8 * 1024)
 #define PMEM_END  ((uintptr_t)&_pmem_start + PMEM_SIZE)
 // warning: 0x300000 is current heap size 
-#define HEAP_SIZE 0x100000
+#define HEAP_SIZE 0x300000
 #define HEAP_END  ((uintptr_t)&_heap_start + HEAP_SIZE)
 Area heap = RANGE(&_heap_start, HEAP_END);
 #ifndef MAINARGS

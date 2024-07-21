@@ -299,13 +299,16 @@ extern "C" void psram_read(int addr, int *odata) {
   *odata = res;
 }
 
-extern "C" void psram_write(int addr, int idata) {
+extern "C" void psram_write(int addr, int idata, char wmask) {
   assert(addr >= 0 && addr < PSRAM_SIZE);
-  //Log("psram write addr=%x data=%lx\n", addr, idata);
+  //if (addr >= 0x101348 && addr < 0x10135e)
+    //Log("psram write addr=%x data=%lx wmask = %d\n", addr, idata, wmask);
   for (int i = 0; i < 4; i++) {
-    psram[addr + i] = (idata >> (i * 8)) & 0xff;
+    if ((1 << i)&wmask)
+      psram[addr + i] = (idata >> (i * 8)) & 0xff;
   }
-  //Log("after write, psram[%x] = %x %x %x %x \n", addr, psram[addr + 3], psram[addr + 2], psram[addr + 1], psram[addr]);
+  //if (addr >= 0x101348 && addr < 0x10135e)
+    //Log("after write, psram[%x] = %x %x %x %x \n", addr, psram[addr + 3], psram[addr + 2], psram[addr + 1], psram[addr]);
 }
 
 extern "C" void npc_pmem_read(int raddr, int *rdata) {
@@ -386,6 +389,19 @@ word_t npc_vaddr_read(word_t addr, int len) {
       case 4: return res&0xffffffff;
       default:
         Log("unsupport flash read len, exit");
+        return 0;
+      break;
+    }
+  }
+  if (addr >= PSRAM_BASE && addr < PSRAM_SIZE + PSRAM_BASE) {
+    int res;
+    psram_read(addr-PSRAM_BASE, &res);
+    switch (len) {
+      case 1: return res&0xff;
+      case 2: return res&0xffff;
+      case 4: return res&0xffffffff;
+      default:
+        Log("unsupport psram read len, exit");
         return 0;
       break;
     }
