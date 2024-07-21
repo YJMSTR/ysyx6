@@ -93,9 +93,9 @@ static int cmd_x(char *args) {
   char *arg2 = arg + strlen(arg) + 1;
   sscanf(arg2, "%x", &addr);
   for (word_t i = 0; i < count; i++) {
-    printf("0x%08x: 0x%08x , ", addr + i * 8, npc_vaddr_read(addr+i*8, 4));
+    printf("0x%08x: 0x%08x , ", addr + i * 4, npc_vaddr_read(addr+i*4, 4));
     for (word_t j = 0; j < 4; j++) {
-      printf("%02x ", npc_vaddr_read(addr + i*8+j, 1));
+      printf("%02x ", npc_vaddr_read(addr + i*4+j, 1));
     }
     printf("\n");
   }

@@ -16,7 +16,6 @@ __sram_size__ = LENGTH(sram);
 
 SECTIONS {
   . = _pmem_start;
-  . = ALIGN(8);
   __fsbl_start__ = .;
   .fsbl : {
     *(entry)
@@ -28,41 +27,33 @@ SECTIONS {
     *(.text_bootloader)
     __text_bootloader_end__ = .;
   } > sram AT> boot_flash
-  . = ALIGN(8);
   __text_bootloader_load_start__ = LOADADDR(.text_bootloader);
-  text_start = .;
   .text : {
+    text_start = .;
     __text_and_rodata_start__ = .;
     *(.text)
 /*  } > flash AT> flash */ 
   } > psram AT> app_flash
-  . = ALIGN(8);
   etext = .;
   _etext = .;
   .rodata : {
     *(.rodata*)
     *(.srodata*)
   } > psram AT> app_flash
-  . = ALIGN(8);
    __text_and_rodata_end__ = .;
    __app_text_and_rodata_load_start__ = LOADADDR(.text);
-  . = ALIGN(8);
-  data_start = .;
-  . = .;
   .data : {
-    *(.data)
+    data_start = .;
+    *(.data*)
   } > psram AT> app_flash
-  . = ALIGN(8);
   edata = .;
   _data = .;
-  . = ALIGN(8);
   _bss_start = .;
   .bss : {
     *(.bss*)
     *(.sbss*)
     *(.scommon)
   } > psram AT> app_flash
-  . = ALIGN(8);
   data_end = .;
   data_load_start = LOADADDR(.data);
   end = .;

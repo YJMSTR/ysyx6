@@ -268,8 +268,7 @@ static void trace_and_difftest(vaddr_t pc, vaddr_t dnpc) {
 
 // 接入 ysyxSoC 所需的代码
 extern "C" void flash_read(int addr, int *data) {
-  assert(addr >= 0 && addr < FLASH_SIZE);
-  
+  assert(addr >= 0 && addr < FLASH_SIZE); 
   word_t res = 0;
   for (int i = 0; i < 4; i++) {
     res = res + ((word_t)flash[addr + i] << (i * 8));
@@ -378,6 +377,19 @@ word_t npc_paddr_read(word_t addr, int len) {
 }
 
 word_t npc_vaddr_read(word_t addr, int len) {
+  if (addr >= FLASH_BASE && addr < FLASH_BASE + FLASH_SIZE) {
+    int res;
+    flash_read(addr-FLASH_BASE, &res);
+    switch (len) {
+      case 1: return res&0xff;
+      case 2: return res&0xffff;
+      case 4: return res&0xffffffff;
+      default:
+        Log("unsupport flash read len, exit");
+        return 0;
+      break;
+    }
+  }
   return npc_paddr_read(addr, len);
 }
 

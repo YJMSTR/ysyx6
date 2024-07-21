@@ -37,7 +37,7 @@ class LSUOut extends Bundle {
   val rden = Bool()
   val rd = UInt(RIDXLEN.W)
   val memsext = UInt(MEM_SEXT_SEL_WIDTH.W)
-  val rdata = UInt(XLEN.W)
+  val rdata = UInt(64.W)
   val csridx = UInt(12.W)
   val csrrv = UInt(XLEN.W)
   val csrwv = UInt(XLEN.W)
