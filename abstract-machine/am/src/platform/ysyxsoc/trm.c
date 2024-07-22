@@ -63,6 +63,8 @@ void _trm_init() {
   }
   printf("%d\n", (int)ysyx_no);
   printf("mainargs=%s\n", mainargs);
+  printf("pmem start = %x\n", &_pmem_start);
+  printf("heap [%x, %x], addr of _heap_start = %x %x\n", heap.start, heap.end, _heap_start, &_heap_start);
   int ret = main(mainargs);
   halt(ret);
 }

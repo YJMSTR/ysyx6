@@ -31,7 +31,7 @@ SECTIONS {
   .text : {
     text_start = .;
     __text_and_rodata_start__ = .;
-    *(.text)
+    *(.text*)
 /*  } > flash AT> flash */ 
   } > psram AT> app_flash
   etext = .;
@@ -40,11 +40,14 @@ SECTIONS {
     *(.rodata*)
     *(.srodata*)
   } > psram AT> app_flash
-   __text_and_rodata_end__ = .;
-   __app_text_and_rodata_load_start__ = LOADADDR(.text);
+  __text_and_rodata_end__ = .;
+  __app_text_and_rodata_load_start__ = LOADADDR(.text);
+  . = ALIGN(8);
+  /*. = .;*/
+  data_start = .;
   .data : {
-    data_start = .;
     *(.data*)
+    *(.sdata*)
   } > psram AT> app_flash
   edata = .;
   _data = .;
