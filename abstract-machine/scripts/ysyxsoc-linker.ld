@@ -28,7 +28,7 @@ SECTIONS {
     __text_bootloader_end__ = .;
   } > sram AT> boot_flash
   __text_bootloader_load_start__ = LOADADDR(.text_bootloader);
-  .text : {
+  .text : ALIGN(8) {
     text_start = .;
     __text_and_rodata_start__ = .;
     *(.text*)
@@ -36,15 +36,16 @@ SECTIONS {
   } > psram AT> app_flash
   etext = .;
   _etext = .;
-  .rodata : {
+  .rodata : ALIGN(4) {
     *(.rodata*)
     *(.srodata*)
+    . = ALIGN(4);
+    data_start = .;
+    __text_and_rodata_end__ = .;
   } > psram AT> app_flash
-  __text_and_rodata_end__ = .;
-  __app_text_and_rodata_load_start__ = LOADADDR(.text);
-  . = ALIGN(8);
+   __app_text_and_rodata_load_start__ = LOADADDR(.text);
   /*. = .;*/
-  data_start = .;
+
   .data : {
     *(.data*)
     *(.sdata*)
@@ -60,6 +61,7 @@ SECTIONS {
   } > psram AT> app_flash
   data_end = .;
   data_load_start = LOADADDR(.data);
+  data_extra_load_start = LOADADDR(.data.extra);
   end = .;
   _end = .;
   /* _stack_top and _heap_start are defined in LD_FLAGS */
