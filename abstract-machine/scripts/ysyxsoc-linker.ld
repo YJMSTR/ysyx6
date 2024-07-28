@@ -61,7 +61,7 @@ SECTIONS {
   } > psram AT> app_flash
   data_end = .;
   data_load_start = LOADADDR(.data);
-  data_extra_load_start = LOADADDR(.data.extra);
+  /*data_extra_load_start = LOADADDR(.data.extra);*/
   end = .;
   _end = .;
   /* _stack_top and _heap_start are defined in LD_FLAGS */

@@ -14,7 +14,7 @@ extern char __app_text_and_rodata_load_start__ [];
 extern char data_start [];
 extern char data_end [];
 extern char data_load_start [];
-extern char data_extra_load_start [];
+// extern char data_extra_load_start [];
 extern char _bss_start [];
 extern char _bss_end [];
 extern void _trm_init();
@@ -44,11 +44,11 @@ void __attribute__((section(".text_bootloader"))) copy_data(void) {
     unsigned char *srct = (unsigned char *)data_load_start;
     unsigned char *dstt = (unsigned char *)data_start;
     uint32_t sizet = data_end - data_start;
-    if (&data_extra_load_start[0] != &data_start[0]) {
+    /*if (&data_extra_load_start[0] != &data_start[0]) {
       if (data_extra_load_start[0]) {
         srct = (unsigned char *)data_extra_load_start;
       }
-    }
+    }*/
     for (int i = 0; i < sizet; i++) {
       dstt[i] = srct[i];
     }

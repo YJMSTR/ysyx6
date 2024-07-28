@@ -15,6 +15,8 @@ object Configs {
   val SRAM_SIZE             = 0x0000_2000L
   val PSRAM_BASE            = 0x8000_0000L
   val PSRAM_SIZE            = 0x2000_0000L
+  val SDRAM_BASE            = 0xa000_0000L
+  val SDRAM_SIZE            = 0x2000_0000L
   // val MEM_BASE              = 0x80000000L
   // val MEM_SIZE              = 0x8000000L
   val FLASH_BASE            = 0x30000000L

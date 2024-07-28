@@ -136,6 +136,8 @@ static uint8_t mem[MEM_SIZE] = {
   // 如果改了这里，记得把默认的 img_size 也改了
 }; 
 
+static uint8_t sdram[4][8152][512][2];
+
 static uint8_t psram[PSRAM_SIZE];
 
 void (*ref_difftest_memcpy)(paddr_t addr, void *buf, size_t n, bool direction) = NULL;
@@ -309,6 +311,34 @@ extern "C" void psram_write(int addr, int idata, char wmask) {
   }
   //if (addr >= 0x101348 && addr < 0x10135e)
     //Log("after write, psram[%x] = %x %x %x %x \n", addr, psram[addr + 3], psram[addr + 2], psram[addr + 1], psram[addr]);
+}
+
+extern "C" void sdram_read(char bank, short row, short col, short *odata, char mask) {
+  assert(bank >= 0 && bank <= 3);
+  assert(row >= 0 && row < 8152);
+  assert(col >= 0 && col < 512);
+  unsigned short res = 0;
+  for (int i = 0; i < 2; i++) {
+    if (mask & (1 << i)) {
+      short delta = (short)sdram[bank][row][col][i];
+      res += delta << (i * 8);
+      printf ("sdram read data = %d at bank=%d row=%d col=%d i = %d mask = %d\n", delta, bank, row, col, i, mask);
+    }
+  }
+  printf("sdram read res = 0x%x\n", res);
+  *odata = res;
+}
+
+extern "C" void sdram_write(char bank, short row, short col, short idata, char mask) {
+  assert(bank >= 0 && bank <= 3);
+  assert(row >= 0 && row < 8152);
+  assert(col >= 0 && col < 512);
+  printf("sdram write idata = %d at bank=%d row=%d col=%d mask = %d\n", idata, bank, row, col, mask);
+  for (int i = 0; i < 2; i++) {
+    if (mask & (1 << i)) {
+      sdram[bank][row][col][i] = (0xff & (idata >> (i * 8)));
+    }
+  }
 }
 
 extern "C" void npc_pmem_read(int raddr, int *rdata) {

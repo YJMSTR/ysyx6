@@ -108,13 +108,90 @@ int vsprintf(char *out, const char *fmt, va_list ap) {
             }
             i++;
             break;
+          case 'l':
+            ++i;
+            switch (fmt[i+1]) {
+              case 'd':
+                unsigned long long tmp = va_arg(ap, unsigned long long);
+                char stk[100];
+                int stk_top = 0, f = 1;
+                if (tmp == 0) {
+                  out[cur++] = '0';
+                  i++;
+                  break;
+                }
+                while (tmp != 0) {
+                  if (tmp < 0) {
+                    f = -1;
+                    tmp = -tmp;
+                  }
+                  stk[++stk_top] = (tmp % 10ll) + '0';
+                  tmp /= 10ll;
+                }
+                if (f == -1) out[cur++] = '-';
+                while (stk_top > 0) {
+                  out[cur++] = stk[stk_top];
+                  stk_top--; 
+                }
+                i++;
+                break;
+              case 'x':
+                unsigned long long tmpx = va_arg(ap, unsigned long long);
+                char stkx[100];
+                unsigned int stkx_top = 0;
+                if (tmpx == 0) {
+                  out[cur++] = '0';
+                  i++;
+                  break;
+                }
+                while (tmpx != 0) {
+                  char res = 'A';
+                  if (tmpx % 16ll > 9) {
+                    switch (tmpx % 16ll)
+                    {
+                    case 11:
+                      res = 'B';
+                      break;
+                    case 12:
+                      res = 'C';
+                      break;
+                    case 13:
+                      res = 'D';
+                      break;
+                    case 14:
+                      res = 'E';
+                      break;
+                    case 15:
+                      res = 'F';
+                      break;
+                    default:
+                      res = 'A';
+                      break;
+                    }
+                  } else {
+                    res = (tmpx % 16ll) + '0';
+                  }
+                  stkx[++stkx_top] = res;
+                  tmpx >>= 4ll;
+                }
+                if (stkx_top == 0) {
+                  out[cur++] = '0';
+                }
+                while (stkx_top > 0) {
+                  out[cur++] = stkx[stkx_top];
+                  stkx_top--; 
+                }
+                i++;
+                break;
+            }
+          break;
         }
       }
       continue;
     } else {
       out[cur++] = fmt[i];
-    } 
-  }  
+    }
+  }
   out[cur] = '\0';
   return cur;
   panic("Not implemented");
