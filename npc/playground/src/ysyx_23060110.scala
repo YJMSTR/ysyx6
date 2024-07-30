@@ -258,7 +258,7 @@ class ysyx_23060110 extends Module {
   //   scoreboard(Decoder.io.rd) := scoreboard(Decoder.io.rd)
   // }
   val pc_plus_imm = Decoder.io.pc + Decoder.io.imm
-  //printf("decoder pc = %x, imm = %x, pc_plus_imm = %x\n", Decoder.io.pc, Decoder.io.imm, pc_plus_imm)
+
   val rs2v = Rread(Decoder.io.rs2)
   val rs1v = Rread(Decoder.io.rs1)
   
@@ -346,7 +346,9 @@ class ysyx_23060110 extends Module {
     Decoder.io.pc := 0.U
   }
   // pcsel := Decoder.io.isdnpc
-
+  //when (Decoder.io.inst === JAL) {
+  //  printf("decoder pc = %x, imm = %x, pc_plus_imm = %x\n", Decoder.io.pc, Decoder.io.imm, pc_plus_imm)
+  //}
   val ALU = Module(new ysyx_23060110_EXU)
   when(EXReg.valid ) { 
     ALU.io.inst := EXReg.inst
@@ -507,7 +509,7 @@ class ysyx_23060110 extends Module {
     ISReg.valid := WBReg.valid
     ISReg.inst := WBReg.inst
     ISReg.pc := WBReg.pc
-    io.npc := LSReg.pc
+    io.npc := NPC_Mem.io.out.bits.pc
     // rdata := WBReg.rdata
     wbsextrdata := MuxLookup(WBReg.memsext, rdata)(Seq(
       MEM_NSEXT_8 ->  Cat(Fill(XLEN-8, 0.U), rdata(7, 0)),

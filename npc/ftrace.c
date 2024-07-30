@@ -81,7 +81,7 @@ pairpc fstack[MAX_FSTACK];  //ftrace 支持的最大大小栈，默认500000
 int ftop;
 
 void ftrace(vaddr_t pc, vaddr_t dnpc, uint32_t instval, vaddr_t ra) {
-    // Log("ftrace pc = 0x%08x dnpc = 0x%08x instval = 0x%08x ra = 0x%08x",pc,dnpc,instval,ra);
+    //Log("ftrace pc = %08x dnpc = %08x instval = %08x ra = %08x\n", pc, dnpc, instval, ra);
     if (pc == 0x30000000) {
          for (int i = 0; i < funcnum; i++) {
             if (func[i].value == pc) {
@@ -94,6 +94,7 @@ void ftrace(vaddr_t pc, vaddr_t dnpc, uint32_t instval, vaddr_t ra) {
         }
     }
     if ((instval & 0b1111111) == 0b1101111) { // jal
+        //Log("ftrace jal at pc = 0x%08x dnpc = 0x%08x instval = 0x%08x ra = 0x%08x",pc,dnpc,instval,ra);
         for (int i = 0; i < funcnum; i++) { 
             // 函数调用
             if (func[i].value == dnpc) {
@@ -102,30 +103,31 @@ void ftrace(vaddr_t pc, vaddr_t dnpc, uint32_t instval, vaddr_t ra) {
                 // prespace += 2;
                 fstack[++ftop].dnpc = dnpc;
                 fstack[ftop].pc = pc;
-                printf("#%d: call: %s at %08x\n", ftop, func[i].name, func[i].value);
+                Log("#%d: call: %s at %08x", ftop, func[i].name, func[i].value);
             }
             // 函数返回：从当前 pc 跳转到 x1（ra）, 且 ra 处值为与栈顶pc+4相等 且栈顶 dnpc 等于 func[i].value
             if (ftop > 0 && dnpc == ra && fstack[ftop].pc + 4 == ra && func[i].value == fstack[ftop].dnpc) {
                 // prespace -= 2;
                 //for (int j = 0; j < prespace; j++) putchar(' ');
-                printf("#%d: ret:  %s at %x to %x\n", ftop, func[i].name, pc, dnpc);
+                Log("#%d: ret:  %s at %x to %x", ftop, func[i].name, pc, dnpc);
                 ftop--;
             }
         }
     }
     if (((instval & 0b111000000000000) == 0) && ((instval & 0b1111111) == 0b1100111)) {
+       // Log("ftrace jalr pc = 0x%08x dnpc = 0x%08x instval = 0x%08x ra = 0x%08x",pc,dnpc,instval,ra);
         for (int i = 0; i < funcnum; i++) {
             //call
             if (func[i].value == dnpc) {
                 //for (int j = 0; j < prespace; j++) putchar(' ');
-                printf("#%d: call: %s at %x\n", ftop, func[i].name, func[i].value);
+                Log("#%d: call: %s at %x", ftop, func[i].name, func[i].value);
                 // prespace += 2;
             } 
             // ret
             if (ftop > 0 && dnpc == ra && fstack[ftop].pc + 4 == ra && func[i].value == fstack[ftop].dnpc) {
                 // prespace -= 2;
                 //for (int j = 0; j < prespace; j++) putchar(' ');
-                printf("#%d: ret:  %s at %x to %x\n", ftop, func[i].name, pc, dnpc);
+                Log("#%d: ret:  %s at %x to %x", ftop, func[i].name, pc, dnpc);
                 ftop--;
             }
         }

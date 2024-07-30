@@ -41,6 +41,9 @@
 #define FLASH_SIZE 0x10000000
 #define PSRAM_BASE 0x80000000
 #define PSRAM_SIZE 0x20000000
+#define SDRAM_BASE 0xa0000000
+#define SDRAM_SIZE 0x20000000
+
 
 #define ysyxSoC
 // #define MROM_LOAD
@@ -64,7 +67,7 @@ int npc_ret;
 static unsigned long long cycles = 0, insts = 0;
 bool difftest_is_enable = 0;
 bool is_batch_mode = 0;
-bool is_itrace = 0;
+bool is_itrace = 1;
 char logbuf[128];
 static uint64_t boot_time = 0;
 static uint64_t rtc_us = 0;
@@ -322,10 +325,11 @@ extern "C" void sdram_read(char bank, short row, short col, short *odata, char m
     if (mask & (1 << i)) {
       short delta = (short)sdram[bank][row][col][i];
       res += delta << (i * 8);
-      printf ("sdram read data = %d at bank=%d row=%d col=%d i = %d mask = %d\n", delta, bank, row, col, i, mask);
+    //  if (bank == 2 && row == 0 && col > 285 && col < 289)
+      //printf ("sdram read data = %d at bank=%d row=%d col=%d i = %d mask = %d\n", delta, bank, row, col, i, mask);
     }
   }
-  printf("sdram read res = 0x%x\n", res);
+  //printf("sdram read res = 0x%x\n", res);
   *odata = res;
 }
 
@@ -333,7 +337,8 @@ extern "C" void sdram_write(char bank, short row, short col, short idata, char m
   assert(bank >= 0 && bank <= 3);
   assert(row >= 0 && row < 8152);
   assert(col >= 0 && col < 512);
-  printf("sdram write idata = %d at bank=%d row=%d col=%d mask = %d\n", idata, bank, row, col, mask);
+  //if (bank == 2 && row == 0 && col > 285 && col < 289)
+  //printf("sdram write idata = %d at bank=%d row=%d col=%d mask = %d\n", idata, bank, row, col, mask);
   for (int i = 0; i < 2; i++) {
     if (mask & (1 << i)) {
       sdram[bank][row][col][i] = (0xff & (idata >> (i * 8)));
@@ -461,8 +466,14 @@ static void single_cycle() {
   word_t npc = topp->io_npc;
   
   //static word_t nz_pc = 0, nz_npc = 0;
-  if (pc != 0) nz_pc = pc;
-  if (npc != 0) nz_npc = npc;
+  if (pc != 0) {
+   // Log("last nz_pc = %08x, new nz_pc = pc = %08x", nz_pc, pc);
+    nz_pc = pc;
+  }
+  if (npc != 0) {
+    //Log("last nz_npc = %08x, new nz_npc = pc = %08x", nz_npc, npc);
+    nz_npc = npc;
+  }
   // #endif
 
 #ifdef VCD
@@ -486,10 +497,7 @@ static void single_cycle() {
       memset(p, ' ', space_len);
       p += space_len;
       disassemble(p, logbuf + sizeof(logbuf) - p, pc, inst, ilen);
-      if (ftrace_is_enable()) {
-        word_t reg_val = Rread(1);
-        ftrace(pc, npc, iringbuf.inst[iringbuf.cur], reg_val);
-      }
+      
       for (int i = 0; i < 32; i++) {
         cpu.gpr[i] = Rread(i);
       }
@@ -501,7 +509,15 @@ static void single_cycle() {
       }
       trace_and_difftest(nz_pc, nz_npc);
     }
+    //if (npc)
+    //  Log ("npc = %08x, nz_pc = %08x, nz_npc = %08x\n", npc, nz_pc, nz_npc);
+    if (ftrace_is_enable() && npc != 0) {
+        word_t reg_val = Rread(1);
+        if (nz_pc != nz_npc)
+          ftrace(nz_pc, nz_npc, iringbuf.inst[iringbuf.cur], reg_val);
+    }
   }
+
   //sleep(1);
 // #endif
 }

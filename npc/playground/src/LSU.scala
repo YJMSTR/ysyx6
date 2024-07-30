@@ -170,9 +170,9 @@ class ysyx_23060110_LSU extends Module {
     is(r_wait_rvalid){ // rready = 1
       when(io.axi4_to_arbiter.rvalid){
         readData := io.axi4_to_arbiter.rdata >> (8.U * offsetreg)
-        when (readAddr >= SDRAM_BASE.U && readAddr < (SDRAM_BASE + SDRAM_SIZE).U) {
-          printf("lsu sdram unaligned raddr = %x rdata = %x  aligned rdata = %x rresp == %d\n" , readAddr, io.axi4_to_arbiter.rdata, io.axi4_to_arbiter.rdata >> (8.U * offsetreg), io.axi4_to_arbiter.rresp)
-        }
+        //when (readAddr >= SDRAM_BASE.U && readAddr < (SDRAM_BASE + SDRAM_SIZE).U) {
+        // printf("lsu  unaligned raddr = %x rdata = %x  aligned rdata = %x rresp == %d\n" , readAddr, io.axi4_to_arbiter.rdata, io.axi4_to_arbiter.rdata >> (8.U * offsetreg), io.axi4_to_arbiter.rresp)
+        //}
         when(io.axi4_to_arbiter.rresp === 0.U) {
           r_state := r_idle
           reqr := 0.B
@@ -196,8 +196,8 @@ class ysyx_23060110_LSU extends Module {
   w_is_sram := io.in.bits.waddr >= SRAM_BASE.U && io.in.bits.waddr < (SRAM_BASE + SRAM_SIZE).U
   w_is_psram := io.in.bits.waddr >= PSRAM_BASE.U && io.in.bits.waddr < (PSRAM_BASE + PSRAM_SIZE).U
   w_is_sdram := io.in.bits.waddr >= SDRAM_BASE.U && io.in.bits.waddr < (SDRAM_BASE + SDRAM_SIZE).U
-  // 目前只有 sram 和 psram 可以写入，因此不考虑其它设备
-  val awaddr_unalign_offset = Mux(w_is_sram | w_is_psram | w_is_sdram, io.in.bits.waddr(2, 0),  0.U)
+
+  val awaddr_unalign_offset = Mux(w_is_sram | w_is_psram, io.in.bits.waddr(2, 0), Mux(w_is_sdram, io.in.bits.waddr(2, 0), 0.U))
 
   
 
@@ -224,9 +224,9 @@ class ysyx_23060110_LSU extends Module {
         // when (awaddr_unalign_offset =/= 0.U) { 
 
         //   // 非对齐写入
-        when (w_is_sdram) {
-          printf("\nwaddr = %x unalign offset = %x wdata = %x pc = %x\n\n\n\n\n", io.in.bits.waddr, awaddr_unalign_offset, io.in.bits.wdata, io.in.bits.pc)
-        }
+        //when (w_is_sdram) {
+        //printf("\nwaddr = %x unalign offset = %x wdata = %x pc = %x\n\n\n\n\n", io.in.bits.waddr, awaddr_unalign_offset, io.in.bits.wdata, io.in.bits.pc)
+        //}
         writeAddr := io.in.bits.waddr
         writeData := io.in.bits.wdata << (awaddr_unalign_offset * 8.U)
         writeSize := MuxLookup(io.in.bits.wmask, 2.U, Seq(

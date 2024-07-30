@@ -6,6 +6,7 @@ MEMORY {
   boot_flash(rx): ORIGIN = 0x30000000, LENGTH = 0x4000
   app_flash(rx): ORIGIN = 0x30004000, LENGTH = 0x0fffc000
   psram(rwx) : ORIGIN = 0x80000000, LENGTH = 4M
+  sdram(rwx) : ORIGIN = 0xa0000000, LENGTH = 32M /*0x02000000*/
 }
 
 __boot_flash_start__ = ORIGIN(boot_flash);
@@ -28,28 +29,31 @@ SECTIONS {
     __text_bootloader_end__ = .;
   } > sram AT> boot_flash
   __text_bootloader_load_start__ = LOADADDR(.text_bootloader);
-  .text : ALIGN(8) {
+  .text : ALIGN(4) {
     text_start = .;
     __text_and_rodata_start__ = .;
     *(.text*)
 /*  } > flash AT> flash */ 
-  } > psram AT> app_flash
+  } > sdram AT> app_flash
   etext = .;
   _etext = .;
   .rodata : ALIGN(4) {
     *(.rodata*)
+    . = ALIGN(4);
     *(.srodata*)
     . = ALIGN(4);
-    data_start = .;
     __text_and_rodata_end__ = .;
-  } > psram AT> app_flash
+  } > sdram AT> app_flash
    __app_text_and_rodata_load_start__ = LOADADDR(.text);
   /*. = .;*/
 
-  .data : {
+  data_start = .;
+  .data : ALIGN(8) {
     *(.data*)
+    . = ALIGN(8);
     *(.sdata*)
-  } > psram AT> app_flash
+    . = ALIGN(8);
+  } > sdram AT> app_flash
   edata = .;
   _data = .;
   .bss : {
@@ -58,7 +62,7 @@ SECTIONS {
     *(.sbss*)
     _bss_end = .;
     *(.scommon)
-  } > psram AT> app_flash
+  } > sdram AT> app_flash
   data_end = .;
   data_load_start = LOADADDR(.data);
   /*data_extra_load_start = LOADADDR(.data.extra);*/
