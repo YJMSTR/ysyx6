@@ -337,8 +337,8 @@ extern "C" void sdram_write(char bank, short row, short col, short idata, char m
   assert(bank >= 0 && bank <= 3);
   assert(row >= 0 && row < 8152);
   assert(col >= 0 && col < 512);
-  //if (bank == 2 && row == 0 && col > 285 && col < 289)
-  //printf("sdram write idata = %d at bank=%d row=%d col=%d mask = %d\n", idata, bank, row, col, mask);
+  //if (idata == 0x0284)
+  //  printf("sdram write idata = %x at bank=%x row=%x col=%x mask = %x\n", idata, bank, row, col, mask);
   for (int i = 0; i < 2; i++) {
     if (mask & (1 << i)) {
       sdram[bank][row][col][i] = (0xff & (idata >> (i * 8)));
