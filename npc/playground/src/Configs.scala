@@ -23,7 +23,9 @@ object Configs {
   val FLASH_SIZE            = 0x10000000L
   val UART_BASE             = 0x10000000L
   val UART_SIZE             = 0x7L           // 一共 7 个 8 字节的 UART16550 寄存器
-  val RTC_ADDR              = CLINT_BASE 
+  val RTC_ADDR              = CLINT_BASE
+  val GPIO_BASE             = 0x1000_2000L
+  val GPIO_SIZE             = 0x1000_200fL
 
 // #define CSR_MTVEC   0x305
 // #define CSR_MEPC    0x341
