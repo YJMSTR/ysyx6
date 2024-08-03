@@ -1,6 +1,6 @@
 #include "VysyxSoCFull.h"
 // #include "verilated_vcd_c.h"
-// #include <nvboard.h>
+#include <nvboard.h>
 #include <unistd.h>
 #include "verilated.h"
 #include "VysyxSoCFull__Dpi.h"
@@ -49,7 +49,7 @@
 // #define MROM_LOAD
 #define FLASH_LOAD
 // #define FLASH_CHAR_TEST 1
-
+static TOP_NAME top;
 #ifndef CONFIG_ITRACE_RINGBUFFER_SIZE
   #define CONFIG_ITRACE_RINGBUFFER_SIZE 16
 #endif
@@ -67,14 +67,14 @@ int npc_ret;
 static unsigned long long cycles = 0, insts = 0;
 bool difftest_is_enable = 0;
 bool is_batch_mode = 0;
-bool is_itrace = 1;
+bool is_itrace = 0;
 char logbuf[128];
 static uint64_t boot_time = 0;
 static uint64_t rtc_us = 0;
 static uint64_t nz_pc = 0;
 static uint64_t nz_npc = 0;
 
-// void nvboard_bind_all_pins(VysyxSoCFull *top);
+void nvboard_bind_all_pins(VysyxSoCFull *top);
 const char *regs[] = {
   "$0", "ra", "sp", "gp", "tp", "t0", "t1", "t2",
   "s0", "s1", "a0", "a1", "a2", "a3", "a4", "a5",
@@ -283,7 +283,7 @@ extern "C" void flash_read(int addr, int *data) {
 }
 extern "C" void mrom_read(int addr, int *data) {
   // *data = 0x00100073;	//ebreak
-  addr &= (~0x2ull);  // mrom 按4字节对齐
+  addr &= (~0x2ull);  // mrom 按 4 字节对齐
   word_t res = 0;
   for (int i = 0; i < 4; i++) {
     res = res + ((word_t)mrom[addr-MROM_BASE+i] << (i*8));
@@ -534,7 +534,7 @@ static void reset(int n) {
   npc_state = NPC_RUN;
   topp->reset = 1;
   for (int i = 0; i < n; i++)
-    single_cycle();           // 此时我的 single_cycle 已经不是 single_cycle,而是执行一条指令了，所以会有很多个周期？
+    single_cycle();           // 此时我的 single_cycle 已经不是 single_cycle，而是执行一条指令了，所以会有很多个周期？
   topp->reset = 0;
 
   // // while (n-- > 0) {
@@ -640,6 +640,7 @@ void cpu_exec(uint32_t n) {
     #ifndef ysyxSoC
     cpu.pc = topp->io_pc;
     #endif
+    nvboard_update();
     single_cycle();
     if (npc_state != NPC_RUN) break;
   }
@@ -680,8 +681,8 @@ int sim_main(int argc, char** argv) {
   topp->trace(tfp, 99); // Trace 99 levels of hierarchy
   tfp->open("logs/wave.vcd");
 #endif
-	// nvboard_bind_all_pins(&top);
-	// nvboard_init();
+  nvboard_bind_all_pins(topp);
+  nvboard_init();
   if (argc > 1) {
     img_file = argv[1];
       
@@ -697,7 +698,7 @@ int sim_main(int argc, char** argv) {
   if (ftrace_is_enable())
     init_ftrace(elf_file);
 
-  printf("\033[0m\033[1;34mnpc将会先进行reset\033[0m\n");
+  printf("\033[0m\033[1;34mnpc 将会先进行 reset\033[0m\n");
   npc_ret = 1;
   
   sdb_mainloop();
@@ -712,6 +713,6 @@ int sim_main(int argc, char** argv) {
   tfp->close();
   tfp = nullptr;
 #endif
-  // nvboard_quit();
+  nvboard_quit();
   return npc_ret;
 }
