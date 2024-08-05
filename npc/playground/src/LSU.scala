@@ -193,11 +193,14 @@ class ysyx_23060110_LSU extends Module {
   val w_is_sram = WireInit(0.B)
   val w_is_psram = WireInit(0.B)
   val w_is_sdram = WireInit(0.B)
+  val w_is_uart  = WireInit(0.B)
   w_is_sram := io.in.bits.waddr >= SRAM_BASE.U && io.in.bits.waddr < (SRAM_BASE + SRAM_SIZE).U
   w_is_psram := io.in.bits.waddr >= PSRAM_BASE.U && io.in.bits.waddr < (PSRAM_BASE + PSRAM_SIZE).U
   w_is_sdram := io.in.bits.waddr >= SDRAM_BASE.U && io.in.bits.waddr < (SDRAM_BASE + SDRAM_SIZE).U
+  w_is_uart :=  io.in.bits.waddr >= UART_BASE.U && io.in.bits.waddr < (UART_SIZE + UART_BASE).U
   // 因为 axi4toapb 将 64 位转 32 位，会根据 waddr (2) 取 wstrb 的高 4 位或低 4 位，因此写入要按 8 字节对齐
-  val awaddr_unalign_offset = Mux(w_is_sram | w_is_psram | w_is_sdram, io.in.bits.waddr(2, 0), 0.U)
+  val awaddr_unalign_offset = Mux(w_is_sram | w_is_psram | w_is_sdram, io.in.bits.waddr(2, 0), Mux(is_uart, io.in.bits.waddr(1, 0), 0.U))
+ 
 
   
 

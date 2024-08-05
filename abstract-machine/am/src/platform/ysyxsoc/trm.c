@@ -27,9 +27,9 @@ void uart_16550_init() {
   // outb(UART_16550_IER, 0);
   outb(UART_16550_FCR, 0xc7u);
   outb(UART_16550_LCR, 0x83u);
-  outb(SERIAL_PORT + 1, 1);
+  outb(SERIAL_PORT + 1, 0);
   outb(SERIAL_PORT    , 1);
-  outb(UART_16550_LCR, 0b00000011);
+  outb(UART_16550_LCR, 3);
 }
 
 void putch(char ch) {

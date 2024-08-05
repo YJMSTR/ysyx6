@@ -67,7 +67,7 @@ int npc_ret;
 static unsigned long long cycles = 0, insts = 0;
 bool difftest_is_enable = 0;
 bool is_batch_mode = 0;
-bool is_itrace = 0;
+bool is_itrace = 1;
 char logbuf[128];
 static uint64_t boot_time = 0;
 static uint64_t rtc_us = 0;
@@ -533,8 +533,9 @@ static bool resetted = false;
 static void reset(int n) {  
   npc_state = NPC_RUN;
   topp->reset = 1;
-  for (int i = 0; i < n; i++)
-    single_cycle();           // 此时我的 single_cycle 已经不是 single_cycle，而是执行一条指令了，所以会有很多个周期？
+  for (int i = 0; i < n; i++) {
+    single_cycle();
+  }
   topp->reset = 0;
 
   // // while (n-- > 0) {
