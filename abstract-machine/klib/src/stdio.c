@@ -27,6 +27,11 @@ int vsprintf(char *out, const char *fmt, va_list ap) {
     if (fmt[i] == '%') {
       if (i + 1 < len) {
         switch (fmt[i+1]) {
+          case 'c':
+            char ch = va_arg(ap, int);
+            out[cur++] = ch;
+            i++;
+            break;
           case 'd': 
             int tmp = va_arg(ap, int);
             char stk[100];

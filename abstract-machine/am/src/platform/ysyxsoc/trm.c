@@ -3,18 +3,18 @@
 #include <klib.h>
 #include <ysyxsoc.h>
 
-extern char _heap_start;
-extern unsigned int _heap_size;
+extern const unsigned char _heap_start;
+extern const unsigned char _heap_end;
 
 int main(const char *args);
 
 extern char _pmem_start;
+
+
 #define PMEM_SIZE (8 * 1024)
 #define PMEM_END  ((uintptr_t)&_pmem_start + PMEM_SIZE)
-// warning: 0x300000 is current heap size 
-#define HEAP_SIZE 0xe00000
-#define HEAP_END  ((uintptr_t)&_heap_start + HEAP_SIZE)
-Area heap = RANGE(&_heap_start, HEAP_END);
+
+Area heap = RANGE((uintptr_t)&_heap_start, (uintptr_t)&_heap_end);
 #ifndef MAINARGS
 #define MAINARGS ""
 #endif
@@ -38,7 +38,7 @@ void putch(char ch) {
     serial_initted = 1;
   }
   while ((inb(UART_16550_LSR) & 0b1000000) == 0) {
-    outb(UART_16550_FCR, inb(UART_16550_FCR) | 0b110);
+    outb(UART_16550_FCR, inb(UART_16550_FCR) | 0b100);
   }
   outb(SERIAL_PORT, ch);
 }
@@ -63,8 +63,8 @@ void _trm_init() {
   }
   printf("%d\n", (int)ysyx_no);
   printf("mainargs=%s\n", mainargs);
-  printf("pmem start = %x\n", &_pmem_start);
-  printf("heap [%x, %x], addr of _heap_start = %x %x\n", heap.start, heap.end, _heap_start, &_heap_start);
+  printf("pmem [%x, %x]\n", &_pmem_start, PMEM_END);
+  printf("heap [%x, %x], &_heap_start = %x &_heap_end = %x\n", heap.start, heap.end, &_heap_start, &_heap_end);
   int ret = main(mainargs);
   halt(ret);
 }

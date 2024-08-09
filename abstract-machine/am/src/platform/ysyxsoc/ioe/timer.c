@@ -2,6 +2,7 @@
 #include <ysyxsoc.h>
 #include <klib-macros.h>
 
+void __am_timer_config(AM_TIMER_CONFIG_T *cfg) { cfg->present = true; cfg->has_rtc = true; }
 void __am_timer_init() {
   putstr("am_timer_init\n");
 }

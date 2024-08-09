@@ -29,7 +29,7 @@ SECTIONS {
     __text_bootloader_end__ = .;
   } > sram AT> boot_flash
   __text_bootloader_load_start__ = LOADADDR(.text_bootloader);
-  .text : ALIGN(4) {
+  .text : ALIGN(8) {
     text_start = .;
     __text_and_rodata_start__ = .;
     *(.text*)
@@ -46,7 +46,7 @@ SECTIONS {
   } > sdram AT> app_flash
    __app_text_and_rodata_load_start__ = LOADADDR(.text);
   /*. = .;*/
-
+  . = ALIGN(8);
   data_start = .;
   .data : ALIGN(8) {
     *(.data*)
@@ -56,10 +56,12 @@ SECTIONS {
   } > sdram AT> app_flash
   edata = .;
   _data = .;
-  .bss : {
+  .bss : ALIGN(4) {
     _bss_start = .;
     *(.bss*)
+    . = ALIGN(4);
     *(.sbss*)
+    . = ALIGN(4);
     _bss_end = .;
     *(.scommon)
   } > sdram AT> app_flash

@@ -14,6 +14,7 @@ AM_SRCS := platform/ysyxsoc/trm.c \
 					 platform/ysyxsoc/bootloader.c \
 					 riscv/ysyxsoc/start.S \
 					 platform/ysyxsoc/ioe/ioe.c \
+					 platform/ysyxsoc/ioe/uart.c \
 					 platform/ysyxsoc/ioe/timer.c \
            riscv/ysyxsoc/input.c \
            riscv/ysyxsoc/cte.c \
@@ -27,7 +28,7 @@ CFLAGS    += -fdata-sections -ffunction-sections
 LDFLAGS   += -T $(AM_HOME)/scripts/ysyxsoc-linker.ld \
 						 --defsym=_pmem_start=0x30000000 --defsym=_entry_offset=0x0 \
 						 --defsym=_stack_top=0x0f001000 --defsym=_stack_pointer=0x0f002000 \
-						 --defsym=_heap_start=0xa1100000 --defsym=_heap_size=0xe00000
+						 --defsym=_heap_start=0xa1100000 --defsym=_heap_end=0xa1f00000
 LDFLAGS   += --gc-sections -e _start
 CFLAGS += -DMAINARGS=\"$(mainargs)\"
 CFLAGS += -I$(AM_HOME)/am/src/platform/ysyxsoc/include
