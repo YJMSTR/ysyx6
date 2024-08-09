@@ -39,15 +39,14 @@ SECTIONS {
   _etext = .;
   .rodata : ALIGN(4) {
     *(.rodata*)
-    . = ALIGN(4);
     *(.srodata*)
-    . = ALIGN(4);
+    . = ALIGN(8);
     __text_and_rodata_end__ = .;
+    data_start = .;
   } > sdram AT> app_flash
    __app_text_and_rodata_load_start__ = LOADADDR(.text);
   /*. = .;*/
   . = ALIGN(8);
-  data_start = .;
   .data : ALIGN(8) {
     *(.data*)
     . = ALIGN(8);
@@ -59,15 +58,13 @@ SECTIONS {
   .bss : ALIGN(4) {
     _bss_start = .;
     *(.bss*)
-    . = ALIGN(4);
     *(.sbss*)
-    . = ALIGN(4);
     _bss_end = .;
     *(.scommon)
   } > sdram AT> app_flash
   data_end = .;
   data_load_start = LOADADDR(.data);
-  /*data_extra_load_start = LOADADDR(.data.extra);*/
+  data_extra_load_start = LOADADDR(.data.extra);
   end = .;
   _end = .;
   /* _stack_top and _heap_start are defined in LD_FLAGS */

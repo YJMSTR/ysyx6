@@ -12,7 +12,7 @@ void __am_uart_rx(AM_UART_RX_T *rx) {
   while (!(inb(UART_16550_LSR) & 1)) {
   }
   char c = inb(SERIAL_PORT);
-  if (c >= 127 || c < 32) {
+  if (c > 127 || c < 0) {
     rx->data = 0xff;
   } else {
     rx->data = c;
